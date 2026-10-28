@@ -97,6 +97,24 @@ python benchmark.py --data data/100k --mode numba-steps --workers 4 --runs 20
 
 Repeat at 1, 2, 4 and 8 workers, ideally alternating the order of modes across trials. The three Go modes all preserve the same formulas, output shapes, shared input arrays, and reconciliation checks. The new mode is not yet measured; it is not evidence that Go is faster. This remains a kernel-only comparison.
 
+## Concurrent heavy-job stress test (Numba versus Go)
+
+The original benchmarks measure **one attribution job** with parallel processing of days. This additional experiment measures **10 independent attribution jobs**, allowing up to 4 jobs to compute simultaneously (4 total compute workers, each job using one native compute thread). The same 100k-security × 252-day dataset is reused as **shared read-only input**. Each active job gets separate, preallocated output arrays. This compares concurrent-job throughput; it does **not** model 10 unique user portfolios or independent data-loading overheads.
+
+Run from the repository root after `git pull origin main`:
+
+```bash
+go build -o benchmark-multijob ./cmd/multijob
+python multi_job.py --data data/100k --jobs 10 --concurrency 4 --runs 5
+./benchmark-multijob --data data/100k --jobs 10 --concurrency 4 --runs 5
+```
+
+To stress more jobs without increasing simultaneous output-memory allocations, try `--jobs 20` and `--jobs 50`, keeping `--concurrency 4`. Compare **median wall-clock duration for all jobs** and **completed jobs/second**, not the single-job kernel times. The tests exclude input reading, Numba compilation, and output allocation, but include job scheduling and completion. Jobs share read-only inputs and recycle their assigned output buffers; this measures repeated independent jobs against the *same fixture*, not ten distinct gigabyte-scale datasets.
+
+**Memory warning:** Each 100k job's output pair is ~403 MB. Four simultaneously active jobs need about **1.61 GB of output arrays**, in addition to ~806 MB of shared inputs and runtime/OS overhead. Go holds all four input arrays in memory; Python memory-maps them, but still depends on system cache and available memory. Start at `--concurrency 2` if the machine is memory-constrained. Increasing `--jobs` alone does not increase output buffer count.
+
+Results for this concurrency experiment are **not measured yet**.
+
 ## Historical results
 
 [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) documents the initial run, when the NumPy baseline was non-threaded and the earlier generator was in use. Those measured results remain historically valid, but the new threaded NumPy mode needs a fresh comparison. Do not present the historical NumPy timing as the performance of threaded NumPy.
