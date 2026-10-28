@@ -295,3 +295,16 @@ The following are **new, separately measured** three-run medians. They are not r
 For 8-way concurrency, Python run times were 1.415297, 1.404686, and 1.354559 seconds; Go run times were 1.332458, 1.369115, and 1.292645 seconds. For the new 4-way concurrency rerun, Python times were 2.106546, 2.070487, and 2.075145 seconds; Go times were 1.993502, 1.979829, and 1.993942 seconds.
 
 Doubling concurrency from 4 to 8 reduced median elapsed time by 32.31% for Numba and 33.16% for Go, for this ten-job workload. Results depend on machine cores, scheduling, and memory bandwidth, and do not prove linear scaling. Checksums agree within floating-point precision (approximately 10.001438846829325).
+
+## Brinson–Fachler CSV benchmark: first measured result (single run)
+
+Two independently shuffled, keyed CSV files (portfolio and benchmark), each holding 3,780,000 security-day rows across 15,000 securities and 252 trading days, with 20 segments. The three-effect Brinson–Fachler calculation includes CSV reading, joining by (date, security_id), segment aggregation, allocation/selection/interaction tasks, and reconciliation.
+
+| Runtime | Elapsed wall time | Auto-detected workers | Segment-days | Effect tasks |
+|---|---:|---:|---:|---:|
+| Python (threaded standard-Python effect functions) | 8.604416 s | 12 | 5,040 | 15,120 |
+| **Go (goroutine effect functions)** | **1.986352 s** | 12 | 5,040 | 15,120 |
+
+Go took **76.9% less elapsed time** (about **4.33× faster**) in this *single* measured run. Both calculations reported matching attribution totals within floating-point tolerance: allocation ≈ 0.00001731259925; selection ≈ 0.001058394418; interaction ≈ 0.00003902220444.
+
+**Interpretation constraints:** Not a direct comparison of equally efficient CPU parallelism. The Python runner parses CSVs and aggregates segments in Python, and its effect tasks are Python threads (so GIL-bound). Go also uses its own native CSV parser and goroutines. Both detected 12 workers, but that is not proof of equal CPU utilization. Timings include CSV processing but exclude CSV *generation*. The current scheduler finishes the daily benchmark-total aggregation before starting selection/interaction effects, even though those effects do not mathematically depend on it. Repeat and alternate execution order for stable results; do not compare this end-to-end timing directly against historical binary kernel-only timing.
