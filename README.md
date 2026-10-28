@@ -189,6 +189,20 @@ The outputs include detected workers, processed security-day records, elapsed ti
 
 **Design boundaries:** The streaming reader requires the dates to appear in identical contiguous groups in both files; only *security row ordering within a date* can differ. The dataset has matching securities in both files; unmatched holdings or benchmark names are rejected, not treated as zero. One pair of effect tasks per trading day prevents millions of tiny queued tasks, so **security-level work inside each effect is still processed as a batch**. Worker selection is CPU-based, not a measured memory-bandwidth optimum. For an entirely order-independent cross-day ingestion pipeline or dynamic memory-aware scheduling, more work is required. **No measured CSV timings have been recorded.**
 
+## Fully independent security-day effect tasks (new experiment)
+
+The earlier `csv_attribution.py` and `cmd/csvattribution` dispatched **one allocation task and one selection task per day**. That grouped all securities together. The newer `csv_finegrain.py` and `cmd/csvfinegrain` dispatch **separate allocation and selection tasks for every (date, security_id)** after joining the two shuffled CSV inputs on those keys. There is no ordering constraint across days, securities or effects. CPU worker availability is auto-detected; neither runner requires a manually chosen worker count. Python uses `multiprocessing` (not GIL-bound Python threads) and Go uses goroutines. Both report total tasks, worker count and elapsed time. The Python queue is bounded to avoid accumulating millions of futures. This benchmark **deliberately tests the scheduling cost of the smallest independently runnable arithmetic units**; it is likely substantially slower than batching because each individual effect only performs a few operations.
+
+```bash
+git pull origin main
+python generate_csv.py --securities 100 --days 5 --output data/csv-small
+go build -o benchmark-csv-finegrain ./cmd/csvfinegrain
+python csv_finegrain.py --data data/csv-small
+./benchmark-csv-finegrain --data data/csv-small
+```
+
+The implementation loads the CSVs into keyed maps first. At 100k securities × 252 days, each file contains 25.2 million rows and the maps can exhaust laptop RAM; **do not run that scale before a streaming/partitioned join is built**. It is also intentionally not an optimized performance comparison: millions of tiny messages cost time. All results remain unmeasured pending local execution. Dates and securities may occur in arbitrary row orders in the two input files; the join is keyed, not positional. Both sides must contain matching keys, and duplicate keys are errors.
+
 ## Historical results
 
 [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) documents the initial run, when the NumPy baseline was non-threaded and the earlier generator was in use. Those measured results remain historically valid, but the new threaded NumPy mode needs a fresh comparison. Do not present the historical NumPy timing as the performance of threaded NumPy.
