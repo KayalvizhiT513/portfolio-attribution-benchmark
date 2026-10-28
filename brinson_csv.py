@@ -33,13 +33,16 @@ def effect(name,wp,wb,rp,rb,benchmark):
     return name,(wp-wb)*(rb-benchmark)
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument("--data",default="data/brinson-15k");a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument("--data",default="data/brinson-15k");p.add_argument("--output",default="results/brinson-python.csv");a=p.parse_args()
     started=time.perf_counter()
     cpu=os.process_cpu_count() if hasattr(os,"process_cpu_count") else os.cpu_count()
     workers=max(1,cpu or 1)
     totals={"allocation":0.0,"selection":0.0,"interaction":0.0}
     days=securities=segments_processed=0
-    with ThreadPoolExecutor(max_workers=workers) as pool:
+    output=Path(a.output);output.parent.mkdir(parents=True,exist_ok=True)
+    with output.open("w",newline="") as outfile, ThreadPoolExecutor(max_workers=workers) as pool:
+        writer=csv.writer(outfile)
+        writer.writerow(["date","segment_id","allocation","selection","interaction","total"])
         for pday,bday in zip_longest(groups(Path(a.data)/"portfolio.csv"),groups(Path(a.data)/"benchmark.csv")):
             if pday is None or bday is None:raise ValueError("different day sets")
             date,pr=pday;date2,br=bday
@@ -57,24 +60,32 @@ def main():
             # R_b is now ready. Selection and interaction do not use it.
             # Effects for all segments can be submitted independently.
             jobs=[]
-            for wp,wb,pcontrib,bcontrib in agg.values():
+            for segment,(wp,wb,pcontrib,bcontrib) in agg.items():
                 rp=pcontrib/wp if wp else 0.0
                 rb=bcontrib/wb if wb else 0.0
                 # Dataset generator ensures both universes have positive segment weights.
                 if wp<=0 or wb<=0:raise ValueError("zero-weight segment not supported")
-                jobs.append(pool.submit(effect,"selection",wp,wb,rp,rb,None))
-                jobs.append(pool.submit(effect,"interaction",wp,wb,rp,rb,None))
-                jobs.append(pool.submit(effect,"allocation",wp,wb,rp,rb,benchmark_return))
+                jobs.append((segment,pool.submit(effect,"selection",wp,wb,rp,rb,None)))
+                jobs.append((segment,pool.submit(effect,"interaction",wp,wb,rp,rb,None)))
+                jobs.append((segment,pool.submit(effect,"allocation",wp,wb,rp,rb,benchmark_return)))
             daytotal=0.0
-            for future in as_completed(jobs):
+            by_segment={seg:{} for seg in agg}
+            future_to_segment={future:segment for segment,future in jobs}
+            for future in as_completed(future_to_segment):
                 name,val=future.result()
+                by_segment[future_to_segment[future]][name]=val
                 totals[name]+=val;daytotal+=val
             if not math.isclose(daytotal,portfolio_return-benchmark_return,rel_tol=1e-8,abs_tol=1e-10):
                 raise ValueError(f"Brinson reconciliation failed: {date}")
+            for seg in sorted(by_segment):
+                effects=by_segment[seg]
+                writer.writerow([date,seg,*[format(effects[name],".17g") for name in ("allocation","selection","interaction")],format(sum(effects.values()),".17g")])
             days+=1;securities+=len(pr);segments_processed+=len(agg)
+        outfile.flush()
+        os.fsync(outfile.fileno())
     elapsed=time.perf_counter()-started
     print(json.dumps({"language":"python","mode":"brinson-fachler","workers":workers,
       "days":days,"security_day_records":securities,"segment_days":segments_processed,
-      "effect_tasks":3*segments_processed,"totals":totals,
-      "elapsed_seconds":elapsed,"timing_scope":"CSV read+join+segment aggregation+effect tasks+validation"},indent=2))
+      "effect_tasks":3*segments_processed,"totals":totals,"output_csv":str(output),
+      "elapsed_seconds":elapsed,"timing_scope":"CSV input reading+join+aggregation+effect tasks+validation+CSV output write+flush+fsync"},indent=2))
 if __name__=="__main__":main()
