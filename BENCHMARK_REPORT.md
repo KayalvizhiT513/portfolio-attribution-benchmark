@@ -213,3 +213,24 @@ python benchmark.py --mode numba-parallel --workers 8 --runs 20
 ```
 
 **Benchmark provenance:** I executed the Python and Go benchmarks locally on my MacBook Pro and captured the terminal results. The architectural interpretations reflect my analysis of those measurements; I have not completed additional hardware profiling.
+
+## Independent-effect task parallelism experiment (100k, four workers)
+
+I also compared the existing **fused** mode (both effects computed in one pass for each day) against **separate-effect tasks** (allocation and selection independently scheduled, two tasks per day). Both versions use four workers, the same input fixture, preallocated output arrays, and 20 measured runs.
+
+| Language/runtime | Fused median | Separate-effect median | Outcome |
+|---|---:|---:|---|
+| Numba | 6.157 ms | **5.782 ms** | **6.1% lower runtime** for separate effects |
+| Go | **7.661 ms** | 8.539 ms | **11.5% higher runtime** for separate effects |
+
+The numbers reconcile to the same allocation and selection totals. My measured maximum daily reconciliation error is approximately 4.07 × 10⁻²⁰ for Numba and 3.79 × 10⁻¹⁹ for Go.
+
+**Architectural interpretation:** Numba may benefit from finer task scheduling (504 day/effect tasks instead of 252 day tasks). Go's extra task dispatch and separate traversals may outweigh that benefit. These are hypotheses, not conclusions from profiling. The Numba improvement is modest and should be reproduced across interleaved trials. Both cases still use the same number of workers; **task granularity**, not hardware parallelism, changes.
+
+```bash
+python benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
+python benchmark.py --data data/100k --mode numba-steps --workers 4 --runs 20
+./benchmark-go --data data/100k --mode fused --workers 4 --runs 20
+./benchmark-go --data data/100k --mode steps --workers 4 --runs 20
+```
+
