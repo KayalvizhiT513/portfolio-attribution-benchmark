@@ -47,6 +47,7 @@ def effect(name,wp,wb,rp,rb,benchmark):
 def main():
     p=argparse.ArgumentParser();p.add_argument("--data",default="data/brinson-15k");p.add_argument("--output",default="results/brinson-python.csv");a=p.parse_args()
     started=time.perf_counter()
+    cpu_started=time.process_time()
     cpu=os.process_cpu_count() if hasattr(os,"process_cpu_count") else os.cpu_count()
     workers=max(1,cpu or 1)
     totals={"allocation":0.0,"selection":0.0,"interaction":0.0}
@@ -104,9 +105,11 @@ def main():
         os.fsync(outfile.fileno())
         write_time += time.perf_counter()-write_start
     elapsed=time.perf_counter()-started
+    cpu_seconds=time.process_time()-cpu_started
     print(json.dumps({"language":"python","mode":"brinson-fachler","workers":workers,
       "days":days,"security_day_records":securities,"segment_days":segments_processed,
       "effect_tasks":3*segments_processed,"totals":totals,"output_csv":str(output),
       "io_timing":{"input_read_parse_seconds":read_time[0],"output_write_sync_seconds":write_time},
+      "cpu_usage":{"process_cpu_seconds":cpu_seconds,"average_effective_cores":cpu_seconds/elapsed if elapsed else 0.0,"measurement":"process CPU time / wall time; not exact peak concurrent cores"},
       "elapsed_seconds":elapsed,"timing_scope":"CSV input reading+join+aggregation+effect tasks+validation+CSV output write+flush+fsync"},indent=2))
 if __name__=="__main__":main()
