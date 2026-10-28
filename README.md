@@ -57,6 +57,30 @@ The new generator uses a **day-by-day random-number sequence**, so its seed-42 f
 
 At these larger sizes, pay attention to **peak memory, disk space, warm/cold page cache and sustained bandwidth**. A bigger dataset stresses memory and I/O; it does not make the two financial formulas computationally more complex.
 
+## Independent-effect scheduling experiment
+
+The existing **fused** calculation remains the performance baseline. A second mode tests whether scheduling allocation and selection as **independent tasks** on each trading day improves speed. These effects have no dependency on each other, but splitting them may increase reads and scheduling overhead. There is no guarantee it will improve performance.
+
+- **Numba `--mode numba-steps`**: `prange(days * 2)` schedules 504 independent (day, effect) tasks; allocation and selection write disjoint arrays.
+- **Go `--mode steps`**: 504 day/effect tasks in the goroutine worker channel. The original default `--mode fused` runs 252 day tasks.
+- Both preserve preallocated outputs, share read-only input buffers in one process, and run the same mathematical formulas. Their per-day reconciliation check remains active.
+- `--workers` sets the **total** worker budget, not separate workers per formula. Thus this tests **task-level inter-step parallelism** without doubling CPU resources.
+
+Run the paired benchmark against the same existing fixture (do not regenerate it):
+
+```bash
+git pull origin main
+go build -o benchmark-go .
+
+# 100k dataset, 4 workers, 20 runs
+python benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
+python benchmark.py --data data/100k --mode numba-steps --workers 4 --runs 20
+./benchmark-go --data data/100k --mode fused --workers 4 --runs 20
+./benchmark-go --data data/100k --mode steps --workers 4 --runs 20
+```
+
+Repeat with 1, 2 and 8 workers to test whether effects-as-tasks helps at different concurrency levels. Timings are kernel-only, just like the earlier report. The [benchmark report](BENCHMARK_REPORT.md) contains **fused-mode measured results only**; no results for the new steps modes have yet been recorded.
+
 ## Historical results
 
 [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) documents the initial run, when the NumPy baseline was non-threaded and the earlier generator was in use. Those measured results remain historically valid, but the new threaded NumPy mode needs a fresh comparison. Do not present the historical NumPy timing as the performance of threaded NumPy.
