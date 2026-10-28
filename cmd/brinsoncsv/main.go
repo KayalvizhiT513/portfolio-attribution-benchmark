@@ -1,5 +1,5 @@
 package main
-import("encoding/csv";"encoding/json";"flag";"fmt";"io";"math";"os";"path/filepath";"runtime";"strconv";"sync";"time")
+import("bufio";"encoding/csv";"encoding/json";"flag";"fmt";"io";"math";"os";"path/filepath";"runtime";"strconv";"sync";"time")
 type rec struct{segment string;weight,ret float64}
 type reader struct{file *os.File;csv *csv.Reader;next []string;seen map[string]bool}
 func open(path string)*reader{f,e:=os.Open(path);if e!=nil{panic(e)};r:=csv.NewReader(f);h,e:=r.Read();if e!=nil{panic(e)}
@@ -18,9 +18,13 @@ func (r *reader)group()(string,map[string]rec,bool){first:=r.next;r.next=nil
  if v[0]!=day{r.next=v;break};add(v)}
  r.seen[day]=true;return day,rows,true}
 type agg struct{wp,wb,pr,br float64}
-type task struct{kind int;wp,wb,rp,rb,benchmark float64}
-type result struct{kind int;value float64}
-func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");flag.Parse();start:=time.Now()
+type task struct{kind int;segment string;wp,wb,rp,rb,benchmark float64}
+type result struct{kind int;segment string;value float64}
+func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");output:=flag.String("output","results/brinson-go.csv","output CSV path");flag.Parse();start:=time.Now()
+ if e:=os.MkdirAll(filepath.Dir(*output),0755);e!=nil{panic(e)}
+ outFile,e:=os.Create(*output);if e!=nil{panic(e)};defer outFile.Close()
+ buffered:=bufio.NewWriter(outFile);writer:=csv.NewWriter(buffered)
+ if e:=writer.Write([]string{"date","segment_id","allocation","selection","interaction","total"});e!=nil{panic(e)}
  p:=open(filepath.Join(*folder,"portfolio.csv"));defer p.file.Close()
  b:=open(filepath.Join(*folder,"benchmark.csv"));defer b.file.Close()
  workers:=runtime.GOMAXPROCS(0);if workers<1{workers=runtime.NumCPU()}
@@ -31,7 +35,7 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");flag
  switch t.kind{case 0:v=(t.wp-t.wb)*(t.rb-t.benchmark)
  case 1:v=t.wb*(t.rp-t.rb)
  case 2:v=(t.wp-t.wb)*(t.rp-t.rb)}
- results<-result{t.kind,v}}}()}
+ results<-result{t.kind,t.segment,v}}}()}
  go func(){wg.Wait();close(results)}()
  totals:=[]float64{0,0,0};days,securities,segments:=0,0,0
  for{day,pr,pok:=p.group();day2,br,bok:=b.group()
@@ -50,23 +54,33 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");flag
  var dispatch sync.WaitGroup
  dispatch.Add(1)
  go func(){defer dispatch.Done()
- for _,x:=range a{if x.wp<=0||x.wb<=0{panic("zero weight segment")}
+ for segment,x:=range a{if x.wp<=0||x.wb<=0{panic("zero weight segment")}
  rp:=x.pr/x.wp;rb:=x.br/x.wb
- tasks<-task{1,x.wp,x.wb,rp,rb,0}
- tasks<-task{2,x.wp,x.wb,rp,rb,0}
- tasks<-task{0,x.wp,x.wb,rp,rb,retB}
+ tasks<-task{1,segment,x.wp,x.wb,rp,rb,0}
+ tasks<-task{2,segment,x.wp,x.wb,rp,rb,0}
+ tasks<-task{0,segment,x.wp,x.wb,rp,rb,retB}
  }
  }()
  expected:=3*len(a)
- dayTotal:=0.0;for i:=0;i<expected;i++{v:=<-results;totals[v.kind]+=v.value;dayTotal+=v.value}
+ dayTotal:=0.0;bySegment:=make(map[string]*[3]float64,len(a))
+ for i:=0;i<expected;i++{v:=<-results;totals[v.kind]+=v.value;dayTotal+=v.value
+ row:=bySegment[v.segment];if row==nil{row=&[3]float64{};bySegment[v.segment]=row};row[v.kind]=v.value}
+ for segment,row:=range bySegment{
+ total:=row[0]+row[1]+row[2]
+ record:=[]string{day,segment,strconv.FormatFloat(row[0],'g',17,64),strconv.FormatFloat(row[1],'g',17,64),strconv.FormatFloat(row[2],'g',17,64),strconv.FormatFloat(total,'g',17,64)}
+ if e:=writer.Write(record);e!=nil{panic(e)}
+ }
  dispatch.Wait()
  if math.Abs(dayTotal-(retP-retB))>1e-10{panic(fmt.Sprintf("reconciliation failed: %s, %.12g",day,dayTotal-(retP-retB)))}
  days++;securities+=len(pr);segments+=len(a)
  }
  close(tasks);for range results{}
- output:=map[string]any{"language":"go","mode":"brinson-fachler","workers":workers,"days":days,
+ writer.Flush();if e:=writer.Error();e!=nil{panic(e)}
+ if e:=buffered.Flush();e!=nil{panic(e)}
+ if e:=outFile.Sync();e!=nil{panic(e)}
+ report:=map[string]any{"language":"go","mode":"brinson-fachler","workers":workers,"days":days,
  "security_day_records":securities,"segment_days":segments,"effect_tasks":3*segments,
  "totals":map[string]float64{"allocation":totals[0],"selection":totals[1],"interaction":totals[2]},
- "elapsed_seconds":time.Since(start).Seconds(),"timing_scope":"CSV read+join+segment aggregation+effect tasks+validation"}
- data,_:=json.MarshalIndent(output,"","  ");fmt.Println(string(data))
+ "elapsed_seconds":time.Since(start).Seconds(),"output_csv":*output,"timing_scope":"CSV input reading+join+aggregation+effect tasks+validation+CSV output write+flush+fsync"}
+ data,_:=json.MarshalIndent(report,"","  ");fmt.Println(string(data))
 }
