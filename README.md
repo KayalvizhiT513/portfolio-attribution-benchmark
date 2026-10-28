@@ -203,6 +203,26 @@ python csv_finegrain.py --data data/csv-small
 
 The implementation loads the CSVs into keyed maps first. At 100k securities × 252 days, each file contains 25.2 million rows and the maps can exhaust laptop RAM; **do not run that scale before a streaming/partitioned join is built**. It is also intentionally not an optimized performance comparison: millions of tiny messages cost time. All results remain unmeasured pending local execution. Dates and securities may occur in arbitrary row orders in the two input files; the join is keyed, not positional. Both sides must contain matching keys, and duplicate keys are errors.
 
+## Brinson–Fachler three-effect CSV experiment (new; unmeasured)
+
+This is a separate, corrected **segment-level** benchmark, leaving historical synthetic two-effect tests intact. Both `portfolio.csv` and `benchmark.csv` now contain `date,security_id,segment_id,weight,return`. Within each trading date, rows are independently shuffled. The implementations match on date/security ID, confirm that segment IDs agree, aggregate weighted returns to the segment level, then compute:
+
+- Allocation: `(wp_segment - wb_segment) * (Rb_segment - Rb_total)`
+- Selection: `wb_segment * (Rp_segment - Rb_segment)`
+- Interaction: `(wp_segment - wb_segment) * (Rp_segment - Rb_segment)`
+
+The sum of all segment effects must reconcile to the difference between total portfolio and benchmark returns on each day. Workers are selected automatically from detected CPU availability. **Selection and interaction have no mathematical dependency on whole-benchmark return**; allocation does. **Current implementation limitation:** both implementations finish each day's matching and segment aggregation, including calculation of whole-benchmark return, *before* submitting any effect. Thus the mathematical dependency is correctly modeled, but the scheduler does **not yet realize the earliest-start advantage of selection**. Effects are individually scheduled per **segment-day**, not per security-day, because these are segment-level attribution formulas. Truly early selection/interaction dispatch requires incremental segment completion notifications while benchmark totals are still being reduced.
+
+```bash
+git pull origin main
+python generate_brinson_csv.py --securities 15000 --days 252 --segments 20 --output data/brinson-15k
+go build -o benchmark-brinson ./cmd/brinsoncsv
+python brinson_csv.py --data data/brinson-15k
+./benchmark-brinson --data data/brinson-15k
+```
+
+These runs include CSV parse, security key matching, segment aggregation, effect scheduling and reconciliation in the elapsed time; they are **not** comparable directly with historical kernel-only numbers. The files can be large: start at this size, not 100k. Results are pending local validation.
+
 ## Historical results
 
 [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) documents the initial run, when the NumPy baseline was non-threaded and the earlier generator was in use. Those measured results remain historically valid, but the new threaded NumPy mode needs a fresh comparison. Do not present the historical NumPy timing as the performance of threaded NumPy.
