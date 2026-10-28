@@ -24,7 +24,10 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");outp
  if e:=os.MkdirAll(filepath.Dir(*output),0755);e!=nil{panic(e)}
  outFile,e:=os.Create(*output);if e!=nil{panic(e)};defer outFile.Close()
  buffered:=bufio.NewWriter(outFile);writer:=csv.NewWriter(buffered)
+ writeTime:=time.Duration(0)
+ writeStart:=time.Now()
  if e:=writer.Write([]string{"date","segment_id","allocation","selection","interaction","total"});e!=nil{panic(e)}
+ writeTime+=time.Since(writeStart)
  p:=open(filepath.Join(*folder,"portfolio.csv"));defer p.file.Close()
  b:=open(filepath.Join(*folder,"benchmark.csv"));defer b.file.Close()
  workers:=runtime.GOMAXPROCS(0);if workers<1{workers=runtime.NumCPU()}
@@ -38,7 +41,10 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");outp
  results<-result{t.kind,t.segment,v}}}()}
  go func(){wg.Wait();close(results)}()
  totals:=[]float64{0,0,0};days,securities,segments:=0,0,0
- for{day,pr,pok:=p.group();day2,br,bok:=b.group()
+ readTime:=time.Duration(0)
+ for{
+ readStart:=time.Now();day,pr,pok:=p.group();readTime+=time.Since(readStart)
+ readStart=time.Now();day2,br,bok:=b.group();readTime+=time.Since(readStart)
  if pok!=bok{panic("different day sets")};if !pok{break}
  if day!=day2||len(pr)!=len(br){panic("date or security count mismatch")}
  a:=make(map[string]*agg);var totalWp,totalWb,retP,retB float64
@@ -69,19 +75,24 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");outp
  for _,segment:=range segmentIDs{row:=bySegment[segment]
  total:=row[0]+row[1]+row[2]
  record:=[]string{day,segment,strconv.FormatFloat(row[0],'g',17,64),strconv.FormatFloat(row[1],'g',17,64),strconv.FormatFloat(row[2],'g',17,64),strconv.FormatFloat(total,'g',17,64)}
+ writeStart=time.Now()
  if e:=writer.Write(record);e!=nil{panic(e)}
+ writeTime+=time.Since(writeStart)
  }
  dispatch.Wait()
  if math.Abs(dayTotal-(retP-retB))>1e-10{panic(fmt.Sprintf("reconciliation failed: %s, %.12g",day,dayTotal-(retP-retB)))}
  days++;securities+=len(pr);segments+=len(a)
  }
  close(tasks);for range results{}
+ writeStart=time.Now()
  writer.Flush();if e:=writer.Error();e!=nil{panic(e)}
  if e:=buffered.Flush();e!=nil{panic(e)}
  if e:=outFile.Sync();e!=nil{panic(e)}
+ writeTime+=time.Since(writeStart)
  report:=map[string]any{"language":"go","mode":"brinson-fachler","workers":workers,"days":days,
  "security_day_records":securities,"segment_days":segments,"effect_tasks":3*segments,
  "totals":map[string]float64{"allocation":totals[0],"selection":totals[1],"interaction":totals[2]},
- "elapsed_seconds":time.Since(start).Seconds(),"output_csv":*output,"timing_scope":"CSV input reading+join+aggregation+effect tasks+validation+CSV output write+flush+fsync"}
+ "elapsed_seconds":time.Since(start).Seconds(),"output_csv":*output,
+ "io_timing":map[string]float64{"input_read_parse_seconds":readTime.Seconds(),"output_write_sync_seconds":writeTime.Seconds()},"timing_scope":"CSV input reading+join+aggregation+effect tasks+validation+CSV output write+flush+fsync"}
  data,_:=json.MarshalIndent(report,"","  ");fmt.Println(string(data))
 }
