@@ -281,3 +281,17 @@ The full test's three recorded Go times were 2.011192, 1.981683, and 1.976598 se
 python multistage.py --data data/100k --jobs 10 --concurrency 4 --window 20 --runs 3
 ./benchmark-multistage --data data/100k --jobs 10 --concurrency 4 --window 20 --runs 3
 ```
+
+
+### Additional concurrency measurements (10 jobs)
+
+The following are **new, separately measured** three-run medians. They are not replacements for the original four-worker results above.
+
+| Concurrency | Python + Numba median | Go median | Numba throughput | Go throughput | Go elapsed-time advantage |
+|---:|---:|---:|---:|---:|---:|
+| 4 | 2.075145 s | **1.993502 s** | 4.819 jobs/s | 5.016 jobs/s | 3.93% |
+| 8 | 1.404686 s | **1.332458 s** | 7.119 jobs/s | 7.505 jobs/s | 5.14% |
+
+For 8-way concurrency, Python run times were 1.415297, 1.404686, and 1.354559 seconds; Go run times were 1.332458, 1.369115, and 1.292645 seconds. For the new 4-way concurrency rerun, Python times were 2.106546, 2.070487, and 2.075145 seconds; Go times were 1.993502, 1.979829, and 1.993942 seconds.
+
+Doubling concurrency from 4 to 8 reduced median elapsed time by 32.31% for Numba and 33.16% for Go, for this ten-job workload. Results depend on machine cores, scheduling, and memory bandwidth, and do not prove linear scaling. Checksums agree within floating-point precision (approximately 10.001438846829325).
