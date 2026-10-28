@@ -4,6 +4,10 @@ Reproducible synthetic security-level attribution benchmark comparing NumPy, Num
 
 **For benchmarking only:** formulas are not confirmed as the team's production attribution methodology.
 
+## Benchmark report
+
+See [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) for the measured Python/Numba and Go results, multicore scaling, execution architecture, interpretation, and limitations.
+
 ## Input
 15,000 securities in each of portfolio and benchmark, 252 days, and daily weights and returns (15,120,000 float64 values). Daily weights in each universe sum to 1. Benchmark security returns are uniformly distributed between -3% and +3%; portfolio returns are perturbed by up to 5 basis points and clipped to the same range. Seed 42. Python generates binary files which both languages read.
 
