@@ -81,12 +81,12 @@ allocation + selection = portfolio_weight*portfolio_return - benchmark_weight*be
 
 | Mode | Workers | Median (ms) |
 |---|---:|---:|
-| NumPy vectorized | reported as 1 | 2.870 |
+| NumPy (previous non-threaded baseline; superseded) | reported as 1 | 2.870 |
 | Numba serial | 1 | 1.588 |
 | Numba parallel | 4 | 1.206 |
 | Go goroutines | 4 | 1.576 |
 
-The initial five-run test is a useful baseline, but the more extensive 20-run results below should be preferred for worker scaling. NumPy's reported worker count does not establish that its underlying numerical libraries use exactly one OS thread.
+The original NumPy result used the earlier non-threaded implementation. I will replace that comparison with my threaded NumPy 15k measurement once available. The more extensive 20-run results below should be preferred for worker scaling. NumPy's reported worker count does not establish that its underlying numerical libraries use exactly one OS thread.
 
 ### Multicore scaling: 20 measured runs per configuration
 
@@ -146,6 +146,46 @@ The numbers agree to floating-point precision under the benchmark's reconciliati
 
 Before selecting a production engine, benchmark the real multistage custom formulas and capture: end-to-end wall time, stage timings, peak RSS, input/output time, correctness per security-day, hardware/runtime versions, and scaling at larger datasets. It is reasonable to keep Python + Numba as the leading candidate until those results show otherwise.
 
+## 8. Larger dataset: 100,000 securities per universe (4 workers)
+
+I increased the dataset from 15,000 to **100,000 securities per universe**, retaining 252 trading days. The updated day-streaming generator produced **100,800,000 float64 inputs** across four arrays (portfolio and benchmark weights and returns); the kernels produce **50,400,000 float64 effect outputs**. The combined logical input/output array footprint is approximately **1.21 GB** (decimal). I ran each mode for 20 repetitions with four workers on my MacBook Pro.
+
+| Mode | Workers | Median (ms) | Relative runtime vs Numba |
+|---|---:|---:|---:|
+| **Numba parallel** | 4 | **6.031854** | **1.00x** |
+| Go goroutines | 4 | 7.465354 | 1.24x |
+| NumPy threaded | 4 | 11.045771 | 1.83x |
+
+Numba took **19.2% less time than Go** and **45.4% less time than threaded NumPy** for this larger kernel measurement. All three passed the daily reconciliation check: threaded NumPy and Numba reported maximum absolute errors of approximately **4.07 × 10⁻²⁰**; Go reported approximately **3.79 × 10⁻¹⁹**. Their total allocation and selection effects matched to floating-point precision (approximately **−0.0000718324413562** and **0.0000139546228697**, respectively).
+
+### What the larger test tells me
+
+- Numba still has the lowest measured latency in this **four-worker** comparison.
+- Threaded NumPy now participates in multicore execution; it uses multiple separate ufunc passes on each assigned day slice, while Numba and Go calculate both effects in one fused loop. More memory passes are a plausible contributor to its higher latency, **not a proven isolated cause**.
+- At 100k securities, the data size is **6.67x** the earlier 15k dataset. Four-worker Numba median grows from **1.206 ms to 6.032 ms** (about **5.00x**); Go grows from **1.297 ms to 7.465 ms** (about **5.76x**). These use separately generated datasets and are scaling observations rather than controlled microarchitectural explanations.
+- A new 15k **threaded NumPy** result is still **pending**. I should not use the historical 2.870 ms unthreaded NumPy timing as if it were a threaded result.
+- These are still **kernel-only** timings. I have not yet measured input/output wall time, peak RSS, CPU hardware counters, or 100k worker-count scaling.
+
+### Reproduce the 100k test
+
+```bash
+python generate.py --securities 100000 --days 252 --seed 42 --output data/100k
+python benchmark.py --data data/100k --mode numpy-threaded --workers 4 --runs 20
+python benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
+go build -o benchmark-go .
+./benchmark-go --data data/100k --workers 4 --runs 20
+```
+
+### Complete the 15k threaded NumPy comparison
+
+Use the **original** `data/` fixture without regenerating it, so it remains comparable to the historical 15k Numba and Go measurements:
+
+```bash
+python benchmark.py --data data --mode numpy-threaded --workers 4 --runs 20
+```
+
+Once that output is available, I will add the measured median to the 15k comparison. No threaded NumPy 15k result is assumed in this report.
+
 ## 7. Reproduction
 
 ```bash
@@ -153,7 +193,7 @@ python -m pip install -r requirements.txt
 python generate.py --securities 15000 --days 252 --seed 42
 
 # Initial five-run comparison
-python benchmark.py --mode numpy
+python benchmark.py --mode numpy-threaded --workers 4 --runs 20  # new measurement pending
 python benchmark.py --mode numba
 python benchmark.py --mode numba-parallel --workers 4
 go build -o benchmark-go .
@@ -171,4 +211,4 @@ python benchmark.py --mode numba-parallel --workers 8 --runs 20
 ./benchmark-go --workers 8 --runs 20
 ```
 
-**Benchmark provenance:** The Python and Go benchmarks were executed locally on a MacBook Pro on 28 October 2026. Execution times and numerical results were captured from the terminal outputs and provided for analysis. Architectural interpretations are based on these measured results; no separate replication was conducted by the report author.
+**Benchmark provenance:** I executed the Python and Go benchmarks locally on my MacBook Pro and captured the terminal results. The architectural interpretations reflect my analysis of those measurements; I have not completed additional hardware profiling.
