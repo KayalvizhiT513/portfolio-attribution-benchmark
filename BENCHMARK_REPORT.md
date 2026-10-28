@@ -327,3 +327,23 @@ Go's single-run wall time was **4.28× lower** (a **76.6% reduction**). Both exe
 Results were written to `results/brinson-python.csv` and `results/brinson-go.csv` on the user's Mac. The individual CSV rows have not yet been compared automatically; agreement of grand totals alone does not establish every row matches.
 
 These timings are **not** pure arithmetic performance: Python's CSV parsing and segment aggregation use Python loops and its effect tasks use threads. Neither version yet permits selection/interaction to start before whole-benchmark aggregation completes. Repeat runs and separate stage timing would improve diagnostic confidence.
+
+
+## Brinson–Fachler CSV benchmark: measured I/O and CPU use
+
+With full input CSV reading, identifier matching, segment aggregation, three-effect attribution, output CSV writing, flush and sync included, the latest single run on the 15k-security × 252-day fixture produced:
+
+| Metric | Python | Go |
+|---|---:|---:|
+| End-to-end elapsed | 8.480177 s | **1.938839 s** |
+| Input CSV reading + parsing | 7.417040 s | **1.803918 s** |
+| Output CSV writing + flush + fsync | 0.012455 s | **0.008382 s** |
+| Other elapsed time (derived remainder) | 1.050682 s | **0.126540 s** |
+| Detected workers | 12 | 12 |
+| Process CPU time | 8.502312 s | 2.485426 s |
+| Average effective logical CPU equivalents | 1.0026 | 1.2819 |
+
+Go was **4.37× faster** in total wall time, but the input reading/parsing phase already accounts for **87.5%** of Python's time and **93.0%** of Go's time. Therefore these numbers cannot identify a 4.37× speed advantage for the financial arithmetic. Both programs averaged far fewer than 12 CPU equivalents; worker count is configured concurrency, **not measured simultaneously busy cores**. The CPU averages measure process CPU seconds / wall seconds and do not determine peak hardware concurrency.
+
+Output CSV rows are written for each date/segment, but grand-total agreement is not a substitute for automated row-by-row verification. These are one-run observations; alternating repeat runs and stage-level breakdown are recommended. The earlier two-effect binary benchmarks and four-stage simulations are different workloads and not directly comparable.
+
