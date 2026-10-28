@@ -308,3 +308,22 @@ Two independently shuffled, keyed CSV files (portfolio and benchmark), each hold
 Go took **76.9% less elapsed time** (about **4.33× faster**) in this *single* measured run. Both calculations reported matching attribution totals within floating-point tolerance: allocation ≈ 0.00001731259925; selection ≈ 0.001058394418; interaction ≈ 0.00003902220444.
 
 **Interpretation constraints:** Not a direct comparison of equally efficient CPU parallelism. The Python runner parses CSVs and aggregates segments in Python, and its effect tasks are Python threads (so GIL-bound). Go also uses its own native CSV parser and goroutines. Both detected 12 workers, but that is not proof of equal CPU utilization. Timings include CSV processing but exclude CSV *generation*. The current scheduler finishes the daily benchmark-total aggregation before starting selection/interaction effects, even though those effects do not mathematically depend on it. Repeat and alternate execution order for stable results; do not compare this end-to-end timing directly against historical binary kernel-only timing.
+
+## Brinson–Fachler CSV benchmark including output file writing (first measured run)
+
+This updated experiment reads **two independently shuffled CSV inputs**, matches securities by date and security ID, builds segment-level return aggregates, calculates the three Brinson–Fachler effects, reconciles results and writes a **date/segment attribution CSV**. Output flushing and `fsync` are inside the stopwatch. Dataset generation remains excluded.
+
+| Runtime | End-to-end elapsed time | Auto-detected workers | Security-day records | Segment-day output rows |
+|---|---:|---:|---:|---:|
+| Python | 8.439694 s | 12 | 3,780,000 | 5,040 |
+| **Go** | **1.971201 s** | 12 | 3,780,000 | 5,040 |
+
+Go's single-run wall time was **4.28× lower** (a **76.6% reduction**). Both executed 15,120 segment-level effect tasks, and their total allocation, selection and interaction values agree within floating-point precision:
+
+- Allocation ≈ 0.0000173125992512
+- Selection ≈ 0.00105839441769
+- Interaction ≈ 0.000039022204445
+
+Results were written to `results/brinson-python.csv` and `results/brinson-go.csv` on the user's Mac. The individual CSV rows have not yet been compared automatically; agreement of grand totals alone does not establish every row matches.
+
+These timings are **not** pure arithmetic performance: Python's CSV parsing and segment aggregation use Python loops and its effect tasks use threads. Neither version yet permits selection/interaction to start before whole-benchmark aggregation completes. Repeat runs and separate stage timing would improve diagnostic confidence.
