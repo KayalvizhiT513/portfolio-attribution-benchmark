@@ -81,12 +81,13 @@ allocation + selection = portfolio_weight*portfolio_return - benchmark_weight*be
 
 | Mode | Workers | Median (ms) |
 |---|---:|---:|
-| NumPy (previous non-threaded baseline; superseded) | reported as 1 | 2.870 |
+| **NumPy threaded (updated, 20 runs)** | **4** | **1.806** |
+| NumPy non-threaded (historical, 5 runs) | 1 | 2.870 |
 | Numba serial | 1 | 1.588 |
 | Numba parallel | 4 | 1.206 |
 | Go goroutines | 4 | 1.576 |
 
-The original NumPy result used the earlier non-threaded implementation. I will replace that comparison with my threaded NumPy 15k measurement once available. The more extensive 20-run results below should be preferred for worker scaling. NumPy's reported worker count does not establish that its underlying numerical libraries use exactly one OS thread.
+I reran the 15k dataset using the replacement threaded NumPy implementation with 4 workers and 20 repetitions: **median 1.806 ms**, maximum daily reconciliation error **1.1181 × 10⁻¹⁹**. The attribution totals match the earlier 15k Numba and Go results to floating-point precision. The previous 2.870 ms result is retained only as a historical non-threaded baseline. The Numba and Go 4-worker figures in this initial table are from the earlier five-run comparison; their 20-run figures appear below. NumPy's reported worker count does not establish that its underlying numerical libraries use exactly one OS thread.
 
 ### Multicore scaling: 20 measured runs per configuration
 
@@ -163,7 +164,7 @@ Numba took **19.2% less time than Go** and **45.4% less time than threaded NumPy
 - Numba still has the lowest measured latency in this **four-worker** comparison.
 - Threaded NumPy now participates in multicore execution; it uses multiple separate ufunc passes on each assigned day slice, while Numba and Go calculate both effects in one fused loop. More memory passes are a plausible contributor to its higher latency, **not a proven isolated cause**.
 - At 100k securities, the data size is **6.67x** the earlier 15k dataset. Four-worker Numba median grows from **1.206 ms to 6.032 ms** (about **5.00x**); Go grows from **1.297 ms to 7.465 ms** (about **5.76x**). These use separately generated datasets and are scaling observations rather than controlled microarchitectural explanations.
-- A new 15k **threaded NumPy** result is still **pending**. I should not use the historical 2.870 ms unthreaded NumPy timing as if it were a threaded result.
+- The updated 15k **threaded NumPy** result is **1.806 ms** at 4 workers (20 runs), compared with **1.206 ms** for Numba (20 runs) and **1.297 ms** for Go (20 runs). Threaded NumPy is approximately **49.7% slower than Numba** on this 15k four-worker comparison.
 - These are still **kernel-only** timings. I have not yet measured input/output wall time, peak RSS, CPU hardware counters, or 100k worker-count scaling.
 
 ### Reproduce the 100k test
@@ -176,7 +177,7 @@ go build -o benchmark-go .
 ./benchmark-go --data data/100k --workers 4 --runs 20
 ```
 
-### Complete the 15k threaded NumPy comparison
+### Reproduce the 15k threaded NumPy comparison
 
 Use the **original** `data/` fixture without regenerating it, so it remains comparable to the historical 15k Numba and Go measurements:
 
@@ -184,7 +185,7 @@ Use the **original** `data/` fixture without regenerating it, so it remains comp
 python benchmark.py --data data --mode numpy-threaded --workers 4 --runs 20
 ```
 
-Once that output is available, I will add the measured median to the 15k comparison. No threaded NumPy 15k result is assumed in this report.
+My recorded 20-run median for this command was **0.0018060000002151355 seconds (1.806 ms)**; maximum reconciliation error was **1.1180834903756764e-19**.
 
 ## 7. Reproduction
 
@@ -193,7 +194,7 @@ python -m pip install -r requirements.txt
 python generate.py --securities 15000 --days 252 --seed 42
 
 # Initial five-run comparison
-python benchmark.py --mode numpy-threaded --workers 4 --runs 20  # new measurement pending
+python benchmark.py --mode numpy-threaded --workers 4 --runs 20
 python benchmark.py --mode numba
 python benchmark.py --mode numba-parallel --workers 4
 go build -o benchmark-go .
