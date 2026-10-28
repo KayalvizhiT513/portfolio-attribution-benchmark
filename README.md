@@ -25,4 +25,4 @@ go build -o benchmark-go .
 
 Use a smaller dataset first (`--securities 100 --days 5`). Benchmark 1, 2, 4, and 8 workers as supported by the machine.
 
-**Timing scope:** CPU calculation kernel only, excluding input generation and loading, JIT compilation warm-up, output writes, and validation. Go reuses output buffers, while Python allocates result arrays inside timed kernels, so the comparison is not perfectly allocation-equivalent. Both include reconciliation checks. This project does not yet implement HTTP, storage adapters, or an event-triggered processing service.
+**Timing scope:** CPU calculation kernel only, excluding input generation and loading, JIT compilation warm-up, output writes, and validation. Both Python and Go preallocate and reuse output buffers outside the timed kernel. NumPy uses ufunc `out=` buffers to avoid large intermediate arrays. Runtime scheduling overheads still differ. Both include reconciliation checks. This project does not yet implement HTTP, storage adapters, or an event-triggered processing service.
