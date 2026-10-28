@@ -1,7 +1,10 @@
-"""Generate a shared deterministic input fixture for both languages."""
-import argparse, json
+"""Generate deterministic binary inputs using bounded per-day memory."""
+import argparse
+import json
 from pathlib import Path
+
 import numpy as np
+
 
 def main():
     p = argparse.ArgumentParser()
@@ -15,20 +18,33 @@ def main():
     out = Path(args.output)
     out.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(args.seed)
-    shape = (args.days, args.securities)
-    for key in ("wp", "wb"):
-        x = rng.random(shape, dtype=np.float64)
-        x /= x.sum(axis=1, keepdims=True)
-        x.astype("<f8", copy=False).tofile(out / f"{key}.bin")
-    rb = rng.uniform(-0.03, 0.03, size=shape)
-    rp = np.clip(rb + rng.uniform(-0.0005, 0.0005, size=shape), -0.03, 0.03)
-    rb.astype("<f8", copy=False).tofile(out / "rb.bin")
-    rp.astype("<f8", copy=False).tofile(out / "rp.bin")
+    # Stream one trading day at a time. Avoid materializing all four full arrays.
+    with (out / "wp.bin").open("wb") as wp_file, \
+         (out / "wb.bin").open("wb") as wb_file, \
+         (out / "rp.bin").open("wb") as rp_file, \
+         (out / "rb.bin").open("wb") as rb_file:
+        for _ in range(args.days):
+            wp = rng.random(args.securities)
+            wp /= wp.sum()
+            wb = rng.random(args.securities)
+            wb /= wb.sum()
+            rb = rng.uniform(-0.03, 0.03, size=args.securities)
+            rp = np.clip(
+                rb + rng.uniform(-0.0005, 0.0005, size=args.securities),
+                -0.03, 0.03
+            )
+            for f, array in ((wp_file, wp), (wb_file, wb),
+                             (rp_file, rp), (rb_file, rb)):
+                array.astype("<f8", copy=False).tofile(f)
     (out / "metadata.json").write_text(json.dumps({
-        "days": args.days, "securities": args.securities, "seed": args.seed,
-        "dtype": "little-endian float64", "layout": "day-major"
+        "days": args.days,
+        "securities": args.securities,
+        "seed": args.seed,
+        "dtype": "little-endian float64",
+        "layout": "day-major"
     }, indent=2))
     print(f"Generated {args.days * args.securities * 4:,} float64 values in {out}")
+
 
 if __name__ == "__main__":
     main()
