@@ -2,15 +2,18 @@
 import argparse
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import numpy as np
 
-def numpy_kernel(wp, wb, rp, rb, a, s):
-    # Reuse output buffers; avoid allocating full-size temporary arrays.
-    np.subtract(wp, wb, out=a)
-    np.multiply(a, rb, out=a)
-    np.subtract(rp, rb, out=s)
-    np.multiply(s, wp, out=s)
+def numpy_chunk(wp, wb, rp, rb, a, s, start, stop):
+    # Each thread owns disjoint, contiguous day slices; NumPy ufuncs release the GIL.
+    sl = slice(start, stop)
+    np.subtract(wp[sl], wb[sl], out=a[sl])
+    np.multiply(a[sl], rb[sl], out=a[sl])
+    np.subtract(rp[sl], rb[sl], out=s[sl])
+    np.multiply(s[sl], wp[sl], out=s[sl])
+
 
 def load(folder):
     folder = Path(folder)
@@ -25,15 +28,26 @@ def main():
     p.add_argument("--data", default="data")
     p.add_argument("--workers", type=int, default=1)
     p.add_argument("--runs", type=int, default=5)
-    p.add_argument("--mode", choices=("numpy", "numba", "numba-parallel"), default="numba-parallel")
+    p.add_argument("--mode", choices=("numpy-threaded", "numba", "numba-parallel"), default="numba-parallel")
     args = p.parse_args()
     if args.workers < 1 or args.runs < 1:
         p.error("workers and runs must be positive")
     arrays, meta = load(args.data)
     wp, wb, rp, rb = arrays
     a, s = np.empty(wp.shape, dtype=np.float64), np.empty(wp.shape, dtype=np.float64)
-    if args.mode == "numpy":
-        kernel = numpy_kernel
+    executor = None
+    if args.mode == "numpy-threaded":
+        executor = ThreadPoolExecutor(max_workers=args.workers)
+        days = wp.shape[0]
+        chunks = [(i * days // args.workers, (i + 1) * days // args.workers)
+                  for i in range(args.workers)]
+        chunks = [(start, stop) for start, stop in chunks if start < stop]
+
+        def kernel(wp, wb, rp, rb, a, s):
+            futures = [executor.submit(numpy_chunk, wp, wb, rp, rb, a, s, start, stop)
+                       for start, stop in chunks]
+            for future in futures:
+                future.result()
     else:
         from numba import njit, prange, set_num_threads
         if args.mode == "numba":
@@ -57,13 +71,15 @@ def main():
         start = time.perf_counter()
         kernel(*arrays, a, s)
         times.append(time.perf_counter() - start)
+    if executor is not None:
+        executor.shutdown()
     error = float(np.max(np.abs((a + s).sum(axis=1) -
                                 (wp * rp - wb * rb).sum(axis=1))))
     if error > 1e-10:
         raise RuntimeError(f"attribution reconciliation failed: {error}")
     print(json.dumps({
         "language": "python", "mode": args.mode,
-        "workers": args.workers if args.mode == "numba-parallel" else 1,
+        "workers": args.workers if args.mode in ("numba-parallel", "numpy-threaded") else 1,
         "days": meta["days"], "securities": meta["securities"],
         "runs_seconds": times, "median_seconds": float(np.median(times)),
         "max_reconciliation_error": error,
