@@ -6,6 +6,12 @@
 **Status:** measured kernel results; architectural hypotheses are not yet profiled  
 **Repository:** [portfolio-attribution-benchmark](../README.md)
 
+## Visual comparison
+
+![Median kernel runtimes for 15k and 100k securities](assets/benchmark-comparison.svg)
+
+*Measured on my MacBook Pro. Four workers, 20 runs per configuration. Lower is better.*
+
 ## Executive summary
 
 **Numba with 8 threads had the lowest observed median kernel runtime: 0.955 ms**, versus **Go with 8 workers at 1.131 ms** (about **15.6% less elapsed time**, or 1.18x as fast). The best single-worker Numba configuration in the scaling experiment took 1.784 ms versus 4.714 ms for Go.
