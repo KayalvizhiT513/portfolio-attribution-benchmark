@@ -223,6 +223,21 @@ python brinson_csv.py --data data/brinson-15k
 
 These runs include CSV parse, security key matching, segment aggregation, effect scheduling and reconciliation in the elapsed time; they are **not** comparable directly with historical kernel-only numbers. The files can be large: start at this size, not 100k. Results are pending local validation.
 
+## Brinson CSV output files and inclusive I/O timing
+
+Both Brinson–Fachler benchmark runners now write **one CSV row per (date, segment_id)** with columns `date,segment_id,allocation,selection,interaction,total`. This includes all three effects and their sum; individual security rows are not produced because Brinson attribution is calculated at segment level. Rows are sorted by segment identifier within each day for easier comparison.
+
+The measured `elapsed_seconds` now includes both input CSV reading and writing the result CSV, plus flushing and `fsync` of the output before stopping the timer. Output directory creation and process/thread setup are likewise inside the timer. File-system caching can still influence timings; `fsync` does not guarantee identical physical-storage behavior across OS and hardware. Dataset generation is excluded.
+
+```bash
+git pull origin main
+go build -o benchmark-brinson ./cmd/brinsoncsv
+python brinson_csv.py --data data/brinson-15k --output results/brinson-python.csv
+./benchmark-brinson --data data/brinson-15k --output results/brinson-go.csv
+```
+
+Compare CSV output by matching `(date,segment_id)` and applying floating-point tolerance to numerical columns. Historical Python 8.604s and Go 1.986s results were collected **before** CSV output writing was added, so they cannot be used as updated end-to-end timings. The new results remain unmeasured.
+
 ## Historical results
 
 [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) documents the initial run, when the NumPy baseline was non-threaded and the earlier generator was in use. Those measured results remain historically valid, but the new threaded NumPy mode needs a fresh comparison. Do not present the historical NumPy timing as the performance of threaded NumPy.
