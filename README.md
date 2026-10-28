@@ -144,6 +144,33 @@ python risk_stress.py --data data/100k --jobs 10 --concurrency 4 --scenarios 8 -
 
 Compare median time and completed jobs per second, and check that the aggregate checksums agree within ordinary floating-point tolerances. The simulation updates are intentionally serial within each scenario and independent between jobs, making it a different CPU-load profile from the earlier simple attribution formulas. These new variants have **not yet been run or validated on the target Mac**.
 
+## Dependent four-stage computation benchmark (new; results pending)
+
+This addresses the **multi-step** requirement, unlike the earlier repeated compounding test. Each of ten concurrent jobs runs four **different, dependent** calculations in order:
+
+1. **Rolling risk-adjusted relative return:** For every security and day, calculate mean and volatility of the portfolio-minus-benchmark return over the preceding 20 trading days.
+2. **Weighted signal calculation:** Consume stage 1 values, apply a job-specific threshold and multiply by portfolio-minus-benchmark weights.
+3. **Daily portfolio aggregation:** Reduce stage 2 security-level signals to one portfolio value per day.
+4. **Sequential portfolio path/drawdown:** Compound daily aggregate values and compute accumulated drawdown; each day depends on the preceding day.
+
+Four active jobs at a time; each job runs its four stages sequentially. Different jobs can run concurrently. All jobs reuse the **same read-only dataset**, with a different threshold per job, and keep independent scratch arrays. The complete workload measures all four compute stages but excludes loading, Numba compilation, and output allocation. This is a **synthetic numerical pipeline**, not validated financial advice or production methodology.
+
+```bash
+git pull origin main
+go build -o benchmark-multistage ./cmd/multistage
+python multistage.py --data data/100k --jobs 2 --concurrency 2 --window 20 --runs 1
+./benchmark-multistage --data data/100k --jobs 2 --concurrency 2 --window 20 --runs 1
+```
+
+If the small test completes and checksums agree, run the full test:
+
+```bash
+python multistage.py --data data/100k --jobs 10 --concurrency 4 --window 20 --runs 3
+./benchmark-multistage --data data/100k --jobs 10 --concurrency 4 --window 20 --runs 3
+```
+
+Four active jobs each allocate a 201.6 MB scratch array (about 806 MB total); Go also loads the shared 806 MB inputs into RAM. Peak process memory and page cache need monitoring, and high worker counts may cause swapping. **No performance result is yet claimed for this new benchmark.**
+
 ## Historical results
 
 [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) documents the initial run, when the NumPy baseline was non-threaded and the earlier generator was in use. Those measured results remain historically valid, but the new threaded NumPy mode needs a fresh comparison. Do not present the historical NumPy timing as the performance of threaded NumPy.
