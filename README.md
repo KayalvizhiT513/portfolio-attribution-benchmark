@@ -115,6 +115,35 @@ To stress more jobs without increasing simultaneous output-memory allocations, t
 
 Results for this concurrency experiment are **not measured yet**.
 
+## Heavy multi-scenario computation (separate from attribution)
+
+The earlier concurrent-jobs test repeats the existing simple attribution formulas. For a genuinely heavier CPU workload, `risk_stress.py` and `cmd/riskstress/main.go` implement matching **hypothetical compounded-return stress simulations**:
+
+- Every job processes the 252 days and 100k securities, across **8 shock scenarios**.
+- For every security, scenario and day, calculate **12 successive compounded updates** for the portfolio and benchmark paths, then weight and aggregate their results.
+- Jobs use slightly different deterministic shocks so they do not simply produce identical outputs.
+- **10 jobs × 252 days × 100k securities × 8 scenarios × 12 steps × 2 paths = 4.8384 billion path updates.**
+- Four jobs can run at a time, using at most four total CPU computation workers. Both implementations share the same read-only numerical inputs and allocate one small result array per active worker. Input read, Numba compilation and output allocation are excluded from the timer.
+- This is a **synthetic CPU stress test**, not a validated portfolio-risk model. It does not measure file I/O or backend API latency.
+
+Start with a smaller sanity run (these will take longer than earlier millisecond benchmarks):
+
+```bash
+git pull origin main
+go build -o benchmark-riskstress ./cmd/riskstress
+python risk_stress.py --data data/100k --jobs 2 --concurrency 2 --scenarios 2 --steps 4 --runs 1
+./benchmark-riskstress --data data/100k --jobs 2 --concurrency 2 --scenarios 2 --steps 4 --runs 1
+```
+
+Then run the full workload, **one process at a time**:
+
+```bash
+python risk_stress.py --data data/100k --jobs 10 --concurrency 4 --scenarios 8 --steps 12 --runs 3
+./benchmark-riskstress --data data/100k --jobs 10 --concurrency 4 --scenarios 8 --steps 12 --runs 3
+```
+
+Compare median time and completed jobs per second, and check that the aggregate checksums agree within ordinary floating-point tolerances. The simulation updates are intentionally serial within each scenario and independent between jobs, making it a different CPU-load profile from the earlier simple attribution formulas. These new variants have **not yet been run or validated on the target Mac**.
+
 ## Historical results
 
 [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) documents the initial run, when the NumPy baseline was non-threaded and the earlier generator was in use. Those measured results remain historically valid, but the new threaded NumPy mode needs a fresh comparison. Do not present the historical NumPy timing as the performance of threaded NumPy.
