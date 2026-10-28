@@ -78,14 +78,35 @@ func computeSteps(wp, wb, rp, rb, a, s []float64, days, secs, workers int) {
     wg.Wait()
 }
 
+func computeStatic(wp, wb, rp, rb, a, s []float64, days, secs, workers int) {
+    // Assign contiguous, non-overlapping day ranges directly to workers.
+    // No job channel, and both effects stay fused in one traversal.
+    var wg sync.WaitGroup
+    active := workers
+    if active > days { active = days }
+    for w := 0; w < active; w++ {
+        startDay := w * days / active
+        endDay := (w + 1) * days / active
+        wg.Add(1)
+        go func(start, end int) {
+            defer wg.Done()
+            for j := start * secs; j < end * secs; j++ {
+                a[j] = (wp[j] - wb[j]) * rb[j]
+                s[j] = wp[j] * (rp[j] - rb[j])
+            }
+        }(startDay, endDay)
+    }
+    wg.Wait()
+}
+
 func main() {
     folder := flag.String("data", "data", "fixture folder")
     workers := flag.Int("workers", runtime.NumCPU(), "parallel workers")
     runs := flag.Int("runs", 5, "timed repetitions")
-    mode := flag.String("mode", "fused", "fused or steps")
+    mode := flag.String("mode", "fused", "fused, steps, or static")
     flag.Parse()
     if *workers < 1 || *runs < 1 { panic("workers/runs must be positive") }
-    if *mode != "fused" && *mode != "steps" { panic("mode must be fused or steps") }
+    if *mode != "fused" && *mode != "steps" && *mode != "static" { panic("mode must be fused, steps, or static") }
     blob, err := os.ReadFile(filepath.Join(*folder, "metadata.json"))
     if err != nil { panic(err) }
     var m Meta
@@ -103,6 +124,7 @@ func main() {
     runtime.GOMAXPROCS(*workers)
     runKernel := compute
     if *mode == "steps" { runKernel = computeSteps }
+    if *mode == "static" { runKernel = computeStatic }
     runKernel(wp, wb, rp, rb, a, s, m.Days, m.Securities, *workers)
     durations := make([]float64, *runs)
     for i := range durations {
