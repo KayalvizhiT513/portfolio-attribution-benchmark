@@ -2,7 +2,7 @@
 ### Python / NumPy / Numba vs Go / Goroutines
 
 **Experiment:** security-level, daily synthetic allocation and selection effects  
-**Run date:** 28 October 2026 (user-supplied local benchmark output)  
+**Run date:** 28 October 2026 (benchmarks executed locally on the user's MacBook Pro)  
 **Status:** measured kernel results; architectural hypotheses are not yet profiled  
 **Repository:** [portfolio-attribution-benchmark](../README.md)
 
@@ -171,4 +171,4 @@ python benchmark.py --mode numba-parallel --workers 8 --runs 20
 ./benchmark-go --workers 8 --runs 20
 ```
 
-*All measurements above are transcribed from the supplied terminal outputs. No independent execution on the user's Mac was performed while writing this report.*
+**Benchmark provenance:** The Python and Go benchmarks were executed locally on a MacBook Pro on 28 October 2026. Execution times and numerical results were captured from the terminal outputs and provided for analysis. Architectural interpretations are based on these measured results; no separate replication was conducted by the report author.
