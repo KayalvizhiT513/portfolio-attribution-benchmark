@@ -5,8 +5,12 @@ import time
 from pathlib import Path
 import numpy as np
 
-def numpy_kernel(wp, wb, rp, rb):
-    return (wp - wb) * rb, wp * (rp - rb)
+def numpy_kernel(wp, wb, rp, rb, a, s):
+    # Reuse output buffers; avoid allocating full-size temporary arrays.
+    np.subtract(wp, wb, out=a)
+    np.multiply(a, rb, out=a)
+    np.subtract(rp, rb, out=s)
+    np.multiply(s, wp, out=s)
 
 def load(folder):
     folder = Path(folder)
@@ -27,34 +31,31 @@ def main():
         p.error("workers and runs must be positive")
     arrays, meta = load(args.data)
     wp, wb, rp, rb = arrays
+    a, s = np.empty(wp.shape, dtype=np.float64), np.empty(wp.shape, dtype=np.float64)
     if args.mode == "numpy":
         kernel = numpy_kernel
     else:
         from numba import njit, prange, set_num_threads
         if args.mode == "numba":
             @njit
-            def kernel(wp, wb, rp, rb):
-                a, s = np.empty_like(wp), np.empty_like(wp)
+            def kernel(wp, wb, rp, rb, a, s):
                 for d in range(wp.shape[0]):
                     for i in range(wp.shape[1]):
                         a[d, i] = (wp[d, i] - wb[d, i]) * rb[d, i]
                         s[d, i] = wp[d, i] * (rp[d, i] - rb[d, i])
-                return a, s
         else:
             set_num_threads(args.workers)
             @njit(parallel=True)
-            def kernel(wp, wb, rp, rb):
-                a, s = np.empty_like(wp), np.empty_like(wp)
+            def kernel(wp, wb, rp, rb, a, s):
                 for d in prange(wp.shape[0]):
                     for i in range(wp.shape[1]):
                         a[d, i] = (wp[d, i] - wb[d, i]) * rb[d, i]
                         s[d, i] = wp[d, i] * (rp[d, i] - rb[d, i])
-                return a, s
-    kernel(*arrays)  # Compile/warm up outside timed region.
+    kernel(*arrays, a, s)  # Compile/warm up outside timed region.
     times = []
     for _ in range(args.runs):
         start = time.perf_counter()
-        a, s = kernel(*arrays)
+        kernel(*arrays, a, s)
         times.append(time.perf_counter() - start)
     error = float(np.max(np.abs((a + s).sum(axis=1) -
                                 (wp * rp - wb * rb).sum(axis=1))))
