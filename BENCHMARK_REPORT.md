@@ -260,30 +260,24 @@ python risk_stress.py --data data/100k --jobs 10 --concurrency 4 --scenarios 8 -
 ```
 
 
-## Dependent four-stage computation benchmark (new; results pending)
+## Dependent four-stage computation benchmark: measured results
 
-This addresses the **multi-step** requirement, unlike the earlier repeated compounding test. Each of ten concurrent jobs runs four **different, dependent** calculations in order:
+I ran the four-stage dependent numerical pipeline on the same 100k-security, 252-day synthetic fixture. Each job computes (1) rolling relative-return mean/volatility across a 20-day window, (2) thresholded weighted security signals using that result, (3) daily portfolio aggregation, and (4) a sequential portfolio path/drawdown from those aggregates. Outputs from one stage are inputs to the next. The ten jobs reuse the same read-only input files but have job-dependent thresholds.
 
-1. **Rolling risk-adjusted relative return:** For every security and day, calculate mean and volatility of the portfolio-minus-benchmark return over the preceding 20 trading days.
-2. **Weighted signal calculation:** Consume stage 1 values, apply a job-specific threshold and multiply by portfolio-minus-benchmark weights.
-3. **Daily portfolio aggregation:** Reduce stage 2 security-level signals to one portfolio value per day.
-4. **Sequential portfolio path/drawdown:** Compound daily aggregate values and compute accumulated drawdown; each day depends on the preceding day.
+| Test | Runtime | Median wall time | Jobs/s | Checksum |
+|---|---|---:|---:|---:|
+| 2 jobs, concurrency 2, 1 run | Python + Numba | 0.715324 s | 2.796 | 2.000288018409295 |
+| 2 jobs, concurrency 2, 1 run | **Go** | **0.659513 s** | **3.033** | 2.000288018409295 |
+| 10 jobs, concurrency 4, 3 runs | Python + Numba | 2.118299 s | 4.721 | 10.001438846829325 |
+| 10 jobs, concurrency 4, 3 runs | **Go** | **1.981683 s** | **5.046** | 10.001438846829323 |
 
-Four active jobs at a time; each job runs its four stages sequentially. Different jobs can run concurrently. All jobs reuse the **same read-only dataset**, with a different threshold per job, and keep independent scratch arrays. The complete workload measures all four compute stages but excludes loading, Numba compilation, and output allocation. This is a **synthetic numerical pipeline**, not validated financial advice or production methodology.
+The full test's three recorded Go times were 2.011192, 1.981683, and 1.976598 seconds; Numba times were 2.118299, 2.059729, and 2.193342 seconds. On the **10-job test**, Go used **6.45% less elapsed time** (or **6.89% more throughput**) than Numba. Small-test results have just **one** measured run each, so are not stable estimates.
 
-```bash
-git pull origin main
-go build -o benchmark-multistage ./cmd/multistage
-python multistage.py --data data/100k --jobs 2 --concurrency 2 --window 20 --runs 1
-./benchmark-multistage --data data/100k --jobs 2 --concurrency 2 --window 20 --runs 1
-```
+**Interpretation:** Unlike the simpler attribution kernels and repeated compounding simulation, this dependent four-stage workload slightly favored Go on the tested Mac. The result does not establish why: differences may involve generated machine instructions, loop indexing, cache access patterns, bounds checking, worker scheduling, and memory behavior. We need per-stage timing and interleaved repeat runs before assigning a cause. The two implementations' reported checksums agree to floating-point precision.
 
-If the small test completes and checksums agree, run the full test:
+**Scope:** Inputs were loaded before timing. Numba JIT warm-up and scratch/output allocations were also excluded. Jobs share the same numerical inputs, with job-specific thresholds. Results represent compute-stage wall time and scheduling only, **not** complete API, storage, or unique-portfolio ingestion performance.
 
 ```bash
 python multistage.py --data data/100k --jobs 10 --concurrency 4 --window 20 --runs 3
 ./benchmark-multistage --data data/100k --jobs 10 --concurrency 4 --window 20 --runs 3
 ```
-
-Four active jobs each allocate a 201.6 MB scratch array (about 806 MB total); Go also loads the shared 806 MB inputs into RAM. Peak process memory and page cache need monitoring, and high worker counts may cause swapping. **No performance result is yet claimed for this new benchmark.**
-
