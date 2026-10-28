@@ -28,7 +28,7 @@ def main():
     p.add_argument("--data", default="data")
     p.add_argument("--workers", type=int, default=1)
     p.add_argument("--runs", type=int, default=5)
-    p.add_argument("--mode", choices=("numpy-threaded", "numba", "numba-parallel"), default="numba-parallel")
+    p.add_argument("--mode", choices=("numpy-threaded", "numba", "numba-parallel", "numba-steps"), default="numba-parallel")
     args = p.parse_args()
     if args.workers < 1 or args.runs < 1:
         p.error("workers and runs must be positive")
@@ -57,7 +57,7 @@ def main():
                     for i in range(wp.shape[1]):
                         a[d, i] = (wp[d, i] - wb[d, i]) * rb[d, i]
                         s[d, i] = wp[d, i] * (rp[d, i] - rb[d, i])
-        else:
+        elif args.mode == "numba-parallel":
             set_num_threads(args.workers)
             @njit(parallel=True)
             def kernel(wp, wb, rp, rb, a, s):
@@ -65,6 +65,21 @@ def main():
                     for i in range(wp.shape[1]):
                         a[d, i] = (wp[d, i] - wb[d, i]) * rb[d, i]
                         s[d, i] = wp[d, i] * (rp[d, i] - rb[d, i])
+        else:
+            # Independent allocation and selection tasks for each day.
+            # Task scheduling includes both effects; neither waits for the other.
+            set_num_threads(args.workers)
+            @njit(parallel=True)
+            def kernel(wp, wb, rp, rb, a, s):
+                days, securities = wp.shape
+                for task in prange(days * 2):
+                    d = task // 2
+                    if task % 2 == 0:
+                        for i in range(securities):
+                            a[d, i] = (wp[d, i] - wb[d, i]) * rb[d, i]
+                    else:
+                        for i in range(securities):
+                            s[d, i] = wp[d, i] * (rp[d, i] - rb[d, i])
     kernel(*arrays, a, s)  # Compile/warm up outside timed region.
     times = []
     for _ in range(args.runs):
@@ -79,7 +94,7 @@ def main():
         raise RuntimeError(f"attribution reconciliation failed: {error}")
     print(json.dumps({
         "language": "python", "mode": args.mode,
-        "workers": args.workers if args.mode in ("numba-parallel", "numpy-threaded") else 1,
+        "workers": args.workers if args.mode in ("numba-parallel", "numba-steps", "numpy-threaded") else 1,
         "days": meta["days"], "securities": meta["securities"],
         "runs_seconds": times, "median_seconds": float(np.median(times)),
         "max_reconciliation_error": error,
