@@ -1,5 +1,5 @@
 package main
-import("bufio";"encoding/csv";"encoding/json";"flag";"fmt";"io";"math";"os";"path/filepath";"runtime";"sort";"strconv";"sync";"time")
+import("bufio";"encoding/csv";"encoding/json";"flag";"fmt";"io";"math";"os";"path/filepath";"runtime";"sort";"strconv";"sync";"syscall";"time")
 type rec struct{segment string;weight,ret float64}
 type reader struct{file *os.File;csv *csv.Reader;next []string;seen map[string]bool}
 func open(path string)*reader{f,e:=os.Open(path);if e!=nil{panic(e)};r:=csv.NewReader(f);h,e:=r.Read();if e!=nil{panic(e)}
@@ -20,7 +20,8 @@ func (r *reader)group()(string,map[string]rec,bool){first:=r.next;r.next=nil
 type agg struct{wp,wb,pr,br float64}
 type task struct{kind int;segment string;wp,wb,rp,rb,benchmark float64}
 type result struct{kind int;segment string;value float64}
-func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");output:=flag.String("output","results/brinson-go.csv","output CSV path");flag.Parse();start:=time.Now()
+func cpuSeconds()float64{var usage syscall.Rusage;if e:=syscall.Getrusage(syscall.RUSAGE_SELF,&usage);e!=nil{panic(e)};return float64(usage.Utime.Sec)+float64(usage.Utime.Usec)/1e6+float64(usage.Stime.Sec)+float64(usage.Stime.Usec)/1e6}
+func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");output:=flag.String("output","results/brinson-go.csv","output CSV path");flag.Parse();start:=time.Now();cpuStart:=cpuSeconds()
  if e:=os.MkdirAll(filepath.Dir(*output),0755);e!=nil{panic(e)}
  outFile,e:=os.Create(*output);if e!=nil{panic(e)};defer outFile.Close()
  buffered:=bufio.NewWriter(outFile);writer:=csv.NewWriter(buffered)
@@ -89,10 +90,12 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");outp
  if e:=buffered.Flush();e!=nil{panic(e)}
  if e:=outFile.Sync();e!=nil{panic(e)}
  writeTime+=time.Since(writeStart)
+ elapsed:=time.Since(start).Seconds();cpuElapsed:=cpuSeconds()-cpuStart
  report:=map[string]any{"language":"go","mode":"brinson-fachler","workers":workers,"days":days,
  "security_day_records":securities,"segment_days":segments,"effect_tasks":3*segments,
  "totals":map[string]float64{"allocation":totals[0],"selection":totals[1],"interaction":totals[2]},
- "elapsed_seconds":time.Since(start).Seconds(),"output_csv":*output,
+ "elapsed_seconds":elapsed,"output_csv":*output,
+ "cpu_usage":map[string]any{"process_cpu_seconds":cpuElapsed,"average_effective_cores":cpuElapsed/elapsed,"measurement":"process CPU time / wall time; not exact peak concurrent cores"},
  "io_timing":map[string]float64{"input_read_parse_seconds":readTime.Seconds(),"output_write_sync_seconds":writeTime.Seconds()},"timing_scope":"CSV input reading+join+aggregation+effect tasks+validation+CSV output write+flush+fsync"}
  data,_:=json.MarshalIndent(report,"","  ");fmt.Println(string(data))
 }
