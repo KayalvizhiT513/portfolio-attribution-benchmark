@@ -1,6 +1,6 @@
 # Portfolio attribution benchmark: Python vs Go
 
-Reproducible synthetic security-level attribution benchmark comparing NumPy, Numba (serial/parallel), and Go goroutines.
+Reproducible synthetic security-level attribution benchmark comparing threaded NumPy, Numba (serial/parallel), and Go goroutines.
 
 **For benchmarking only:** formulas are not confirmed as the team's production attribution methodology.
 
@@ -20,20 +20,54 @@ See [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) for the measured Python/Numba and
 ```bash
 python -m pip install -r requirements.txt
 python generate.py --securities 15000 --days 252 --seed 42
-python benchmark.py --mode numpy --runs 5
+python benchmark.py --mode numpy-threaded --workers 4 --runs 5
 python benchmark.py --mode numba --runs 5
 python benchmark.py --mode numba-parallel --workers 4 --runs 5
 go build -o benchmark-go .
 ./benchmark-go --workers 4 --runs 5
 ```
 
+## Larger stress test
+
+The original 15,000-security fixture is a lightweight baseline. Increase the **security count** rather than trading days to keep the intended one-year horizon. Each security is present in both portfolio and benchmark.
+
+| Securities per universe | Input values | Four input arrays | Two output arrays | Total array footprint |
+|---:|---:|---:|---:|---:|
+| 15,000 | 15.12 million | 121 MB | 60 MB | 181 MB |
+| 100,000 | 100.8 million | 806 MB | 403 MB | 1.21 GB |
+| 250,000 | 252 million | 2.02 GB | 1.01 GB | 3.02 GB |
+| 500,000 | 504 million | 4.03 GB | 2.02 GB | 6.05 GB |
+| 1,000,000 | 1.008 billion | 8.06 GB | 4.03 GB | 12.10 GB |
+
+Sizes are decimal GB; actual peak RAM, file-system cache, temporary arrays and application overhead increase resource demands. Go eagerly loads inputs; Python memory-maps them. The generator writes day by day to limit peak generation memory.
+
+**Recommended first stress test: 100,000 securities per universe, then 250,000** if memory and disk are sufficient. Keep a separate directory for each test:
+
+```bash
+python generate.py --securities 100000 --days 252 --seed 42 --output data/100k
+python benchmark.py --data data/100k --mode numpy-threaded --workers 4 --runs 20
+python benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
+./benchmark-go --data data/100k --workers 4 --runs 20
+
+# Repeat across 1, 2, 4, 8 workers for each parallel runtime.
+# If this fits comfortably, replace 100000 with 250000 and output data/250k.
+```
+
+The new generator uses a **day-by-day random-number sequence**, so its seed-42 fixture is not byte-identical to the original generator's historical dataset. Re-run **all** implementations with the newly generated files; don't compare new timings to old fixtures as if the inputs were unchanged.
+
+At these larger sizes, pay attention to **peak memory, disk space, warm/cold page cache and sustained bandwidth**. A bigger dataset stresses memory and I/O; it does not make the two financial formulas computationally more complex.
+
+## Historical results
+
+[BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) documents the initial run, when the NumPy baseline was non-threaded and the earlier generator was in use. Those measured results remain historically valid, but the new threaded NumPy mode needs a fresh comparison. Do not present the historical NumPy timing as the performance of threaded NumPy.
+
 ## Reproduce the reported benchmark runs
 
 Run these commands from the repository root after installing dependencies and generating the default fixture. The same dataset is reused by all runs.
 
 ```bash
-# Initial comparison (five measured runs each)
-python benchmark.py --mode numpy
+# Updated comparison (five measured runs each; historical report used unthreaded NumPy)
+python benchmark.py --mode numpy-threaded --workers 4
 python benchmark.py --mode numba
 python benchmark.py --mode numba-parallel --workers 4
 go build -o benchmark-go .
@@ -55,4 +89,4 @@ The measured outputs report median kernel runtime, individual runtimes, attribut
 
 Use a smaller dataset first (`--securities 100 --days 5`). Benchmark 1, 2, 4, and 8 workers as supported by the machine.
 
-**Timing scope:** CPU calculation kernel only, excluding input generation and loading, JIT compilation warm-up, output writes, and validation. Both Python and Go preallocate and reuse output buffers outside the timed kernel. NumPy uses ufunc `out=` buffers to avoid large intermediate arrays. Runtime scheduling overheads still differ. Both include reconciliation checks. This project does not yet implement HTTP, storage adapters, or an event-triggered processing service.
+**Timing scope:** CPU calculation kernel only, excluding input generation and loading, JIT compilation warm-up, output writes, and validation. Both Python and Go preallocate and reuse output buffers outside the timed kernel. Threaded NumPy uses a persistent thread pool and ufunc `out=` buffers to avoid large intermediate arrays. Runtime scheduling overheads still differ. Both include reconciliation checks. This project does not yet implement HTTP, storage adapters, or an event-triggered processing service.
