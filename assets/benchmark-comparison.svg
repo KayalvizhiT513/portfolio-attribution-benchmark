@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="510" viewBox="0 0 960 510" role="img" aria-label="Comparison of Python and Go attribution benchmark median runtimes">
+<rect width="960" height="510" fill="#ffffff" rx="16"/>
+<text x="44" y="49" fill="#182a40" font-family="Arial,sans-serif" font-size="26" font-weight="bold">Portfolio attribution benchmark</text>
+<text x="44" y="76" fill="#65758b" font-family="Arial,sans-serif" font-size="15">Kernel median time · 4 workers · 20 runs · lower is better</text>
+<line x1="260" y1="116" x2="260" y2="455" stroke="#e6e9ef"/><text x="260" y="479" fill="#65758b" font-family="Arial,sans-serif" text-anchor="middle" font-size="12">0</text>
+<line x1="358" y1="116" x2="358" y2="455" stroke="#e6e9ef"/><text x="358" y="479" fill="#65758b" font-family="Arial,sans-serif" text-anchor="middle" font-size="12">2</text>
+<line x1="456" y1="116" x2="456" y2="455" stroke="#e6e9ef"/><text x="456" y="479" fill="#65758b" font-family="Arial,sans-serif" text-anchor="middle" font-size="12">4</text>
+<line x1="554" y1="116" x2="554" y2="455" stroke="#e6e9ef"/><text x="554" y="479" fill="#65758b" font-family="Arial,sans-serif" text-anchor="middle" font-size="12">6</text>
+<line x1="652" y1="116" x2="652" y2="455" stroke="#e6e9ef"/><text x="652" y="479" fill="#65758b" font-family="Arial,sans-serif" text-anchor="middle" font-size="12">8</text>
+<line x1="750" y1="116" x2="750" y2="455" stroke="#e6e9ef"/><text x="750" y="479" fill="#65758b" font-family="Arial,sans-serif" text-anchor="middle" font-size="12">10</text>
+<line x1="848" y1="116" x2="848" y2="455" stroke="#e6e9ef"/><text x="848" y="479" fill="#65758b" font-family="Arial,sans-serif" text-anchor="middle" font-size="12">12</text>
+<text x="554" y="501" fill="#65758b" font-family="Arial,sans-serif" text-anchor="middle" font-size="12">Milliseconds</text>
+<text x="44" y="178" fill="#182a40" font-family="Arial,sans-serif" font-size="19" font-weight="bold">15k securities</text>
+<text x="244" y="169" fill="#344054" font-family="Arial,sans-serif" font-size="13" text-anchor="end">Threaded NumPy</text><rect x="260" y="150" width="88.5" height="25" rx="4" fill="#6584c2"/><text x="357.494" y="168" fill="#182a40" font-family="Arial,sans-serif" font-size="13" font-weight="bold">1.806 ms</text>
+<text x="244" y="203" fill="#344054" font-family="Arial,sans-serif" font-size="13" text-anchor="end">Numba parallel</text><rect x="260" y="184" width="59.1" height="25" rx="4" fill="#169c80"/><text x="328.094" y="202" fill="#182a40" font-family="Arial,sans-serif" font-size="13" font-weight="bold">1.206 ms</text>
+<text x="244" y="237" fill="#344054" font-family="Arial,sans-serif" font-size="13" text-anchor="end">Go goroutines</text><rect x="260" y="218" width="63.6" height="25" rx="4" fill="#e3a347"/><text x="332.553" y="236" fill="#182a40" font-family="Arial,sans-serif" font-size="13" font-weight="bold">1.297 ms</text>
+<text x="44" y="336" fill="#182a40" font-family="Arial,sans-serif" font-size="19" font-weight="bold">100k securities</text>
+<text x="244" y="327" fill="#344054" font-family="Arial,sans-serif" font-size="13" text-anchor="end">Threaded NumPy</text><rect x="260" y="308" width="541.3" height="25" rx="4" fill="#6584c2"/><text x="810.254" y="326" fill="#182a40" font-family="Arial,sans-serif" font-size="13" font-weight="bold">11.046 ms</text>
+<text x="244" y="361" fill="#344054" font-family="Arial,sans-serif" font-size="13" text-anchor="end">Numba parallel</text><rect x="260" y="342" width="295.6" height="25" rx="4" fill="#169c80"/><text x="564.568" y="360" fill="#182a40" font-family="Arial,sans-serif" font-size="13" font-weight="bold">6.032 ms</text>
+<text x="244" y="395" fill="#344054" font-family="Arial,sans-serif" font-size="13" text-anchor="end">Go goroutines</text><rect x="260" y="376" width="365.8" height="25" rx="4" fill="#e3a347"/><text x="634.785" y="394" fill="#182a40" font-family="Arial,sans-serif" font-size="13" font-weight="bold">7.465 ms</text>
+</svg>
