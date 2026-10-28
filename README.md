@@ -271,3 +271,7 @@ The measured outputs report median kernel runtime, individual runtimes, attribut
 Use a smaller dataset first (`--securities 100 --days 5`). Benchmark 1, 2, 4, and 8 workers as supported by the machine.
 
 **Timing scope:** CPU calculation kernel only, excluding input generation and loading, JIT compilation warm-up, output writes, and validation. Both Python and Go preallocate and reuse output buffers outside the timed kernel. Threaded NumPy uses a persistent thread pool and ufunc `out=` buffers to avoid large intermediate arrays. Runtime scheduling overheads still differ. Both include reconciliation checks. This project does not yet implement HTTP, storage adapters, or an event-triggered processing service.
+
+### Separate CSV I/O durations in JSON
+
+Both Brinson runners now include an `io_timing` object with `input_read_parse_seconds` and `output_write_sync_seconds`, alongside unchanged `elapsed_seconds`. Input read/parse time measures the wall time spent advancing the CSV readers and decoding rows (not pure disk access). Output time includes row formatting and CSV writing plus flush and `fsync`. File opens, matching, aggregation, validation, task execution and runtime overhead remain counted in total elapsed time but are not attributed to either I/O subtotal. Thus the two subtotals do **not** necessarily add to total time. Timings should be obtained by rerunning both executables; the earlier results did not emit this breakdown.
