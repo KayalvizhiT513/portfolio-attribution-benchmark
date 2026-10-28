@@ -45,15 +45,22 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");flag
  x.wp+=pp.weight;x.wb+=bb.weight;x.pr+=pp.weight*pp.ret;x.br+=bb.weight*bb.ret
  }
  if math.Abs(totalWp-1)>1e-9||math.Abs(totalWb-1)>1e-9{panic("weights not normalized")}
- count:=0
- // Dispatch in a separate goroutine while collecting effects, to keep both\n // queues bounded without deadlocking on backpressure.\n var dispatch sync.WaitGroup\n dispatch.Add(1)\n go func(){defer dispatch.Done()\n for _,x:=range a{if x.wp<=0||x.wb<=0{panic("zero weight segment")}
+ // Dispatch in a separate goroutine while collecting effects, to keep both
+ // queues bounded without deadlocking on backpressure.
+ var dispatch sync.WaitGroup
+ dispatch.Add(1)
+ go func(){defer dispatch.Done()
+ for _,x:=range a{if x.wp<=0||x.wb<=0{panic("zero weight segment")}
  rp:=x.pr/x.wp;rb:=x.br/x.wb
  tasks<-task{1,x.wp,x.wb,rp,rb,0}
  tasks<-task{2,x.wp,x.wb,rp,rb,0}
  tasks<-task{0,x.wp,x.wb,rp,rb,retB}
- count+=3
- }\n }()\n expected:=3*len(a)\n dayTotal:=0.0;for i:=0;i<expected;i++{v:=<-results;totals[v.kind]+=v.value;dayTotal+=v.value}
- dispatch.Wait()\n if math.Abs(dayTotal-(retP-retB))>1e-10{panic(fmt.Sprintf("reconciliation failed: %s, %.12g",day,dayTotal-(retP-retB)))}
+ }
+ }()
+ expected:=3*len(a)
+ dayTotal:=0.0;for i:=0;i<expected;i++{v:=<-results;totals[v.kind]+=v.value;dayTotal+=v.value}
+ dispatch.Wait()
+ if math.Abs(dayTotal-(retP-retB))>1e-10{panic(fmt.Sprintf("reconciliation failed: %s, %.12g",day,dayTotal-(retP-retB)))}
  days++;securities+=len(pr);segments+=len(a)
  }
  close(tasks);for range results{}
