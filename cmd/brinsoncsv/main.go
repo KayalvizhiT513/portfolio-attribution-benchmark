@@ -1,5 +1,5 @@
 package main
-import("bufio";"encoding/csv";"encoding/json";"flag";"fmt";"io";"math";"os";"path/filepath";"runtime";"strconv";"sync";"time")
+import("bufio";"encoding/csv";"encoding/json";"flag";"fmt";"io";"math";"os";"path/filepath";"runtime";"sort";"strconv";"sync";"time")
 type rec struct{segment string;weight,ret float64}
 type reader struct{file *os.File;csv *csv.Reader;next []string;seen map[string]bool}
 func open(path string)*reader{f,e:=os.Open(path);if e!=nil{panic(e)};r:=csv.NewReader(f);h,e:=r.Read();if e!=nil{panic(e)}
@@ -65,7 +65,8 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");outp
  dayTotal:=0.0;bySegment:=make(map[string]*[3]float64,len(a))
  for i:=0;i<expected;i++{v:=<-results;totals[v.kind]+=v.value;dayTotal+=v.value
  row:=bySegment[v.segment];if row==nil{row=&[3]float64{};bySegment[v.segment]=row};row[v.kind]=v.value}
- for segment,row:=range bySegment{
+ segmentIDs:=make([]string,0,len(bySegment));for id:=range bySegment{segmentIDs=append(segmentIDs,id)};sort.Strings(segmentIDs)
+ for _,segment:=range segmentIDs{row:=bySegment[segment]
  total:=row[0]+row[1]+row[2]
  record:=[]string{day,segment,strconv.FormatFloat(row[0],'g',17,64),strconv.FormatFloat(row[1],'g',17,64),strconv.FormatFloat(row[2],'g',17,64),strconv.FormatFloat(total,'g',17,64)}
  if e:=writer.Write(record);e!=nil{panic(e)}
