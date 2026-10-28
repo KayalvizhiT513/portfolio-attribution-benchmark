@@ -240,3 +240,22 @@ python benchmark.py --data data/100k --mode numba-steps --workers 4 --runs 20
 ./benchmark-go --data data/100k --mode steps --workers 4 --runs 20
 ```
 
+
+## Concurrent compounded-return stress test (measured, 100k)
+
+I ran the separately added `risk_stress.py` and `cmd/riskstress` workloads on the 100k fixture: 10 jobs, up to 4 concurrent jobs, 8 synthetic return-shock scenarios, 12 sequential compounding updates, two paths, and 252 trading days. Each job uses the same shared input arrays with small job-specific shocks.
+
+| Implementation | Median of 3 runs | Jobs/second | Checksum |
+|---|---:|---:|---:|
+| **Python + Numba** | **3.235067 s** | **3.091** | 34.24248579370965 |
+| Go | 4.455534 s | 2.244 | 34.24248579370965 |
+
+Numba completed the test approximately **27.4% faster by elapsed time**, with matching reported checksums. This corresponds to **48.384 billion compounded path updates** across ten jobs. Inputs are shared and results are kept in memory; file loading, JIT compilation, and output buffer allocation are outside the timer.
+
+**Scope correction:** Although this test repeatedly compounds returns across scenarios, it is **one type of calculation repeated many times**, not a realistic multi-stage analytics pipeline. Its result must not be presented as evidence that Numba is faster for diverse dependent stages, database access, file I/O, or complete API requests. A separate dependent multi-stage test is required.
+
+```bash
+python risk_stress.py --data data/100k --jobs 10 --concurrency 4 --scenarios 8 --steps 12 --runs 3
+./benchmark-riskstress --data data/100k --jobs 10 --concurrency 4 --scenarios 8 --steps 12 --runs 3
+```
+
