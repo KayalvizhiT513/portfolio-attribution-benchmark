@@ -171,6 +171,24 @@ python multistage.py --data data/100k --jobs 10 --concurrency 4 --window 20 --ru
 
 Four active jobs each allocate a 201.6 MB scratch array (about 806 MB total); Go also loads the shared 806 MB inputs into RAM. Peak process memory and page cache need monitoring, and high worker counts may cause swapping. **No performance result is yet claimed for this new benchmark.**
 
+## Shuffled two-file CSV attribution benchmark (hardware-selected concurrency)
+
+This is a **new end-to-end CSV experiment**, separate from the older binary-input kernel tests. Generate **portfolio.csv** and **benchmark.csv**, each with `date,security_id,weight,return` columns. Rows for securities are independently shuffled **within each date**; days remain grouped and in the same order in both files to support streaming. Joining is by **(date, security_id)**, never row position.
+
+The Python implementation uses standard NumPy with a thread pool; it **does not require Numba**. Go uses its standard CSV parser and goroutines. Both determine worker concurrency from available CPU resources instead of accepting a fixed worker count. The two independent per-day tasks are allocation `(wp-wb)*rb` and selection `wp*(rp-rb)`. Each task can be scheduled in any order, with only its input records as prerequisites. Both implementations reject mismatched dates, duplicate security keys and missing matches, rather than silently imputing zeros. The CSV reader, parse, keyed match, task dispatch, computation and collection **all fall inside the measured wall time**, unlike the earlier kernel-only benchmark.
+
+```bash
+git pull origin main
+python generate_csv.py --securities 15000 --days 252 --output data/csv-15k
+go build -o benchmark-csv ./cmd/csvattribution
+python csv_attribution.py --data data/csv-15k
+./benchmark-csv --data data/csv-15k
+```
+
+The outputs include detected workers, processed security-day records, elapsed time, total allocation and selection. Compare the effect totals with floating-point tolerance, not exact string equality (Go map iteration changes summation order).
+
+**Design boundaries:** The streaming reader requires the dates to appear in identical contiguous groups in both files; only *security row ordering within a date* can differ. The dataset has matching securities in both files; unmatched holdings or benchmark names are rejected, not treated as zero. One pair of effect tasks per trading day prevents millions of tiny queued tasks, so **security-level work inside each effect is still processed as a batch**. Worker selection is CPU-based, not a measured memory-bandwidth optimum. For an entirely order-independent cross-day ingestion pipeline or dynamic memory-aware scheduling, more work is required. **No measured CSV timings have been recorded.**
+
 ## Historical results
 
 [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) documents the initial run, when the NumPy baseline was non-threaded and the earlier generator was in use. Those measured results remain historically valid, but the new threaded NumPy mode needs a fresh comparison. Do not present the historical NumPy timing as the performance of threaded NumPy.
