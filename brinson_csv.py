@@ -27,6 +27,18 @@ def groups(path):
             rows[sid]=(seg,w,ret)
         if prev is not None:yield prev,rows
 
+def timed_groups(path, counter):
+    iterator = groups(path)
+    while True:
+        started = time.perf_counter()
+        try:
+            item = next(iterator)
+        except StopIteration:
+            counter[0] += time.perf_counter() - started
+            break
+        counter[0] += time.perf_counter() - started
+        yield item
+
 def effect(name,wp,wb,rp,rb,benchmark):
     if name=="selection":return name,wb*(rp-rb)
     if name=="interaction":return name,(wp-wb)*(rp-rb)
@@ -39,11 +51,15 @@ def main():
     workers=max(1,cpu or 1)
     totals={"allocation":0.0,"selection":0.0,"interaction":0.0}
     days=securities=segments_processed=0
+    read_time=[0.0]
+    write_time=0.0
     output=Path(a.output);output.parent.mkdir(parents=True,exist_ok=True)
     with output.open("w",newline="") as outfile, ThreadPoolExecutor(max_workers=workers) as pool:
         writer=csv.writer(outfile)
+        write_start=time.perf_counter()
         writer.writerow(["date","segment_id","allocation","selection","interaction","total"])
-        for pday,bday in zip_longest(groups(Path(a.data)/"portfolio.csv"),groups(Path(a.data)/"benchmark.csv")):
+        write_time += time.perf_counter()-write_start
+        for pday,bday in zip_longest(timed_groups(Path(a.data)/"portfolio.csv",read_time),timed_groups(Path(a.data)/"benchmark.csv",read_time)):
             if pday is None or bday is None:raise ValueError("different day sets")
             date,pr=pday;date2,br=bday
             if date!=date2 or pr.keys()!=br.keys():raise ValueError("mismatched date/security IDs")
@@ -79,13 +95,18 @@ def main():
                 raise ValueError(f"Brinson reconciliation failed: {date}")
             for seg in sorted(by_segment):
                 effects=by_segment[seg]
+                write_start=time.perf_counter()
                 writer.writerow([date,seg,*[format(effects[name],".17g") for name in ("allocation","selection","interaction")],format(sum(effects.values()),".17g")])
+                write_time += time.perf_counter()-write_start
             days+=1;securities+=len(pr);segments_processed+=len(agg)
+        write_start=time.perf_counter()
         outfile.flush()
         os.fsync(outfile.fileno())
+        write_time += time.perf_counter()-write_start
     elapsed=time.perf_counter()-started
     print(json.dumps({"language":"python","mode":"brinson-fachler","workers":workers,
       "days":days,"security_day_records":securities,"segment_days":segments_processed,
       "effect_tasks":3*segments_processed,"totals":totals,"output_csv":str(output),
+      "io_timing":{"input_read_parse_seconds":read_time[0],"output_write_sync_seconds":write_time},
       "elapsed_seconds":elapsed,"timing_scope":"CSV input reading+join+aggregation+effect tasks+validation+CSV output write+flush+fsync"},indent=2))
 if __name__=="__main__":main()
