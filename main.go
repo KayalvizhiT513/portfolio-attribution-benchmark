@@ -50,12 +50,42 @@ func compute(wp, wb, rp, rb, a, s []float64, days, secs, workers int) {
     wg.Wait()
 }
 
+func computeSteps(wp, wb, rp, rb, a, s []float64, days, secs, workers int) {
+    // Two independent tasks per day: allocation and selection.
+    jobs := make(chan int, days*2)
+    var wg sync.WaitGroup
+    for w := 0; w < workers; w++ {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            for task := range jobs {
+                d, effect := task/2, task%2
+                start, end := d*secs, (d+1)*secs
+                if effect == 0 {
+                    for j := start; j < end; j++ {
+                        a[j] = (wp[j] - wb[j]) * rb[j]
+                    }
+                } else {
+                    for j := start; j < end; j++ {
+                        s[j] = wp[j] * (rp[j] - rb[j])
+                    }
+                }
+            }
+        }()
+    }
+    for task := 0; task < days*2; task++ { jobs <- task }
+    close(jobs)
+    wg.Wait()
+}
+
 func main() {
     folder := flag.String("data", "data", "fixture folder")
     workers := flag.Int("workers", runtime.NumCPU(), "parallel workers")
     runs := flag.Int("runs", 5, "timed repetitions")
+    mode := flag.String("mode", "fused", "fused or steps")
     flag.Parse()
     if *workers < 1 || *runs < 1 { panic("workers/runs must be positive") }
+    if *mode != "fused" && *mode != "steps" { panic("mode must be fused or steps") }
     blob, err := os.ReadFile(filepath.Join(*folder, "metadata.json"))
     if err != nil { panic(err) }
     var m Meta
@@ -71,11 +101,13 @@ func main() {
     wp, wb, rp, rb := vals[0], vals[1], vals[2], vals[3]
     a, s := make([]float64, n), make([]float64, n)
     runtime.GOMAXPROCS(*workers)
-    compute(wp, wb, rp, rb, a, s, m.Days, m.Securities, *workers)
+    runKernel := compute
+    if *mode == "steps" { runKernel = computeSteps }
+    runKernel(wp, wb, rp, rb, a, s, m.Days, m.Securities, *workers)
     durations := make([]float64, *runs)
     for i := range durations {
         start := time.Now()
-        compute(wp, wb, rp, rb, a, s, m.Days, m.Securities, *workers)
+        runKernel(wp, wb, rp, rb, a, s, m.Days, m.Securities, *workers)
         durations[i] = time.Since(start).Seconds()
     }
     maxErr, totalA, totalS := 0.0, 0.0, 0.0
@@ -96,7 +128,7 @@ func main() {
     median := ordered[mid]
     if len(ordered)%2 == 0 { median = (ordered[mid-1]+ordered[mid])/2 }
     report := map[string]any{
-        "language": "go", "mode": "goroutines", "workers": *workers,
+        "language": "go", "mode": *mode, "workers": *workers,
         "days": m.Days, "securities": m.Securities, "runs_seconds": durations,
         "median_seconds": median, "max_reconciliation_error": maxErr,
         "total_allocation": totalA, "total_selection": totalS,
