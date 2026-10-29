@@ -85,7 +85,7 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");outp
  rp:=x.pr/x.wp;rb:=x.br/x.wb
  tasks<-task{1,pp.segment,x.wp,x.wb,rp,rb,0}
  tasks<-task{2,pp.segment,x.wp,x.wb,rp,rb,0}
- earlySegments++
+ if len(seen)<len(pr){earlySegments++}
  }
  }
  if len(seen)!=len(pr){panic("missing benchmark records")}
@@ -120,7 +120,7 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");outp
  elapsed:=time.Since(start).Seconds();cpuElapsed:=cpuSeconds()-cpuStart
  report:=map[string]any{"language":"go","mode":"brinson-fachler","workers":workers,"days":days,
  "security_day_records":securities,"segment_days":segments,"effect_tasks":3*segments,
- "pipeline":map[string]any{"early_selection_interaction_segment_days":earlySegments,"allocation_released_after_benchmark_total":true},
+ "pipeline":map[string]any{"segments_released_before_full_benchmark":earlySegments,"allocation_released_after_benchmark_total":true},
  "totals":map[string]float64{"allocation":totals[0],"selection":totals[1],"interaction":totals[2]},
  "elapsed_seconds":elapsed,"output_csv":*output,
  "cpu_usage":map[string]any{"process_cpu_seconds":cpuElapsed,"average_effective_cores":cpuElapsed/elapsed,"measurement":"process CPU time / wall time; not exact peak concurrent cores"},
