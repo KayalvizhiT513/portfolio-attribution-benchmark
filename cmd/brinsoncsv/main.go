@@ -25,7 +25,7 @@ type agg struct{wp,wb,pr,br float64}
 type task struct{kind int;segment string;wp,wb,rp,rb,benchmark float64}
 type result struct{kind int;segment string;value float64}
 func cpuSeconds()float64{var usage syscall.Rusage;if e:=syscall.Getrusage(syscall.RUSAGE_SELF,&usage);e!=nil{panic(e)};return float64(usage.Utime.Sec)+float64(usage.Utime.Usec)/1e6+float64(usage.Stime.Sec)+float64(usage.Stime.Usec)/1e6}
-func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");output:=flag.String("output","results/brinson-go.csv","output CSV path");flag.Parse();start:=time.Now();cpuStart:=cpuSeconds()
+func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");output:=flag.String("output","results/brinson-go.csv","output CSV path");architecture:=flag.String("architecture","streaming","baseline or streaming");flag.Parse();if *architecture!="baseline"&&*architecture!="streaming"{panic("invalid architecture")};start:=time.Now();cpuStart:=cpuSeconds()
  if e:=os.MkdirAll(filepath.Dir(*output),0755);e!=nil{panic(e)}
  outFile,e:=os.Create(*output);if e!=nil{panic(e)};defer outFile.Close()
  buffered:=bufio.NewWriter(outFile);writer:=csv.NewWriter(buffered)
@@ -83,14 +83,20 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");outp
  if remaining[pp.segment]==0{
  if x.wp<=0||x.wb<=0{panic("zero-weight segment")}
  rp:=x.pr/x.wp;rb:=x.br/x.wb
+ if *architecture=="streaming"{
  tasks<-task{1,pp.segment,x.wp,x.wb,rp,rb,0}
  tasks<-task{2,pp.segment,x.wp,x.wb,rp,rb,0}
  if len(seen)<len(pr){earlySegments++}
  }
  }
+ }
  if len(seen)!=len(pr){panic("missing benchmark records")}
  if math.Abs(totalWb-1)>1e-9{panic("benchmark weights not normalized")}
  for segment,x:=range a{
+ if *architecture=="baseline"{
+ tasks<-task{1,segment,x.wp,x.wb,x.pr/x.wp,x.br/x.wb,0}
+ tasks<-task{2,segment,x.wp,x.wb,x.pr/x.wp,x.br/x.wb,0}
+ }
  tasks<-task{0,segment,x.wp,x.wb,x.pr/x.wp,x.br/x.wb,retB}
  }
  }()
@@ -118,7 +124,7 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");outp
  if e:=outFile.Sync();e!=nil{panic(e)}
  writeTime+=time.Since(writeStart)
  elapsed:=time.Since(start).Seconds();cpuElapsed:=cpuSeconds()-cpuStart
- report:=map[string]any{"language":"go","mode":"brinson-fachler","workers":workers,"days":days,
+ report:=map[string]any{"language":"go","mode":"brinson-fachler","architecture":*architecture,"workers":workers,"days":days,
  "security_day_records":securities,"segment_days":segments,"effect_tasks":3*segments,
  "pipeline":map[string]any{"segments_released_before_full_benchmark":earlySegments,"allocation_released_after_benchmark_total":true},
  "totals":map[string]float64{"allocation":totals[0],"selection":totals[1],"interaction":totals[2]},
