@@ -59,7 +59,7 @@ def effect(name,wp,wb,rp,rb,benchmark):
     return name,(wp-wb)*(rb-benchmark)
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument("--data",default="data/brinson-15k");p.add_argument("--output",default="results/brinson-python.csv");a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument("--data",default="data/brinson-15k");p.add_argument("--output",default="results/brinson-python.csv");p.add_argument("--architecture",choices=("baseline","streaming"),default="streaming");a=p.parse_args()
     started=time.perf_counter()
     cpu_started=time.process_time()
     cpu=os.process_cpu_count() if hasattr(os,"process_cpu_count") else os.cpu_count()
@@ -115,15 +115,19 @@ def main():
                     wp,swb,pc,bc=b
                     if wp<=0 or swb<=0:raise ValueError("zero-weight segment")
                     rp=pc/wp;rbseg=bc/swb
-                    submit(seg,"selection",wp,swb,rp,rbseg)
-                    submit(seg,"interaction",wp,swb,rp,rbseg)
-                    if len(seen_ids)<len(pr):early_segment_days+=1
+                    if a.architecture=="streaming":
+                        submit(seg,"selection",wp,swb,rp,rbseg)
+                        submit(seg,"interaction",wp,swb,rp,rbseg)
+                        if len(seen_ids)<len(pr):early_segment_days+=1
                 pending=next(benchmark,None)
             if seen_ids!=pr.keys() or any(remaining.values()):
                 raise ValueError("missing benchmark securities")
             if abs(total_wb-1)>1e-9:raise ValueError("benchmark weights not normalized")
             # Global benchmark return is finalized only now: release allocations.
             for seg,(wp,wb,pc,bc) in agg.items():
+                if a.architecture=="baseline":
+                    submit(seg,"selection",wp,wb,pc/wp,bc/wb)
+                    submit(seg,"interaction",wp,wb,pc/wp,bc/wb)
                 submit(seg,"allocation",wp,wb,pc/wp,bc/wb,benchmark_return)
             by_segment={seg:{} for seg in agg}
             daytotal=0.0
@@ -146,7 +150,7 @@ def main():
         write_time += time.perf_counter()-write_start
     elapsed=time.perf_counter()-started
     cpu_seconds=time.process_time()-cpu_started
-    print(json.dumps({"language":"python","mode":"brinson-fachler","workers":workers,
+    print(json.dumps({"language":"python","mode":"brinson-fachler","architecture":a.architecture,"workers":workers,
       "days":days,"security_day_records":securities,"segment_days":segments_processed,
       "effect_tasks":3*segments_processed,"totals":totals,
       "pipeline":{"segments_released_before_full_benchmark":early_segment_days,"allocation_released_after_benchmark_total":True},"output_csv":str(output),
