@@ -14,13 +14,6 @@ def check_equal(a,b,tag):
             if not math.isclose(float(r[col]),float(s[col]),rel_tol=1e-8,abs_tol=1e-11):
                 raise ValueError(f"{tag}: {key} {col} mismatch")
 
-def one_job(binary,folder,output,cpu_budget):
-    env=os.environ.copy();env["GOMAXPROCS"]=str(cpu_budget)
-    run=subprocess.run([str(binary),"--data",str(folder),"--output",str(output),"--architecture",one_job.architecture],
-                       capture_output=True,text=True,env=env)
-    if run.returncode:raise RuntimeError(f"{folder}: {run.stderr}\n{run.stdout}")
-    return json.loads(run.stdout)
-
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--data",default="data/brinson-multi")
@@ -53,8 +46,11 @@ def main():
             started=time.perf_counter()
             def execute(folder):
                 path=output/f"{folder.name}-{architecture}-round{round_number:02d}.csv"
-                env=os.environ.copy();env["GOMAXPROCS"]=str(per_job)
-                env["BRINSON_CPU_BUDGET"]=str(per_job)
+                env=os.environ.copy()
+                if args.language=="go":
+                    env.pop("GOMAXPROCS",None)  # Go chooses its own runtime default.
+                else:
+                    env["BRINSON_CPU_BUDGET"]=str(per_job)
                 selected="day_parallel" if architecture=="baseline" else "streaming_days"
                 if args.language=="go":
                     command=[str(day_binary if architecture=="baseline" else stream_binary)]
@@ -69,7 +65,9 @@ def main():
             wall=time.perf_counter()-started
             completed[architecture]={name:path for name,path,_ in results}
             record={"round":round_number,"architecture":architecture,"batch_elapsed_seconds":wall,
-                    "portfolios":len(folders),"parallel_processes":parallel,"gomaxprocs_per_process":per_job,
+                    "portfolios":len(folders),"parallel_processes":parallel,
+                    "gomaxprocs_per_process":results[0][2]["workers"] if args.language=="go" else None,
+                    "python_workers_per_process":per_job if args.language=="python" else None,
                     "sum_job_elapsed_seconds":sum(r["elapsed_seconds"] for _,_,r in results),
                     "sum_read_seconds":sum(r["io_timing"]["input_read_parse_seconds"] for _,_,r in results),
                     "sum_write_seconds":sum(r["io_timing"]["output_write_sync_seconds"] for _,_,r in results),
@@ -99,7 +97,10 @@ def main():
         w=csv.DictWriter(f,fieldnames=list(summary[0]));w.writeheader();w.writerows(summary)
     (output/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
     print(json.dumps({"language":args.language,"baseline_architecture":"day_parallel","streaming_architecture":"streaming_days",
-                      "logical_cpus":cores,"parallel_processes":parallel,"gomaxprocs_per_process":per_job,
+                      "logical_cpus":cores,"parallel_processes":parallel,
+                      "go_cpu_policy":"runtime_default_no_GOMAXPROCS" if args.language=="go" else "not_applicable",
+                      "gomaxprocs_per_process":measurements[0]["gomaxprocs_per_process"],
+                      "python_workers_per_process":per_job if args.language=="python" else None,
                       "summary":summary},indent=2))
 
 if __name__=="__main__":main()
