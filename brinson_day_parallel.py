@@ -1,5 +1,5 @@
 """Brinson–Fachler day-parallel baseline: one independent day per process task."""
-import argparse,csv,json,math,os,time
+import argparse,csv,json,math,os,time,resource
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor,wait,FIRST_COMPLETED
 from pathlib import Path
@@ -63,6 +63,8 @@ def main():
     ap.add_argument("--architecture",choices=["day_parallel"],default="day_parallel")
     a=ap.parse_args()
     start=time.perf_counter();cpu_start=time.process_time()
+    before=resource.getrusage(resource.RUSAGE_CHILDREN)
+    child_cpu_start=before.ru_utime+before.ru_stime
     workers=max(1,(os.process_cpu_count() if hasattr(os,"process_cpu_count") else os.cpu_count()) or 1)
     out=Path(a.output);out.parent.mkdir(parents=True,exist_ok=True)
     read_time=[0.0];write_time=0.0
@@ -98,12 +100,9 @@ def main():
         t=time.perf_counter();f.flush();os.fsync(f.fileno());write_time+=time.perf_counter()-t
     elapsed=time.perf_counter()-start
     cpu_seconds=time.process_time()-cpu_start
-    # process_time() above counts parent only. Sum child CPU from RUSAGE_CHILDREN
-    # (macOS and Unix) when available; wall time and all output remain valid without it.
-    import resource
-    child=resource.getrusage(resource.RUSAGE_CHILDREN)
-    # The cumulative RUSAGE_CHILDREN counter includes prior children, if any.
-    # Record it only as informational; parent+child use requires start snapshot.
+    after=resource.getrusage(resource.RUSAGE_CHILDREN)
+    child_cpu=(after.ru_utime+after.ru_stime)-child_cpu_start
+    combined_cpu=cpu_seconds+child_cpu
     print(json.dumps({"language":"python","mode":"brinson-fachler","architecture":"day_parallel",
         "workers":workers,"days":index,"security_day_records":securities,"segment_days":segment_days,
         "effect_tasks":index,"task_granularity":"one complete trading day",
@@ -111,7 +110,7 @@ def main():
         "pipeline":{"segments_released_before_full_benchmark":0,"allocation_released_after_benchmark_total":True},
         "output_csv":str(out),"elapsed_seconds":elapsed,
         "io_timing":{"input_read_parse_seconds":read_time[0],"output_write_sync_seconds":write_time},
-        "cpu_usage":{"process_cpu_seconds":cpu_seconds,"average_effective_cores":cpu_seconds/elapsed,
-        "measurement":"parent process only; worker-process CPU excluded"},
+        "cpu_usage":{"process_cpu_seconds":combined_cpu,"average_effective_cores":combined_cpu/elapsed,
+        "measurement":"parent and completed worker-process CPU / wall time; not peak simultaneous cores"},
         "timing_scope":"CSV input read+parse+day process tasks+validation+output write+sync"},indent=2))
 if __name__=="__main__":main()
