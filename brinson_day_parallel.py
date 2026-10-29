@@ -4,10 +4,10 @@ from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor,wait,FIRST_COMPLETED
 from pathlib import Path
 
-FIELDS=["date","security_id","segment_id","weight","return"]
+FIELDS=["date","security_id","weight","return"]
 OUT=["date","segment_id","allocation","selection","interaction","total"]
 
-def groups(path,read_time):
+def groups(path,read_time,segments):
     with open(path,newline="") as f:
         reader=csv.DictReader(f)
         if reader.fieldnames!=FIELDS:raise ValueError(f"bad header: {path}")
@@ -24,10 +24,11 @@ def groups(path,read_time):
             rows={}
             while row is not None and row["date"]==date:
                 sid=row["security_id"]
-                if not sid or not row["segment_id"] or sid in rows:raise ValueError("missing or duplicate key")
+                if not sid or sid in rows:raise ValueError("missing or duplicate key")
+                if sid not in segments:raise ValueError(f"unmapped security: {sid}")
                 weight=float(row["weight"]);ret=float(row["return"])
                 if not math.isfinite(weight) or weight<0 or not math.isfinite(ret):raise ValueError("invalid numeric input")
-                rows[sid]=(row["segment_id"],weight,ret)
+                rows[sid]=(segments[sid],weight,ret)
                 t=time.perf_counter();row=next(reader,None);read_time[0]+=time.perf_counter()-t
             pending=row
             yield date,rows
@@ -73,8 +74,16 @@ def main():
     with out.open("w",newline="") as f, ProcessPoolExecutor(max_workers=workers) as pool:
         writer=csv.writer(f)
         t=time.perf_counter();writer.writerow(OUT);write_time+=time.perf_counter()-t
-        pg=groups(Path(a.data)/"portfolio.csv",read_time)
-        bg=groups(Path(a.data)/"benchmark.csv",read_time)
+        with open(Path(a.data)/"security_segments.csv",newline="") as mapping_file:
+            mapping_reader=csv.DictReader(mapping_file)
+            if mapping_reader.fieldnames!=["security_id","segment_id"]:raise ValueError("invalid mapping header")
+            segments={}
+            for mapping in mapping_reader:
+                sid=mapping["security_id"];seg=mapping["segment_id"]
+                if not sid or not seg or sid in segments:raise ValueError("invalid or duplicate security mapping")
+                segments[sid]=seg
+        pg=groups(Path(a.data)/"portfolio.csv",read_time,segments)
+        bg=groups(Path(a.data)/"benchmark.csv",read_time,segments)
         index=0
         # Keep submitted days bounded so 252 days do not become 252 large pickled tasks.
         for pday,bday in __import__("itertools").zip_longest(pg,bg):
