@@ -117,7 +117,7 @@ def main():
                     rp=pc/wp;rbseg=bc/swb
                     submit(seg,"selection",wp,swb,rp,rbseg)
                     submit(seg,"interaction",wp,swb,rp,rbseg)
-                    early_segment_days+=1
+                    if len(seen_ids)<len(pr):early_segment_days+=1
                 pending=next(benchmark,None)
             if seen_ids!=pr.keys() or any(remaining.values()):
                 raise ValueError("missing benchmark securities")
@@ -149,7 +149,7 @@ def main():
     print(json.dumps({"language":"python","mode":"brinson-fachler","workers":workers,
       "days":days,"security_day_records":securities,"segment_days":segments_processed,
       "effect_tasks":3*segments_processed,"totals":totals,
-      "pipeline":{"early_selection_interaction_segment_days":early_segment_days,"allocation_released_after_benchmark_total":True},"output_csv":str(output),
+      "pipeline":{"segments_released_before_full_benchmark":early_segment_days,"allocation_released_after_benchmark_total":True},"output_csv":str(output),
       "io_timing":{"input_read_parse_seconds":read_time[0],"output_write_sync_seconds":write_time},
       "cpu_usage":{"process_cpu_seconds":cpu_seconds,"average_effective_cores":cpu_seconds/elapsed if elapsed else 0.0,"measurement":"process CPU time / wall time; not exact peak concurrent cores"},
       "elapsed_seconds":elapsed,"timing_scope":"CSV input reading+join+aggregation+effect tasks+validation+CSV output write+flush+fsync"},indent=2))
