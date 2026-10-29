@@ -65,7 +65,8 @@ def main():
     start=time.perf_counter();cpu_start=time.process_time()
     before=resource.getrusage(resource.RUSAGE_CHILDREN)
     child_cpu_start=before.ru_utime+before.ru_stime
-    workers=max(1,(os.process_cpu_count() if hasattr(os,"process_cpu_count") else os.cpu_count()) or 1)
+    available=(os.process_cpu_count() if hasattr(os,"process_cpu_count") else os.cpu_count()) or 1
+    workers=max(1,min(available,int(os.environ.get("BRINSON_CPU_BUDGET",available))))
     out=Path(a.output);out.parent.mkdir(parents=True,exist_ok=True)
     read_time=[0.0];write_time=0.0
     pending=set();completed={}
