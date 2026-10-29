@@ -296,3 +296,18 @@ python brinson_csv.py --data data/brinson-15k --output results/brinson-python.cs
 ```
 
 **Validation status:** This code has been committed but has not yet been executed on the user's Mac; compare both output CSVs and reported totals against earlier measured runs. Historical timings belong to the previous day-barrier architecture.
+
+
+## Repeatable four-way architecture comparison
+
+The current Python and Go Brinson runners accept `--architecture baseline|streaming` (default `streaming`). Both read the same CSV fixture and write the same six-column attribution CSV. `baseline` waits until all benchmark records for a day have been read before dispatching *any* segment effects; `streaming` dispatches selection and interaction when individual segments complete, then dispatches allocation after the whole-day benchmark return is known. This comparison controls the formulas and task counts but is **not a byte-for-byte reproduction of the earlier historical baseline implementation**, whose CSV processing and collection logic differed.
+
+The new runner executes each of the four combinations sequentially, rotates execution order between rounds, checks every output row against a shared reference using floating-point tolerance, and writes raw timings and summary statistics (median, mean, minimum, maximum, sample standard deviation) to CSV and JSON.
+
+```bash
+git pull origin main
+go build -o benchmark-brinson ./cmd/brinsoncsv
+python compare_architectures.py --data data/brinson-15k --go ./benchmark-brinson --runs 10
+```
+
+Outputs: `results/architecture-comparison/runs.csv`, `summary.csv`, `summary.json`, and individual per-run attribution CSV files. There is no warm-up run; the first runs can reflect cold caches and process startup. The runner checks numerical equivalence but does not prove parallel CPU usage. Run on an otherwise quiet computer for more meaningful results.
