@@ -17,6 +17,10 @@ func (r *reader)group()(string,map[string]rec,bool){first:=r.next;r.next=nil
  for{v,e:=r.csv.Read();if e==io.EOF{break};if e!=nil{panic(e)}
  if v[0]!=day{r.next=v;break};add(v)}
  r.seen[day]=true;return day,rows,true}
+func (r *reader)row()([]string,bool){
+ if r.next!=nil{v:=r.next;r.next=nil;return v,true}
+ v,e:=r.csv.Read();if e==io.EOF{return nil,false};if e!=nil{panic(e)};return v,true
+}
 type agg struct{wp,wb,pr,br float64}
 type task struct{kind int;segment string;wp,wb,rp,rb,benchmark float64}
 type result struct{kind int;segment string;value float64}
@@ -59,16 +63,23 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");outp
  // The existing reader returns a complete benchmark day, which must be
  // replaced with row streaming to overlap read/compute at segment boundaries.
  // For now, drain and schedule the completed segments as soon as matched.
- readStart=time.Now();day2,br,bok:=b.group();readTime+=time.Since(readStart)
- if !bok||day!=day2||len(pr)!=len(br){panic("date/security mismatch")}
  var dispatch sync.WaitGroup
  dispatch.Add(1)
  go func(){
  defer dispatch.Done()
- for id,bb:=range br{
- pp,ok:=pr[id];if !ok||pp.segment!=bb.segment{panic("key/segment mismatch")}
- x:=a[pp.segment];x.wb+=bb.weight;x.br+=bb.weight*bb.ret
- totalWb+=bb.weight;retB+=bb.weight*bb.ret;remaining[pp.segment]--
+ seen:=make(map[string]bool,len(pr))
+ current:=true
+ for current{
+ readStart:=time.Now();row,ok:=b.row();readTime+=time.Since(readStart)
+ if !ok{break}
+ if row[0]!=day{b.next=row;break}
+ id:=row[1]
+ if seen[id]{panic("duplicate benchmark security")};seen[id]=true
+ pp,found:=pr[id];if !found||pp.segment!=row[2]{panic("key/segment mismatch")}
+ w,err:=strconv.ParseFloat(row[3],64);if err!=nil||math.IsNaN(w)||math.IsInf(w,0)||w<0{panic("bad benchmark weight")}
+ r,err:=strconv.ParseFloat(row[4],64);if err!=nil||math.IsNaN(r)||math.IsInf(r,0){panic("bad benchmark return")}
+ x:=a[pp.segment];x.wb+=w;x.br+=w*r
+ totalWb+=w;retB+=w*r;remaining[pp.segment]--
  if remaining[pp.segment]==0{
  if x.wp<=0||x.wb<=0{panic("zero-weight segment")}
  rp:=x.pr/x.wp;rb:=x.br/x.wb
@@ -77,6 +88,7 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");outp
  earlySegments++
  }
  }
+ if len(seen)!=len(pr){panic("missing benchmark records")}
  if math.Abs(totalWb-1)>1e-9{panic("benchmark weights not normalized")}
  for segment,x:=range a{
  tasks<-task{0,segment,x.wp,x.wb,x.pr/x.wp,x.br/x.wb,retB}
@@ -97,7 +109,8 @@ func main(){folder:=flag.String("data","data/brinson-15k","fixture folder");outp
  }
  days++;securities+=len(pr);segments+=len(a)
  }
- if _,_,ok:=b.group();ok{panic("extra benchmark dates")}
+ readStart:=time.Now();_,remainingBenchmark:=b.row();readTime+=time.Since(readStart)
+ if remainingBenchmark{panic("extra benchmark dates")}
  close(tasks);for range results{}
  writeStart=time.Now()
  writer.Flush();if e:=writer.Error();e!=nil{panic(e)}
