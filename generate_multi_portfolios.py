@@ -11,14 +11,17 @@ def main():
     if a.portfolios<2:ap.error("require >=2 portfolios")
     source=Path(a.source).resolve();dest=Path(a.output).resolve()
     if source==dest:ap.error("source and output must differ")
-    original=source/"portfolio.csv";benchmark=source/"benchmark.csv"
-    if not original.is_file() or not benchmark.is_file():ap.error("source CSVs missing")
+    original=source/"portfolio.csv";benchmark=source/"benchmark.csv";mapping=source/"security_segments.csv"
+    if not original.is_file() or not benchmark.is_file() or not mapping.is_file():ap.error("source CSVs missing")
     dest.mkdir(parents=True,exist_ok=True)
     for index in range(a.portfolios):
         folder=dest/f"portfolio-{index+1:03d}";folder.mkdir(exist_ok=True)
         btarget=folder/"benchmark.csv"
         if btarget.is_symlink() or btarget.exists():btarget.unlink()
         btarget.symlink_to(os.path.relpath(benchmark,folder))
+        mtarget=folder/"security_segments.csv"
+        if mtarget.is_symlink() or mtarget.exists():mtarget.unlink()
+        mtarget.symlink_to(os.path.relpath(mapping,folder))
         target=folder/"portfolio.csv"
         if index==0:
             shutil.copyfile(original,target)
