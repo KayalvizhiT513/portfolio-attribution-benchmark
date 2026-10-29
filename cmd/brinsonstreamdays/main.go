@@ -23,7 +23,7 @@ func calculate(j job)result{
  // Each segment effect is its own goroutine task. This deliberately exposes
  // fine-grained task overhead, while multiple whole days are already in flight.
  submit:=func(seg string,kind int,x *ag,benchmark float64){
-  pw,bw,pr,br:=x.wp,x.wb,x.pr/x.wp,x.br/x.bw
+  pw,bw,pr,br:=x.wp,x.wb,x.pr/x.wp,x.br/x.wb
   go func(){var v float64;switch kind{case 0:v=(pw-bw)*(br-benchmark);case 1:v=bw*(pr-br);case 2:v=(pw-bw)*(pr-br)};effects<-effectResult{seg,kind,v}}()
  }
  seen:=map[string]bool{};early:=0
