@@ -63,7 +63,7 @@ def main():
     started=time.perf_counter()
     cpu_started=time.process_time()
     cpu=os.process_cpu_count() if hasattr(os,"process_cpu_count") else os.cpu_count()
-    workers=max(1,cpu or 1)
+    workers=max(1,min(cpu or 1,int(os.environ.get("BRINSON_CPU_BUDGET",cpu or 1))))
     totals={"allocation":0.0,"selection":0.0,"interaction":0.0}
     days=securities=segments_processed=0
     read_time=[0.0]
