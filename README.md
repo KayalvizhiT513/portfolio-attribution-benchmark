@@ -279,3 +279,20 @@ Both Brinson runners now include an `io_timing` object with `input_read_parse_se
 ### Actual CPU utilization (not configured worker count)
 
 The Brinson runners now emit `cpu_usage.process_cpu_seconds` and `cpu_usage.average_effective_cores` using process user+system CPU time divided by wall-clock elapsed time. For example, a value around 1.0 means approximately one logical CPU's worth of processing **on average** for the complete run. This is more meaningful than the configured `workers` count, but does **not** establish how many cores were running at the same instant or which physical cores ran the workload. Precise peak concurrency requires OS sampling/profiling (e.g. macOS Instruments). Python's GIL-bound threaded effect code may not achieve multicore CPU compute despite detecting multiple workers. Go CPU accounting here uses the platform's `syscall.Getrusage` interface; test on macOS before treating the build as validated.
+
+
+### Streaming, dependency-aware Brinson schedule (latest)
+
+Python and Go now keep a **portfolio security map for one day** and consume the corresponding **benchmark CSV one row at a time**. The portfolio records provide the expected number of securities in each segment. Each matching benchmark row updates that segment's benchmark weight and return. As soon as all securities in a segment have matched, **selection and interaction are submitted immediately** to the worker pool. These two effects can execute while later benchmark rows are being parsed. Only after all benchmark securities for the day have been matched and the overall benchmark return is final are the **allocation** tasks submitted. Daily reconciliation and CSV writing still form a day boundary.
+
+The new `pipeline.segments_released_before_full_benchmark` reports the count of segment-days whose selection/interaction tasks were dispatched **before the last benchmark record of the day was processed**. This counts dispatch readiness, not proven simultaneous CPU execution. This approach presumes **date-grouped CSV inputs** and complete per-date membership across both files; security rows within a date can be shuffled. It also has a limitation: portfolio input parsing occurs before benchmark streaming each day, and per-segment completion is constrained by when the last member's benchmark row arrives.
+
+Rebuild and rerun both implementations to measure the new architecture:
+```bash
+git pull origin main
+go build -o benchmark-brinson ./cmd/brinsoncsv
+python brinson_csv.py --data data/brinson-15k --output results/brinson-python.csv
+./benchmark-brinson --data data/brinson-15k --output results/brinson-go.csv
+```
+
+**Validation status:** This code has been committed but has not yet been executed on the user's Mac; compare both output CSVs and reported totals against earlier measured runs. Historical timings belong to the previous day-barrier architecture.
