@@ -1,5 +1,5 @@
 """Compare Go baseline vs streaming across independent portfolios, repeated rounds."""
-import argparse,csv,json,math,os,statistics,subprocess,time
+import argparse,csv,json,math,os,statistics,subprocess,time,sys
 from concurrent.futures import ThreadPoolExecutor,as_completed
 from pathlib import Path
 
@@ -25,6 +25,8 @@ def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--data",default="data/brinson-multi")
     ap.add_argument("--go",default="./benchmark-brinson")
+    ap.add_argument("--go-day",default="./benchmark-brinson-day")
+    ap.add_argument("--language",choices=("go","python"),default="go")
     ap.add_argument("--runs",type=int,default=10)
     ap.add_argument("--parallel",type=int,default=None)
     ap.add_argument("--output-dir",default="results/multi-portfolio")
@@ -37,7 +39,9 @@ def main():
     if parallel<1 or parallel>cores:ap.error("parallel must be between 1 and detected logical CPUs")
     per_job=max(1,cores//parallel)
     binary=Path(args.go).resolve()
-    if not binary.exists():ap.error("Go executable does not exist; build it first")
+    day_binary=Path(args.go_day).resolve()
+    if args.language=="go" and (not binary.exists() or not day_binary.exists()):
+        ap.error("Build both Go executables: ./cmd/brinsoncsv and ./cmd/brinsonday")
     output=Path(args.output_dir);output.mkdir(parents=True,exist_ok=True)
     measurements=[]
     for round_number in range(1,args.runs+1):
@@ -48,8 +52,14 @@ def main():
             def execute(folder):
                 path=output/f"{folder.name}-{architecture}-round{round_number:02d}.csv"
                 env=os.environ.copy();env["GOMAXPROCS"]=str(per_job)
-                proc=subprocess.run([str(binary),"--data",str(folder),"--output",str(path),
-                                     "--architecture",architecture],capture_output=True,text=True,env=env)
+                env["BRINSON_CPU_BUDGET"]=str(per_job)
+                selected="day_parallel" if architecture=="baseline" else "streaming"
+                if args.language=="go":
+                    command=[str(day_binary if architecture=="baseline" else binary)]
+                else:
+                    command=[sys.executable,"brinson_day_parallel.py" if architecture=="baseline" else "brinson_csv.py"]
+                proc=subprocess.run(command+["--data",str(folder),"--output",str(path),
+                                     "--architecture",selected],capture_output=True,text=True,env=env)
                 if proc.returncode:raise RuntimeError(f"{architecture}/{folder.name}: {proc.stderr}\n{proc.stdout}")
                 return folder.name,path,json.loads(proc.stdout)
             with ThreadPoolExecutor(max_workers=parallel) as executor:
@@ -86,7 +96,8 @@ def main():
     with (output/"summary.csv").open("w",newline="") as f:
         w=csv.DictWriter(f,fieldnames=list(summary[0]));w.writeheader();w.writerows(summary)
     (output/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
-    print(json.dumps({"logical_cpus":cores,"parallel_processes":parallel,"gomaxprocs_per_process":per_job,
+    print(json.dumps({"language":args.language,"baseline_architecture":"day_parallel","streaming_architecture":"streaming",
+                      "logical_cpus":cores,"parallel_processes":parallel,"gomaxprocs_per_process":per_job,
                       "summary":summary},indent=2))
 
 if __name__=="__main__":main()
