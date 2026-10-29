@@ -1,12 +1,19 @@
 package main
 import("bufio";"encoding/csv";"encoding/json";"flag";"fmt";"io";"math";"os";"path/filepath";"runtime";"sort";"strconv";"sync";"syscall";"time")
 type sec struct{seg string;w,r float64}
-type reader struct{f *os.File;r *csv.Reader;next []string;seen map[string]bool}
-func input(path string)*reader{f,e:=os.Open(path);must(e);r:=csv.NewReader(f);h,e:=r.Read();must(e);want:=[]string{"date","security_id","segment_id","weight","return"};if len(h)!=len(want){panic("bad header")};for i:=range h{if h[i]!=want[i]{panic("bad header")}};return &reader{f:f,r:r,seen:map[string]bool{}}}
+type reader struct{f *os.File;r *csv.Reader;next []string;seen map[string]bool;segments map[string]string}
+func input(path string,segments map[string]string)*reader{f,e:=os.Open(path);must(e);r:=csv.NewReader(f);h,e:=r.Read();must(e);want:=[]string{"date","security_id","weight","return"};if len(h)!=len(want){panic("bad header")};for i:=range h{if h[i]!=want[i]{panic("bad header")}};return &reader{f:f,r:r,seen:map[string]bool{},segments:segments}}
+func loadSegments(path string)map[string]string{
+ f,e:=os.Open(path);must(e);defer f.Close();r:=csv.NewReader(f)
+ h,e:=r.Read();must(e);if len(h)!=2||h[0]!="security_id"||h[1]!="segment_id"{panic("bad mapping header")}
+ segments:=map[string]string{}
+ for{row,e:=r.Read();if e==io.EOF{break};must(e);if row[0]==""||row[1]==""{panic("blank mapping")};if _,ok:=segments[row[0]];ok{panic("duplicate mapping")};segments[row[0]]=row[1]}
+ return segments
+}
 func must(e error){if e!=nil{panic(e)}}
 func(x *reader)group()(string,map[string]sec,bool,error){v:=x.next;x.next=nil;if v==nil{var e error;v,e=x.r.Read();if e==io.EOF{return "",nil,false,nil};if e!=nil{return "",nil,false,e}}
  d:=v[0];if d==""||x.seen[d]{return "",nil,false,fmt.Errorf("invalid date %s",d)};rows:=map[string]sec{}
- add:=func(v []string)error{if v[1]==""||v[2]==""{return fmt.Errorf("blank id")};if _,ok:=rows[v[1]];ok{return fmt.Errorf("duplicate id")};w,e:=strconv.ParseFloat(v[3],64);if e!=nil||math.IsNaN(w)||math.IsInf(w,0)||w<0{return fmt.Errorf("bad weight")};r,e:=strconv.ParseFloat(v[4],64);if e!=nil||math.IsNaN(r)||math.IsInf(r,0){return fmt.Errorf("bad return")};rows[v[1]]=sec{v[2],w,r};return nil}
+ add:=func(v []string)error{if v[1]==""{return fmt.Errorf("blank id")};if _,ok:=rows[v[1]];ok{return fmt.Errorf("duplicate id")};w,e:=strconv.ParseFloat(v[2],64);if e!=nil||math.IsNaN(w)||math.IsInf(w,0)||w<0{return fmt.Errorf("bad weight")};r,e:=strconv.ParseFloat(v[3],64);if e!=nil||math.IsNaN(r)||math.IsInf(r,0){return fmt.Errorf("bad return")};seg,ok:=x.segments[v[1]];if !ok{return fmt.Errorf("unmapped security %s",v[1])};rows[v[1]]=sec{seg,w,r};return nil}
  if e:=add(v);e!=nil{return "",nil,false,e}
  for{v,e:=x.r.Read();if e==io.EOF{break};if e!=nil{return "",nil,false,e};if v[0]!=d{x.next=v;break};if e:=add(v);e!=nil{return "",nil,false,e}};x.seen[d]=true;return d,rows,true,nil}
 type job struct{index int;day string;p,b map[string]sec}
@@ -48,7 +55,7 @@ func calculate(j job)result{
 func cpu()float64{var u syscall.Rusage;must(syscall.Getrusage(syscall.RUSAGE_SELF,&u));return float64(u.Utime.Sec+u.Stime.Sec)+float64(u.Utime.Usec+u.Stime.Usec)/1e6}
 func main(){dir:=flag.String("data","data/brinson-15k","input");path:=flag.String("output","results/brinson-go-day.csv","output");arch:=flag.String("architecture","streaming_days","streaming_days");flag.Parse();if *arch!="streaming_days"{panic("use streaming_days")};start:=time.Now();cpuStart:=cpu()
  must(os.MkdirAll(filepath.Dir(*path),0755));f,e:=os.Create(*path);must(e);defer f.Close();bw:=bufio.NewWriter(f);writer:=csv.NewWriter(bw);writeTime:=time.Duration(0);t:=time.Now();must(writer.Write([]string{"date","segment_id","allocation","selection","interaction","total"}));writeTime+=time.Since(t)
- p:=input(filepath.Join(*dir,"portfolio.csv"));defer p.f.Close();b:=input(filepath.Join(*dir,"benchmark.csv"));defer b.f.Close()
+ mapping:=loadSegments(filepath.Join(*dir,"security_segments.csv"));p:=input(filepath.Join(*dir,"portfolio.csv"),mapping);defer p.f.Close();b:=input(filepath.Join(*dir,"benchmark.csv"),mapping);defer b.f.Close()
  n:=runtime.GOMAXPROCS(0);if n<1{n=runtime.NumCPU()};jobs:=make(chan job,n);done:=make(chan result,n);errCh:=make(chan error,1)
  var wg sync.WaitGroup;for i:=0;i<n;i++{wg.Add(1);go func(){defer wg.Done();for j:=range jobs{done<-calculate(j)}}()};go func(){wg.Wait();close(done)}()
  readTime:=time.Duration(0)
