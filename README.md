@@ -373,3 +373,17 @@ python compare_multi_portfolios.py --language python --data data/brinson-multi -
 ```
 
 For a quick validation run first use `--runs 2`. The new implementations have been committed but not yet verified on your local Mac. Prior measurements cannot be treated as comparable to this revised experiment.
+
+
+## Go benchmark without per-portfolio GOMAXPROCS caps
+
+The multi-portfolio runner now explicitly removes `GOMAXPROCS` from the environment of **both Go architectures**, even if the shell has it set. Go uses its runtime default for each portfolio process; macOS schedules all processes over the same 12 logical CPUs. This is not CPU affinity or a 48-core machine. The runner still starts up to one portfolio process per fixture and alternates baseline-first / streaming-first on successive rounds. Python retains its separate `BRINSON_CPU_BUDGET` policy.
+
+```bash
+git pull origin main
+go build -o benchmark-brinson-day ./cmd/brinsonday
+go build -o benchmark-brinson-stream-days ./cmd/brinsonstreamdays
+python compare_multi_portfolios.py --language go --data data/brinson-multi --runs 10 --output-dir results/multi-day-go-uncapped
+```
+
+The Go JSON's `workers` and summary's `gomaxprocs_per_process` report the actual Go runtime concurrency setting rather than the former forced allocation of 3. This change has not been benchmarked on the user's Mac yet.
