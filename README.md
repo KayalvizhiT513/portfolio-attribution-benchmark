@@ -354,3 +354,22 @@ python compare_multi_portfolios.py --language python --data data/brinson-multi -
 For an initial smoke test replace `--runs 10` with `--runs 2`. Python child-process CPU time is included in the effective-core calculation for the day-parallel runner. The CSV timings for day-parallel programs measure reading/parsing by the parent reader and writing/syncing by the parent writer, with worker IPC and computations included in total elapsed time. Because the previous benchmarks used a different baseline, do not compare their medians as if the architecture were unchanged.
 
 **Status:** These are new source implementations; full machine-specific compilation/performance and output comparison must be validated by running the above commands. The Python and Go orchestration models differ (processes vs goroutines) but calculate the same daily Brinson–Fachler formulas.
+
+
+## Corrected comparison: both architectures parallelize independent dates
+
+The previous comparison accidentally gave only the day-level baseline concurrent trading days. This is corrected with **two new streaming-day implementations**, `cmd/brinsonstreamdays` (Go) and `brinson_streaming_days.py` (Python).
+
+- **Baseline**: separate trading-day workers, each computes all three effects inline for every segment (one scheduled job per date).
+- **Streaming-days**: separate trading-day workers **also run concurrently**. Within each day, selection and interaction are independently scheduled when a segment's matching benchmark records are complete; allocation is independently scheduled after that day's benchmark total has been finalized. Go launches individual effect goroutines; Python uses separate thread tasks within each day process. Both pipelines read input CSV day-by-day in one producer; reading is not per-day-parallel. Both produce date-ordered CSV output.
+- The multi-portfolio runner now compares these modes, not the old sequential-date streaming executable, and still alternates architecture execution order per round. The streaming mode has more effect-task scheduling overhead by design; Python also has extra nested thread pools.
+
+```bash
+git pull origin main
+go build -o benchmark-brinson-day ./cmd/brinsonday
+go build -o benchmark-brinson-stream-days ./cmd/brinsonstreamdays
+python compare_multi_portfolios.py --language go --data data/brinson-multi --runs 10 --output-dir results/multi-day-fair-go
+python compare_multi_portfolios.py --language python --data data/brinson-multi --runs 10 --output-dir results/multi-day-fair-python
+```
+
+For a quick validation run first use `--runs 2`. The new implementations have been committed but not yet verified on your local Mac. Prior measurements cannot be treated as comparable to this revised experiment.
