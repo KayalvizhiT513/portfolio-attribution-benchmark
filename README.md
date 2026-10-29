@@ -387,3 +387,25 @@ python compare_multi_portfolios.py --language go --data data/brinson-multi --run
 ```
 
 The Go JSON's `workers` and summary's `gomaxprocs_per_process` report the actual Go runtime concurrency setting rather than the former forced allocation of 3. This change has not been benchmarked on the user's Mac yet.
+
+
+## Separate security-to-segment mapping (current fixture format)
+
+The **current** benchmark fixture has six distinct physical CSV files for four portfolios: four `portfolio.csv` files, one shared `benchmark.csv`, and **one shared `security_segments.csv`**. The mapping is a separate actual input; neither portfolio nor benchmark CSV embeds `segment_id` anymore.
+
+- `portfolio.csv`, `benchmark.csv` header: `date,security_id,weight,return`.
+- `security_segments.csv` header: `security_id,segment_id`; one mapping row per security, reused across dates and portfolios.
+- Go `cmd/brinsonday` and `cmd/brinsonstreamdays` and Python `brinson_day_parallel.py` and `brinson_streaming_days.py` read the mapping and lookup the segment for every security ID when parsing daily input. Each portfolio process loads its own in-memory mapping; mapping files are symlinked to the shared file on disk.
+
+Old fixtures have the obsolete five-column schema and **must be regenerated** before running the new implementation:
+
+```bash
+git pull origin main
+python generate_brinson_csv.py --securities 15000 --days 252 --segments 20 --seed 42 --output data/brinson-15k-mapped
+python generate_multi_portfolios.py --source data/brinson-15k-mapped --output data/brinson-multi-mapped --portfolios 4
+go build -o benchmark-brinson-day ./cmd/brinsonday
+go build -o benchmark-brinson-stream-days ./cmd/brinsonstreamdays
+python compare_multi_portfolios.py --language go --data data/brinson-multi-mapped --runs 2 --output-dir results/mapped-smoke-go
+```
+
+After validation, use `--runs 10` with a new output folder. This is a **new I/O/join workload**, so compare its timings separately from the previous embedded-segment experiments. The older sequential-day scripts `brinson_csv.py` and `cmd/brinsoncsv` still expect embedded segment IDs and are legacy paths, not part of the updated multi-portfolio comparator.
