@@ -311,3 +311,19 @@ python compare_architectures.py --data data/brinson-15k --go ./benchmark-brinson
 ```
 
 Outputs: `results/architecture-comparison/runs.csv`, `summary.csv`, `summary.json`, and individual per-run attribution CSV files. There is no warm-up run; the first runs can reflect cold caches and process startup. The runner checks numerical equivalence but does not prove parallel CPU usage. Run on an otherwise quiet computer for more meaningful results.
+
+
+## Multi-portfolio Go baseline vs streaming experiment
+
+This experiment tests whether independent **portfolio-level jobs** provide more opportunity for parallel execution. It creates separate portfolios with distinct, normalized security weights and returns, but shares the same benchmark CSV using relative symlinks. Each portfolio runs the existing Brinson–Fachler Go program; baseline and streaming use the same fixture and the same three-effect formulas.
+
+```bash
+git pull origin main
+go build -o benchmark-brinson ./cmd/brinsoncsv
+python generate_multi_portfolios.py --source data/brinson-15k --output data/brinson-multi --portfolios 4
+python compare_multi_portfolios.py --data data/brinson-multi --go ./benchmark-brinson --runs 10
+```
+
+The driver runs **all portfolios simultaneously** per architecture up to the detected logical CPU count, sets `GOMAXPROCS` per child process to approximately `detected CPUs / concurrent portfolio jobs`, and compares *batch wall-clock latency*, not the sum of child runtimes. It alternates baseline-first vs streaming-first by round, performs numerical CSV output comparisons for each portfolio, and saves `results/multi-portfolio/runs.csv`, `summary.csv`, and `summary.json` plus per-run attribution CSVs. `batch_effective_cores` is sum of child process CPU seconds divided by batch wall time (an average CPU equivalent, not simultaneous peak physical cores). Repeated shared benchmark reads may benefit from OS caching, which is part of the measured workload.
+
+Do not confuse this with a shared-reader or in-process multi-portfolio scheduler: **each portfolio currently starts its own Go process and rereads the shared benchmark**. It tests portfolio concurrency and dispatch strategy; cross-portfolio benchmark reuse or dynamic job scheduling would be separate designs. The fixtures require a platform supporting symlinks (including macOS). No measured multi-portfolio results have been recorded yet.
