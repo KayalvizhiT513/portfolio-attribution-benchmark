@@ -327,3 +327,30 @@ python compare_multi_portfolios.py --data data/brinson-multi --go ./benchmark-br
 The driver runs **all portfolios simultaneously** per architecture up to the detected logical CPU count, sets `GOMAXPROCS` per child process to approximately `detected CPUs / concurrent portfolio jobs`, and compares *batch wall-clock latency*, not the sum of child runtimes. It alternates baseline-first vs streaming-first by round, performs numerical CSV output comparisons for each portfolio, and saves `results/multi-portfolio/runs.csv`, `summary.csv`, and `summary.json` plus per-run attribution CSVs. `batch_effective_cores` is sum of child process CPU seconds divided by batch wall time (an average CPU equivalent, not simultaneous peak physical cores). Repeated shared benchmark reads may benefit from OS caching, which is part of the measured workload.
 
 Do not confuse this with a shared-reader or in-process multi-portfolio scheduler: **each portfolio currently starts its own Go process and rereads the shared benchmark**. It tests portfolio concurrency and dispatch strategy; cross-portfolio benchmark reuse or dynamic job scheduling would be separate designs. The fixtures require a platform supporting symlinks (including macOS). No measured multi-portfolio results have been recorded yet.
+
+
+## True day-parallel vs dependency-aware fine-grained attribution (Go and Python)
+
+The previously named `baseline` in `brinson_csv.py` / `cmd/brinsoncsv` only delayed effect dispatch and still processed dates sequentially. **That is not day parallelism.**
+
+The new **coarse-grained baseline** is `cmd/brinsonday/main.go` for Go and `brinson_day_parallel.py` for Python: one **complete trading day** per task. Workers independently match securities, aggregate segment returns, calculate all three Brinson–Fachler effects, and reconcile the day's results. Days may finish out of order; the collector writes the output CSV in original date order. Each day-parallel process has a bounded task queue and a CPU budget determined from the machine's logical CPUs. Python uses a `ProcessPoolExecutor` for actual CPU parallelism; Go uses worker goroutines. Input CSV grouping/reading remains a single producer in both.
+
+The **fine-grained streaming** comparison stays in `cmd/brinsoncsv` and `brinson_csv.py`: days processed sequentially, with separate selection/interaction/allocation tasks per segment, selection and interaction released as soon as a segment's benchmark records are complete.
+
+For a fair multi-portfolio comparison the runner now labels `baseline` as **true day_parallel**, and `streaming` as per-segment early-release. The runner alternates the order every round, executes portfolios concurrently, validates every baseline/streaming CSV pair, and records latency, I/O timing and CPU usage.
+
+```bash
+git pull origin main
+go build -o benchmark-brinson ./cmd/brinsoncsv
+go build -o benchmark-brinson-day ./cmd/brinsonday
+
+# Four distinct portfolios already generated:
+python compare_multi_portfolios.py --language go --data data/brinson-multi --runs 10 --output-dir results/multi-day-vs-stream-go
+
+# Python, same inputs and architecture comparison:
+python compare_multi_portfolios.py --language python --data data/brinson-multi --runs 10 --output-dir results/multi-day-vs-stream-python
+```
+
+For an initial smoke test replace `--runs 10` with `--runs 2`. Python child-process CPU time is included in the effective-core calculation for the day-parallel runner. The CSV timings for day-parallel programs measure reading/parsing by the parent reader and writing/syncing by the parent writer, with worker IPC and computations included in total elapsed time. Because the previous benchmarks used a different baseline, do not compare their medians as if the architecture were unchanged.
+
+**Status:** These are new source implementations; full machine-specific compilation/performance and output comparison must be validated by running the above commands. The Python and Go orchestration models differ (processes vs goroutines) but calculate the same daily Brinson–Fachler formulas.
