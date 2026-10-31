@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1460" viewBox="0 0 1440 1460" role="img" aria-labelledby="title desc">
+<title id="title">02  Standalone subset: select → reject or retain → renormalize</title>
+<desc id="desc">The filter changes the investment universe on each side before attribution</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#475569"/></marker></defs>
+<rect width="1440" height="1460" fill="white"/>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#0f172a}.title{font-size:32px;font-weight:700}.sub{font-size:18px;fill:#475569}.head{font-size:20px;font-weight:700}.body{font-size:17px}.label{font-size:16px;fill:#475569}.edge{fill:none;stroke:#475569;stroke-width:2.2;marker-end:url(#arrow)}</style>
+<text x="65" y="58" class="title" text-anchor="start">
+<tspan x="65" dy="0">02  Standalone subset: select → reject or retain → renormalize</tspan>
+</text>
+<text x="65" y="94" class="sub" text-anchor="start">
+<tspan x="65" dy="0">The filter changes the investment universe on each side before attribution</tspan>
+</text>
+<rect x="75" y="140" width="1290" height="90" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+<text x="720.0" y="170" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">LOAD SELECTED IDs ONCE</tspan>
+</text>
+<text x="720.0" y="201" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Example selection = {A, C}; precompute membership mask and compact selected-ID slots.</tspan>
+</text>
+<rect x="100" y="285" width="520" height="105" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="360.0" y="315" class="head" text-anchor="middle">
+<tspan x="360.0" dy="0">PARSE PORTFOLIO DAY</tspan>
+</text>
+<text x="360.0" y="346" class="body" text-anchor="middle">
+<tspan x="360.0" dy="0">A: 20%, B: 30%, C: 50%</tspan>
+<tspan x="360.0" dy="25">Validate all rows, including excluded IDs.</tspan>
+</text>
+<rect x="820" y="285" width="520" height="105" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="1080.0" y="315" class="head" text-anchor="middle">
+<tspan x="1080.0" dy="0">PARSE INDEX DAY</tspan>
+</text>
+<text x="1080.0" y="346" class="body" text-anchor="middle">
+<tspan x="1080.0" dy="0">A: 10%, B: 60%, C: 30%</tspan>
+<tspan x="1080.0" dy="25">Input still must be read in full.</tspan>
+</text>
+<path d="M360 230 V285" class="edge"/>
+<path d="M1080 230 V285" class="edge"/>
+<path d="M360 425.0 L540.0 480 L360 535.0 L180.0 480 Z" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+<text x="360" y="472" class="body" text-anchor="middle">
+<tspan x="360" dy="0">Instrument selected?</tspan>
+<tspan x="360" dy="25">Mask lookup for each row</tspan>
+</text>
+<path d="M1080 425.0 L1260.0 480 L1080 535.0 L900.0 480 Z" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+<text x="1080" y="472" class="body" text-anchor="middle">
+<tspan x="1080" dy="0">Instrument selected?</tspan>
+<tspan x="1080" dy="25">Mask lookup for each row</tspan>
+</text>
+<path d="M360 390 V425" class="edge"/>
+<path d="M1080 390 V425" class="edge"/>
+<rect x="25" y="595" width="240" height="90" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="145.0" y="625" class="head" text-anchor="middle">
+<tspan x="145.0" dy="0">EXCLUDE B</tspan>
+</text>
+<text x="145.0" y="656" class="body" text-anchor="middle">
+<tspan x="145.0" dy="0">No aggregate/output slot.</tspan>
+</text>
+<rect x="1175" y="595" width="240" height="90" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="1295.0" y="625" class="head" text-anchor="middle">
+<tspan x="1295.0" dy="0">EXCLUDE B</tspan>
+</text>
+<text x="1295.0" y="656" class="body" text-anchor="middle">
+<tspan x="1295.0" dy="0">No aggregate/output slot.</tspan>
+</text>
+<path d="M180 480 H70 V595" class="edge"/>
+<text x="110" y="560" class="label" text-anchor="middle">
+<tspan x="110" dy="0">No</tspan>
+</text>
+<path d="M1260 480 H1350 V595" class="edge"/>
+<text x="1320" y="560" class="label" text-anchor="middle">
+<tspan x="1320" dy="0">No</tspan>
+</text>
+<rect x="305" y="595" width="340" height="110" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+<text x="475.0" y="625" class="head" text-anchor="middle">
+<tspan x="475.0" dy="0">RETAIN A + C</tspan>
+</text>
+<text x="475.0" y="656" class="body" text-anchor="middle">
+<tspan x="475.0" dy="0">Selected portfolio weight = 70%</tspan>
+<tspan x="475.0" dy="25">Fail if selected weight = zero.</tspan>
+</text>
+<rect x="795" y="595" width="340" height="110" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+<text x="965.0" y="625" class="head" text-anchor="middle">
+<tspan x="965.0" dy="0">RETAIN A + C</tspan>
+</text>
+<text x="965.0" y="656" class="body" text-anchor="middle">
+<tspan x="965.0" dy="0">Selected index weight = 40%</tspan>
+<tspan x="965.0" dy="25">Fail if selected weight = zero.</tspan>
+</text>
+<path d="M360 535 V565 H475 V595" class="edge"/>
+<text x="410" y="564" class="label" text-anchor="middle">
+<tspan x="410" dy="0">Yes</tspan>
+</text>
+<path d="M1080 535 V565 H965 V595" class="edge"/>
+<text x="1025" y="564" class="label" text-anchor="middle">
+<tspan x="1025" dy="0">Yes</tspan>
+</text>
+<rect x="225" y="780" width="430" height="120" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+<text x="440.0" y="810" class="head" text-anchor="middle">
+<tspan x="440.0" dy="0">PORTFOLIO ÷ 0.70</tspan>
+</text>
+<text x="440.0" y="841" class="body" text-anchor="middle">
+<tspan x="440.0" dy="0">A = 28.5714%; C = 71.4286%</tspan>
+<tspan x="440.0" dy="25">Normalize weights AND weighted returns.</tspan>
+<tspan x="440.0" dy="25">Use compact slots for selected IDs only.</tspan>
+</text>
+<rect x="785" y="780" width="430" height="120" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+<text x="1000.0" y="810" class="head" text-anchor="middle">
+<tspan x="1000.0" dy="0">INDEX ÷ 0.40</tspan>
+</text>
+<text x="1000.0" y="841" class="body" text-anchor="middle">
+<tspan x="1000.0" dy="0">A = 25%; C = 75%</tspan>
+<tspan x="1000.0" dy="25">Normalize weights AND weighted returns.</tspan>
+<tspan x="1000.0" dy="25">Use this subset’s index return.</tspan>
+</text>
+<path d="M475 705 V780" class="edge"/>
+<path d="M965 705 V780" class="edge"/>
+<path d="M440 900 V945 H720 V990" class="edge"/>
+<path d="M1000 900 V945 H720" class="edge"/>
+<rect x="225" y="990" width="990" height="110" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="720.0" y="1020" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">CALCULATE A + C AS STANDALONE INVESTMENTS</tspan>
+</text>
+<text x="720.0" y="1051" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Union the selected holdings; calculate base/local effects using renormalized weights.</tspan>
+<tspan x="720.0" dy="25">Reconcile against selected portfolio return − selected index return.</tspan>
+</text>
+<path d="M720 1100 V1160" class="edge"/>
+<rect x="225" y="1160" width="990" height="110" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="720.0" y="1190" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">WRITE ONLY SELECTED-UNIVERSE DETAILS + TOTALS</tspan>
+</text>
+<text x="720.0" y="1221" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">No B rows; stream each day to the portfolio CSV.</tspan>
+<tspan x="720.0" dy="25">EOF: flush/fsync; coordinator publishes files after all workers succeed.</tspan>
+</text>
+<rect x="225" y="1320" width="990" height="90" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="720.0" y="1350" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">EFFICIENCY</tspan>
+</text>
+<text x="720.0" y="1381" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Read/parse remains proportional to input; aggregation/compute slots scale with selected IDs.</tspan>
+</text>
+</svg>

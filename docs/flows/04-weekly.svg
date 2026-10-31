@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1440" viewBox="0 0 1440 1440" role="img" aria-labelledby="title desc">
+<title id="title">04  Weekly: accumulate daily security effects within Monday–Sunday</title>
+<desc id="desc">A streaming state machine • keep one week, not a table of historical daily effects</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#475569"/></marker></defs>
+<rect width="1440" height="1440" fill="white"/>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#0f172a}.title{font-size:32px;font-weight:700}.sub{font-size:18px;fill:#475569}.head{font-size:20px;font-weight:700}.body{font-size:17px}.label{font-size:16px;fill:#475569}.edge{fill:none;stroke:#475569;stroke-width:2.2;marker-end:url(#arrow)}</style>
+<text x="65" y="58" class="title" text-anchor="start">
+<tspan x="65" dy="0">04  Weekly: accumulate daily security effects within Monday–Sunday</tspan>
+</text>
+<text x="65" y="94" class="sub" text-anchor="start">
+<tspan x="65" dy="0">A streaming state machine • keep one week, not a table of historical daily effects</tspan>
+</text>
+<rect x="180" y="140" width="1080" height="95" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="720.0" y="170" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">READ NEXT MATCHED PORTFOLIO / INDEX DATE</tspan>
+</text>
+<text x="720.0" y="201" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Normalize full weights; build daily security arrays; EOF closes the active week.</tspan>
+</text>
+<path d="M720 235 V290" class="edge"/>
+<rect x="180" y="290" width="1080" height="110" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+<text x="720.0" y="320" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">ASSIGN MONDAY–SUNDAY WEEK KEY</tspan>
+</text>
+<text x="720.0" y="351" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Sunday 2023-01-01 → week starting 2022-12-26</tspan>
+<tspan x="720.0" dy="25">Monday 2023-01-02 through Sunday 2023-01-08 → week starting 2023-01-02</tspan>
+</text>
+<path d="M720 400 V450" class="edge"/>
+<path d="M720 450.0 L980.0 520 L720 590.0 L460.0 520 Z" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+<text x="720" y="512" class="body" text-anchor="middle">
+<tspan x="720" dy="0">Active week exists AND</tspan>
+<tspan x="720" dy="25">new date has a different week key?</tspan>
+</text>
+<rect x="980" y="650" width="400" height="130" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="1180.0" y="680" class="head" text-anchor="middle">
+<tspan x="1180.0" dy="0">CLOSE PREVIOUS WEEK</tspan>
+</text>
+<text x="1180.0" y="711" class="body" text-anchor="middle">
+<tspan x="1180.0" dy="0">Reconcile compounded active return.</tspan>
+<tspan x="1180.0" dy="25">Write linked security effects + totals.</tspan>
+<tspan x="1180.0" dy="25">Reset active accumulator.</tspan>
+</text>
+<path d="M980 520 H1180 V650" class="edge"/>
+<text x="1190" y="560" class="label" text-anchor="middle">
+<tspan x="1190" dy="0">Yes: Monday boundary</tspan>
+</text>
+<rect x="330" y="710" width="570" height="110" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="615.0" y="740" class="head" text-anchor="middle">
+<tspan x="615.0" dy="0">CALCULATE CURRENT DAY’S SECURITY EFFECTS</tspan>
+</text>
+<text x="615.0" y="771" class="body" text-anchor="middle">
+<tspan x="615.0" dy="0">Base/local allocation, selection, interaction.</tspan>
+<tspan x="615.0" dy="25">Reconcile daily effects before linking.</tspan>
+</text>
+<path d="M720 590 V710" class="edge"/>
+<text x="550" y="650" class="label" text-anchor="middle">
+<tspan x="550" dy="0">No: first/same week</tspan>
+</text>
+<path d="M1180 780 V850 H935 V765 H900" class="edge"/>
+<path d="M615 820 V885" class="edge"/>
+<rect x="300" y="885" width="840" height="130" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="720.0" y="915" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">UPDATE ACTIVE WEEK IN PLACE</tspan>
+</text>
+<text x="720.0" y="946" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">E ← E × (1 + index return today) + e_today × portfolio growth before today</tspan>
+<tspan x="720.0" dy="25">Update compounded returns and sums of daily weights.</tspan>
+<tspan x="720.0" dy="25">Retain per-security accumulated components; release current-day inputs.</tspan>
+</text>
+<path d="M300 950 H55 V115 H720 V140" class="edge"/>
+<text x="145" y="1070" class="label" text-anchor="middle">
+<tspan x="145" dy="0">Next date</tspan>
+</text>
+<path d="M720 1015 V1090" class="edge"/>
+<text x="770" y="1060" class="label" text-anchor="middle">
+<tspan x="770" dy="0">At EOF</tspan>
+</text>
+<rect x="230" y="1090" width="980" height="115" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="720.0" y="1120" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">FLUSH THE LAST WEEK, EVEN IF PARTIAL</tspan>
+</text>
+<text x="720.0" y="1151" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Write observed start/end dates, linked effects and mean daily weights.</tspan>
+<tspan x="720.0" dy="25">Flush/fsync; publish per-portfolio CSVs after worker validation.</tspan>
+</text>
+<rect x="230" y="1260" width="980" height="100" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="720.0" y="1290" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">ILLUSTRATIVE WEEK OUTPUT</tspan>
+</text>
+<text x="720.0" y="1321" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Jan 1: partial prior week • Jan 2–8: one week • Jan 9: begins another bucket.</tspan>
+</text>
+</svg>

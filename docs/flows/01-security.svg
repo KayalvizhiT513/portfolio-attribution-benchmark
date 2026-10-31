@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1280" viewBox="0 0 1440 1280" role="img" aria-labelledby="title desc">
+<title id="title">01  Full security: align instruments, then calculate daily effects</title>
+<desc id="desc">No group reduction and no time linking • all portfolio/index instruments remain visible</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#475569"/></marker></defs>
+<rect width="1440" height="1280" fill="white"/>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#0f172a}.title{font-size:32px;font-weight:700}.sub{font-size:18px;fill:#475569}.head{font-size:20px;font-weight:700}.body{font-size:17px}.label{font-size:16px;fill:#475569}.edge{fill:none;stroke:#475569;stroke-width:2.2;marker-end:url(#arrow)}</style>
+<text x="65" y="58" class="title" text-anchor="start">
+<tspan x="65" dy="0">01  Full security: align instruments, then calculate daily effects</tspan>
+</text>
+<text x="65" y="94" class="sub" text-anchor="start">
+<tspan x="65" dy="0">No group reduction and no time linking • all portfolio/index instruments remain visible</tspan>
+</text>
+<rect x="75" y="145" width="570" height="110" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="360.0" y="175" class="head" text-anchor="middle">
+<tspan x="360.0" dy="0">STREAM PORTFOLIO • one date</tspan>
+</text>
+<text x="360.0" y="206" class="body" text-anchor="middle">
+<tspan x="360.0" dy="0">A: weight 60%, return 2%</tspan>
+<tspan x="360.0" dy="25">B: weight 40%, return −1%</tspan>
+</text>
+<rect x="795" y="145" width="570" height="110" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="1080.0" y="175" class="head" text-anchor="middle">
+<tspan x="1080.0" dy="0">STREAM INDEX • same date</tspan>
+</text>
+<text x="1080.0" y="206" class="body" text-anchor="middle">
+<tspan x="1080.0" dy="0">A: weight 50%, return 1%</tspan>
+<tspan x="1080.0" dy="25">C: weight 50%, return 0%</tspan>
+</text>
+<path d="M360 255 V310 H720 V345" class="edge"/>
+<path d="M1080 255 V310 H720" class="edge"/>
+<rect x="300" y="345" width="840" height="105" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+<text x="720.0" y="375" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">ALIGN THE UNION USING DENSE ID SLOTS</tspan>
+</text>
+<text x="720.0" y="406" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Validate dates; normalize each side’s full weights independently.</tspan>
+<tspan x="720.0" dy="25">Missing-side return uses the held-side return.</tspan>
+</text>
+<rect x="75" y="515" width="420" height="110" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="285.0" y="545" class="head" text-anchor="middle">
+<tspan x="285.0" dy="0">A • held on both sides</tspan>
+</text>
+<text x="285.0" y="576" class="body" text-anchor="middle">
+<tspan x="285.0" dy="0">Wp = 0.60; Wb = 0.50</tspan>
+<tspan x="285.0" dy="25">Rp = 0.02; Rb = 0.01</tspan>
+</text>
+<rect x="510" y="515" width="420" height="110" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="720.0" y="545" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">B • portfolio only</tspan>
+</text>
+<text x="720.0" y="576" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Wp = 0.40; Wb = 0</tspan>
+<tspan x="720.0" dy="25">Rp = Rb = −0.01</tspan>
+</text>
+<rect x="945" y="515" width="420" height="110" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="1155.0" y="545" class="head" text-anchor="middle">
+<tspan x="1155.0" dy="0">C • index only</tspan>
+</text>
+<text x="1155.0" y="576" class="body" text-anchor="middle">
+<tspan x="1155.0" dy="0">Wp = 0; Wb = 0.50</tspan>
+<tspan x="1155.0" dy="25">Rp = Rb = 0</tspan>
+</text>
+<path d="M720 450 V480 H285 V515" class="edge"/>
+<path d="M720 480 V515" class="edge"/>
+<path d="M720 480 H1155 V515" class="edge"/>
+<path d="M285 625 V675 H720 V715" class="edge"/>
+<path d="M720 625 V715" class="edge"/>
+<path d="M1155 625 V675 H720" class="edge"/>
+<rect x="250" y="715" width="940" height="110" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="720.0" y="745" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">COMPUTE DAILY SECURITY ATTRIBUTION</tspan>
+</text>
+<text x="720.0" y="776" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Total index return B = 0.005; calculate allocation, selection, interaction.</tspan>
+<tspan x="720.0" dy="25">Run base and local independently; reconcile the sum to active return.</tspan>
+</text>
+<path d="M720 825 V885" class="edge"/>
+<rect x="250" y="885" width="940" height="110" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="720.0" y="915" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">WRITE A, B, C DETAIL ROWS + PORTFOLIO TOTALS</tspan>
+</text>
+<text x="720.0" y="946" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">One row per instrument / date / return type.</tspan>
+<tspan x="720.0" dy="25">Buffered CSV → .partial; reuse row-formatting storage.</tspan>
+</text>
+<path d="M250 940 H35 V125 H360 V145" class="edge"/>
+<text x="190" y="1090" class="label" text-anchor="middle">
+<tspan x="190" dy="0">Next date: reuse reader buffers</tspan>
+</text>
+<rect x="250" y="1125" width="940" height="95" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="720.0" y="1155" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">DISTINGUISHING COST</tspan>
+</text>
+<text x="720.0" y="1186" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">No cross-instrument rollup: compute and CSV volume scale with the instrument union.</tspan>
+</text>
+</svg>

@@ -1,0 +1,85 @@
+{
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "logical_cpus": 12,
+  "data": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data",
+  "max_days": 3,
+  "runs": 3,
+  "cache_policy": "OS-managed; no forced cold-cache clearing; language order alternates; first run retained",
+  "rust_threads": 4,
+  "go_GOMAXPROCS": 12,
+  "correctness": [
+    {
+      "scenario": "security",
+      "rows_compared": 2400024,
+      "max_absolute_difference": 0.0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "subset",
+      "rows_compared": 9624,
+      "max_absolute_difference": 0.0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "country",
+      "rows_compared": 48,
+      "max_absolute_difference": 0.0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "weekly",
+      "rows_compared": 1600016,
+      "max_absolute_difference": 1.734723475976807e-18,
+      "status": "PASS"
+    },
+    {
+      "scenario": "monthly",
+      "rows_compared": 800008,
+      "max_absolute_difference": 1.734723475976807e-18,
+      "status": "PASS"
+    }
+  ],
+  "executables": {
+    "rust": {
+      "path": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/rust/target/release/portfolio-attribution",
+      "sha256": "157420c8b034d121e30dbc3079658f4cba36fb5fbb50bad02d1954de3aaa96bf"
+    },
+    "go": {
+      "path": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/benchmark-go-attribution",
+      "sha256": "f2b470c495d73de02c273297730360d7f0c8d24d367f75a6dc657eb5f5cb2ba3"
+    }
+  },
+  "input_files": [
+    {
+      "name": "index.csv",
+      "bytes": 7008003887,
+      "mtime_ns": 1793463602850911887
+    },
+    {
+      "name": "portfolio_PF1.csv",
+      "bytes": 1018344961,
+      "mtime_ns": 1793463401839934359
+    },
+    {
+      "name": "portfolio_PF2.csv",
+      "bytes": 1018352361,
+      "mtime_ns": 1793463422061815423
+    },
+    {
+      "name": "portfolio_PF3.csv",
+      "bytes": 1018358723,
+      "mtime_ns": 1793463442671061947
+    },
+    {
+      "name": "portfolio_PF4.csv",
+      "bytes": 1018345962,
+      "mtime_ns": 1793463463345815530
+    },
+    {
+      "name": "security_master.csv",
+      "bytes": 2560031,
+      "mtime_ns": 1793463381978061062
+    }
+  ]
+}

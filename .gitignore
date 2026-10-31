@@ -4,3 +4,26 @@ __pycache__/
 *.pyc
 *.exe
 benchmark-go
+
+rust/target/
+
+benchmark-go-attribution
+*.csv.partial
+
+# Generated benchmark executables and attribution outputs
+/benchmark-*
+/results/*
+!/results/native-benchmark/
+/results/native-benchmark/*
+!/results/native-benchmark/REPORT.md
+!/results/native-benchmark/runs.csv
+!/results/native-benchmark/summary.csv
+!/results/native-benchmark/environment.json
+!/results/native-benchmark/subset.csv
+!/results/native-full-history/
+/results/native-full-history/*
+!/results/native-full-history/REPORT.md
+!/results/native-full-history/runs.csv
+!/results/native-full-history/summary.csv
+!/results/native-full-history/environment.json
+!/results/native-full-history/subset.csv

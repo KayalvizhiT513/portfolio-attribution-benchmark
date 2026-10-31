@@ -2,7 +2,7 @@
 """Generate synthetic 3-year portfolio/index returns and a security master.
 
 Install: pip install numpy
-Run: python generate_attribution_csvs.py --output-dir ./attribution_data
+Run: python python/generate_attribution_csvs.py --output-dir ./attribution_data
 
 The dataset includes 1,095 calendar dates (including weekends), 4 portfolios of
 15,000 instruments each, 1 index of 100,000 instruments, and 160,000 unique

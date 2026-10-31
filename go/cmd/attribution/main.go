@@ -1,0 +1,739 @@
+// Streaming Brinson-Fachler attribution with bounded benchmark broadcasts.
+package main
+
+import (
+	"bufio"
+	"encoding/csv"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"math"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+)
+
+var inputHeader = []string{"Entity", "EffectiveDate", "InstrumentId", "Weight", "BaseReturn", "LocalReturn"}
+var outputHeader = []string{"Scenario", "Entity", "PeriodStart", "PeriodEnd", "Days", "RowType", "Segment", "ReturnType", "PortfolioWeight", "BenchmarkWeight", "Allocation", "Selection", "Interaction", "Total", "PortfolioReturn", "BenchmarkReturn", "ActiveReturn"}
+
+type config struct {
+	data, output, metrics, scenario, period, subset string
+	threads, maxDays                                int
+}
+type stat struct {
+	w       float64
+	r       [2]float64
+	present bool
+}
+type master struct {
+	ids                 map[string]int
+	names, countryNames []string
+	countries           []int
+	selected            []bool
+	subsetSlots         []int
+	subsetNames         []string
+}
+type metrics struct {
+	read, filter, aggregate, compute, write                 float64
+	rows, retained, groups, effects, written, bytes, parsed uint64
+}
+
+func (m *metrics) add(b metrics) {
+	m.read += b.read
+	m.filter += b.filter
+	m.aggregate += b.aggregate
+	m.compute += b.compute
+	m.write += b.write
+	m.rows += b.rows
+	m.retained += b.retained
+	m.groups += b.groups
+	m.effects += b.effects
+	m.written += b.written
+	m.bytes += b.bytes
+	m.parsed += b.parsed
+}
+func seconds(t time.Time) float64 { return time.Since(t).Seconds() }
+func openCSV(path string, header []string) (*os.File, *csv.Reader, error) {
+	f, e := os.Open(path)
+	if e != nil {
+		return nil, nil, e
+	}
+	r := csv.NewReader(bufio.NewReaderSize(f, 1024*1024))
+	r.ReuseRecord = true
+	h, e := r.Read()
+	if e != nil || strings.Join(h, "\x00") != strings.Join(header, "\x00") {
+		f.Close()
+		return nil, nil, fmt.Errorf("invalid header: %s", path)
+	}
+	return f, r, nil
+}
+func loadMaster(c config) (master, error) {
+	m := master{ids: map[string]int{}}
+	f, r, e := openCSV(filepath.Join(c.data, "security_master.csv"), []string{"InstrumentId", "Currency", "Country"})
+	if e != nil {
+		return m, e
+	}
+	defer f.Close()
+	countries := map[string]int{}
+	for {
+		row, e := r.Read()
+		if e == io.EOF {
+			break
+		}
+		if e != nil {
+			return m, e
+		}
+		for _, v := range row {
+			if v == "" {
+				return m, errors.New("blank master field")
+			}
+		}
+		if _, ok := m.ids[row[0]]; ok {
+			return m, errors.New("duplicate master ID")
+		}
+		m.ids[row[0]] = len(m.names)
+		m.names = append(m.names, row[0])
+		k, ok := countries[row[2]]
+		if !ok {
+			k = len(countries)
+			countries[row[2]] = k
+			m.countryNames = append(m.countryNames, row[2])
+		}
+		m.countries = append(m.countries, k)
+	}
+	if len(m.names) == 0 {
+		return m, errors.New("empty master")
+	}
+	m.selected = make([]bool, len(m.names))
+	for i := range m.selected {
+		m.selected[i] = c.scenario != "subset"
+	}
+	if c.subset != "" {
+		sf, sr, e := openCSV(c.subset, []string{"InstrumentId"})
+		if e != nil {
+			return m, e
+		}
+		defer sf.Close()
+		for {
+			row, e := sr.Read()
+			if e == io.EOF {
+				break
+			}
+			if e != nil {
+				return m, e
+			}
+			i, ok := m.ids[row[0]]
+			if !ok {
+				return m, errors.New("unknown subset instrument")
+			}
+			m.selected[i] = true
+		}
+	}
+	if c.scenario == "subset" {
+		m.subsetSlots = make([]int, len(m.names))
+		for id, selected := range m.selected {
+			if selected {
+				m.subsetSlots[id] = len(m.subsetNames)
+				m.subsetNames = append(m.subsetNames, m.names[id])
+			}
+		}
+	}
+	return m, nil
+}
+
+type day struct {
+	date, entity string
+	stats        []stat
+}
+type stream struct {
+	f                *os.File
+	r                *csv.Reader
+	pending          []string
+	previous, entity string
+	rowsBuf          []raw
+	seen             []bool
+}
+
+func newStream(path string) (*stream, error) {
+	f, r, e := openCSV(path, inputHeader)
+	if e != nil {
+		return nil, e
+	}
+	return &stream{f: f, r: r}, nil
+}
+
+type raw struct {
+	id int
+	s  stat
+}
+
+func (s *stream) next(m *master, c config, mt *metrics) (*day, error) {
+	start := time.Now()
+	offset := s.r.InputOffset()
+	rows := s.rowsBuf[:0]
+	if len(s.seen) != len(m.names) {
+		s.seen = make([]bool, len(m.names))
+	} else {
+		clear(s.seen)
+	}
+	seen := s.seen
+	date := ""
+	total := 0.0
+	for {
+		var row []string
+		var e error
+		if s.pending != nil {
+			row = s.pending
+			s.pending = nil
+		} else {
+			row, e = s.r.Read()
+			if e == io.EOF {
+				break
+			}
+			if e != nil {
+				return nil, e
+			}
+		}
+		if date == "" {
+			date = row[1]
+			if s.previous != "" && date <= s.previous {
+				return nil, errors.New("dates must strictly increase")
+			}
+			if _, e := parseDate(date); e != nil {
+				return nil, e
+			}
+		}
+		if row[1] != date {
+			s.pending = append([]string(nil), row...)
+			break
+		}
+		for _, v := range row {
+			if v == "" {
+				return nil, errors.New("blank return field")
+			}
+		}
+		if s.entity == "" {
+			s.entity = row[0]
+		}
+		if s.entity != row[0] {
+			return nil, errors.New("mixed entities")
+		}
+		id, ok := m.ids[row[2]]
+		if !ok {
+			return nil, errors.New("unmapped instrument")
+		}
+		if seen[id] {
+			return nil, errors.New("duplicate instrument/day")
+		}
+		seen[id] = true
+		var values [3]float64
+		for i := 0; i < 3; i++ {
+			v, e := strconv.ParseFloat(row[i+3], 64)
+			if e != nil || math.IsNaN(v) || math.IsInf(v, 0) {
+				return nil, errors.New("invalid number")
+			}
+			values[i] = v
+		}
+		w, b, l := values[0], values[1], values[2]
+		if w < 0 || b <= -1 || l <= -1 {
+			return nil, errors.New("invalid weight/return (returns must exceed -1)")
+		}
+		rows = append(rows, raw{id, stat{w: w, r: [2]float64{w * b, w * l}, present: true}})
+		total += w
+	}
+	s.rowsBuf = rows[:0]
+	mt.read += seconds(start)
+	mt.parsed += uint64(s.r.InputOffset() - offset)
+	mt.rows += uint64(len(rows))
+	if date == "" {
+		return nil, nil
+	}
+	if math.Abs(total-1) > 1e-6 {
+		return nil, fmt.Errorf("weights sum to %g on %s", total, date)
+	}
+	s.previous = date
+	start = time.Now()
+	retained := rows[:0]
+	selected := 0.0
+	for _, r := range rows {
+		if c.scenario != "subset" || m.selected[r.id] {
+			retained = append(retained, r)
+			selected += r.s.w
+		}
+	}
+	if selected <= 0 {
+		return nil, fmt.Errorf("zero selected weight: %s/%s", s.entity, date)
+	}
+	mt.retained += uint64(len(retained))
+	mt.filter += seconds(start)
+	start = time.Now()
+	n := len(m.names)
+	if c.scenario == "country" {
+		n = len(m.countryNames)
+	} else if c.scenario == "subset" {
+		n = len(m.subsetNames)
+	}
+	stats := make([]stat, n)
+	for _, r := range retained {
+		k := r.id
+		if c.scenario == "country" {
+			k = m.countries[k]
+		} else if c.scenario == "subset" {
+			k = m.subsetSlots[k]
+		}
+		a := &stats[k]
+		a.present = true
+		a.w += r.s.w / selected
+		for t := 0; t < 2; t++ {
+			a.r[t] += r.s.r[t] / selected
+		}
+	}
+	for _, s := range stats {
+		if s.present {
+			mt.groups++
+		}
+	}
+	mt.aggregate += seconds(start)
+	return &day{date, s.entity, stats}, nil
+}
+func parseDate(s string) (time.Time, error) {
+	t, e := time.Parse("2006-01-02", s)
+	if e != nil || t.Format("2006-01-02") != s || t.Year() < 1 {
+		return t, errors.New("invalid YYYY-MM-DD date")
+	}
+	return t, nil
+}
+func bucket(date, period string) (string, error) {
+	d, e := parseDate(date)
+	if e != nil {
+		return "", e
+	}
+	switch period {
+	case "week":
+		weekday := (int(d.Weekday()) + 6) % 7
+		return d.AddDate(0, 0, -weekday).Format("2006-01-02"), nil
+	case "month":
+		return d.Format("2006-01"), nil
+	case "quarter":
+		return fmt.Sprintf("%d-Q%d", d.Year(), (int(d.Month())-1)/3+1), nil
+	case "year":
+		return strconv.Itoa(d.Year()), nil
+	default:
+		return date, nil
+	}
+}
+func effect(p, b stat, t int, benchmark float64) [3]float64 {
+	rp, rb := 0.0, 0.0
+	if p.w > 0 {
+		rp = p.r[t] / p.w
+	}
+	if b.w > 0 {
+		rb = b.r[t] / b.w
+	} else {
+		rb = rp
+	}
+	if p.w == 0 {
+		rp = rb
+	}
+	return [3]float64{(p.w - b.w) * (rb - benchmark), b.w * (rp - rb), (p.w - b.w) * (rp - rb)}
+}
+
+type acc struct {
+	w       [2]float64
+	e       [2][3]float64
+	present bool
+}
+
+// rowWriter reuses a byte buffer and formats numbers directly into it.
+// Text fields retain RFC 4180 escaping, including embedded newlines/quotes.
+type rowWriter struct {
+	w      *bufio.Writer
+	buffer []byte
+}
+
+func (w *rowWriter) record(fields []string, numbers []float64) error {
+	w.buffer = w.buffer[:0]
+	for i, field := range fields {
+		if i > 0 {
+			w.buffer = append(w.buffer, ',')
+		}
+		if strings.ContainsAny(field, ",\"\r\n") {
+			w.buffer = append(w.buffer, '"')
+			for j := 0; j < len(field); j++ {
+				if field[j] == '"' {
+					w.buffer = append(w.buffer, '"')
+				}
+				w.buffer = append(w.buffer, field[j])
+			}
+			w.buffer = append(w.buffer, '"')
+		} else {
+			w.buffer = append(w.buffer, field...)
+		}
+	}
+	for _, n := range numbers {
+		w.buffer = append(w.buffer, ',')
+		w.buffer = strconv.AppendFloat(w.buffer, n, 'g', -1, 64)
+	}
+	w.buffer = append(w.buffer, '\n')
+	_, err := w.w.Write(w.buffer)
+	return err
+}
+func (w *rowWriter) Write(fields []string) error { return w.record(fields, nil) }
+
+type period struct {
+	key, start, end string
+	dayText         string
+	days            int
+	growth          [2][2]float64
+	acc             []acc
+}
+
+func newPeriod(d *day, key string) *period {
+	return &period{key: key, start: d.date, end: d.date, growth: [2][2]float64{{1, 1}, {1, 1}}, acc: make([]acc, len(d.stats))}
+}
+func (p *period) add(pd, bd *day, mt *metrics) error {
+	start := time.Now()
+	var totals [2][2]float64
+	for _, s := range pd.stats {
+		for t := 0; t < 2; t++ {
+			totals[0][t] += s.r[t]
+		}
+	}
+	for _, s := range bd.stats {
+		for t := 0; t < 2; t++ {
+			totals[1][t] += s.r[t]
+		}
+	}
+	var sum [2]float64
+	for k := range p.acc {
+		ps, bs := pd.stats[k], bd.stats[k]
+		a := &p.acc[k]
+		if ps.present || bs.present {
+			a.present = true
+			mt.effects += 6
+		}
+		a.w[0] += ps.w
+		a.w[1] += bs.w
+		for t := 0; t < 2; t++ {
+			e := effect(ps, bs, t, totals[1][t])
+			for j := 0; j < 3; j++ {
+				a.e[t][j] = a.e[t][j]*(1+totals[1][t]) + e[j]*p.growth[0][t]
+				sum[t] += e[j]
+			}
+		}
+	}
+	for t := 0; t < 2; t++ {
+		if math.Abs(sum[t]-(totals[0][t]-totals[1][t])) > 1e-9 {
+			return errors.New("daily reconciliation failed")
+		}
+		for side := 0; side < 2; side++ {
+			p.growth[side][t] *= 1 + totals[side][t]
+			if math.IsInf(p.growth[side][t], 0) || math.IsNaN(p.growth[side][t]) {
+				return errors.New("nonfinite compounded return")
+			}
+		}
+	}
+	p.days++
+	p.end = pd.date
+	mt.compute += seconds(start)
+	return nil
+}
+func number(v float64) string { return strconv.FormatFloat(v, 'g', -1, 64) }
+func (p *period) row(c config, entity, kind, name string, t int, weights [2]float64, e [3]float64, w *rowWriter) error {
+	rp, rb := p.growth[0][t]-1, p.growth[1][t]-1
+	rt := "base"
+	if t == 1 {
+		rt = "local"
+	}
+	return w.record([]string{c.scenario, entity, p.start, p.end, p.dayText, kind, name, rt}, []float64{weights[0] / float64(p.days), weights[1] / float64(p.days), e[0], e[1], e[2], e[0] + e[1] + e[2], rp, rb, rp - rb})
+}
+func (p *period) write(c config, entity string, names []string, w *rowWriter, mt *metrics) error {
+	p.dayText = strconv.Itoa(p.days)
+	start := time.Now()
+	var totals [2][3]float64
+	for _, a := range p.acc {
+		for t := 0; t < 2; t++ {
+			for j := 0; j < 3; j++ {
+				totals[t][j] += a.e[t][j]
+			}
+		}
+	}
+	for t := 0; t < 2; t++ {
+		active := p.growth[0][t] - p.growth[1][t]
+		if math.Abs(totals[t][0]+totals[t][1]+totals[t][2]-active) > 1e-8 {
+			return errors.New("linked reconciliation failed")
+		}
+	}
+	mt.compute += seconds(start)
+	start = time.Now()
+	for k, a := range p.acc {
+		if a.present {
+			for t := 0; t < 2; t++ {
+				if e := p.row(c, entity, "detail", names[k], t, a.w, a.e[t], w); e != nil {
+					return e
+				}
+				mt.written++
+			}
+		}
+	}
+	for t := 0; t < 2; t++ {
+		if e := p.row(c, entity, "total", "ALL", t, [2]float64{float64(p.days), float64(p.days)}, totals[t], w); e != nil {
+			return e
+		}
+		mt.written++
+	}
+	mt.write += seconds(start)
+	return nil
+}
+func outputPath(c config, path string) string {
+	return filepath.Join(c.output, c.scenario+"-"+strings.TrimSuffix(filepath.Base(path), ".csv")+".csv")
+}
+func worker(path string, c config, m *master, input <-chan *day) (mt metrics, err error) {
+	s, e := newStream(path)
+	if e != nil {
+		return mt, e
+	}
+	defer s.f.Close()
+	f, e := os.Create(outputPath(c, path) + ".partial")
+	if e != nil {
+		return mt, e
+	}
+	defer f.Close()
+	bw := bufio.NewWriterSize(f, 1024*1024)
+	w := &rowWriter{w: bw, buffer: make([]byte, 0, 512)}
+	if e = w.Write(outputHeader); e != nil {
+		return mt, e
+	}
+	var p *period
+	entity := ""
+	names := m.names
+	if c.scenario == "country" {
+		names = m.countryNames
+	} else if c.scenario == "subset" {
+		names = m.subsetNames
+	}
+	count := 0
+	for b := range input {
+		d, e := s.next(m, c, &mt)
+		if e != nil {
+			return mt, e
+		}
+		if d == nil {
+			return mt, errors.New("portfolio ended before index")
+		}
+		if d.date != b.date {
+			return mt, errors.New("portfolio/index date mismatch")
+		}
+		entity = d.entity
+		key, e := bucket(d.date, c.period)
+		if e != nil {
+			return mt, e
+		}
+		if p != nil && p.key != key {
+			if e = p.write(c, entity, names, w, &mt); e != nil {
+				return mt, e
+			}
+			p = nil
+		}
+		if p == nil {
+			p = newPeriod(d, key)
+		}
+		if e = p.add(d, b, &mt); e != nil {
+			return mt, e
+		}
+		count++
+	}
+	if count == 0 {
+		return mt, errors.New("no input dates")
+	}
+	if c.maxDays == 0 || count < c.maxDays {
+		d, e := s.next(m, c, &mt)
+		if e != nil {
+			return mt, e
+		}
+		if d != nil {
+			return mt, errors.New("extra portfolio dates")
+		}
+	}
+	if e = p.write(c, entity, names, w, &mt); e != nil {
+		return mt, e
+	}
+	start := time.Now()
+	if e = bw.Flush(); e != nil {
+		return mt, e
+	}
+	if e = f.Sync(); e != nil {
+		return mt, e
+	}
+	mt.write += seconds(start)
+	return mt, nil
+}
+func run() error {
+	wall := time.Now()
+	var c config
+	flag.StringVar(&c.data, "data", "attribution_data", "CSV input directory")
+	flag.StringVar(&c.output, "output-dir", "results/go", "CSV output directory")
+	flag.StringVar(&c.metrics, "metrics", "results/go-metrics.csv", "metrics CSV")
+	flag.StringVar(&c.scenario, "scenario", "country", "security|subset|country|weekly|monthly")
+	flag.StringVar(&c.period, "period", "", "day|week|month|quarter|year")
+	flag.StringVar(&c.subset, "instruments-file", "", "one-column InstrumentId CSV")
+	flag.IntVar(&c.threads, "threads", runtime.NumCPU(), "GOMAXPROCS")
+	flag.IntVar(&c.maxDays, "max-days", 0, "0 reads all dates")
+	flag.Parse()
+	if c.threads < 1 || c.maxDays < 0 {
+		return errors.New("invalid threads/max-days")
+	}
+	switch c.scenario {
+	case "security", "subset", "country", "weekly", "monthly":
+	default:
+		return errors.New("invalid scenario")
+	}
+	if c.period == "" {
+		c.period = "day"
+		if c.scenario == "weekly" {
+			c.period = "week"
+		}
+		if c.scenario == "monthly" {
+			c.period = "month"
+		}
+	}
+	switch c.period {
+	case "day", "week", "month", "quarter", "year":
+	default:
+		return errors.New("invalid period")
+	}
+	if c.scenario == "subset" && c.subset == "" {
+		return errors.New("subset requires --instruments-file")
+	}
+	runtime.GOMAXPROCS(c.threads)
+	m, e := loadMaster(c)
+	if e != nil {
+		return e
+	}
+	if e = os.MkdirAll(c.output, 0755); e != nil {
+		return e
+	}
+	out, e := filepath.EvalSymlinks(c.output)
+	if e != nil {
+		return e
+	}
+	data, e := filepath.EvalSymlinks(c.data)
+	if e != nil {
+		return e
+	}
+	oa, _ := filepath.Abs(out)
+	da, _ := filepath.Abs(data)
+	if oa == da {
+		return errors.New("output directory must differ from input")
+	}
+	paths, e := filepath.Glob(filepath.Join(c.data, "portfolio_*.csv"))
+	if e != nil {
+		return e
+	}
+	sort.Strings(paths)
+	if len(paths) == 0 {
+		return errors.New("no portfolios")
+	}
+	type result struct {
+		m metrics
+		e error
+	}
+	results := make(chan result, len(paths))
+	inputs := make([]chan *day, len(paths))
+	done := make([]chan struct{}, len(paths))
+	for i, path := range paths {
+		inputs[i] = make(chan *day, 1)
+		done[i] = make(chan struct{})
+		go func(i int, path string) {
+			mt, e := worker(path, c, &m, inputs[i])
+			close(done[i])
+			results <- result{mt, e}
+		}(i, path)
+	}
+	var mt metrics
+	index, e := newStream(filepath.Join(c.data, "index.csv"))
+	days := 0
+	production := e
+	if e == nil {
+		for c.maxDays == 0 || days < c.maxDays {
+			d, e := index.next(&m, c, &mt)
+			if e != nil {
+				production = e
+				break
+			}
+			if d == nil {
+				break
+			}
+			for i, ch := range inputs {
+				select {
+				case ch <- d:
+				case <-done[i]:
+				}
+			}
+			days++
+		}
+		index.f.Close()
+	}
+	for _, ch := range inputs {
+		close(ch)
+	}
+	var workerError error
+	for range paths {
+		r := <-results
+		mt.add(r.m)
+		if r.e != nil {
+			workerError = r.e
+		}
+	}
+	if production != nil {
+		return production
+	}
+	if workerError != nil {
+		return workerError
+	}
+	var inputBytes uint64
+	for _, p := range append(append([]string{}, paths...), filepath.Join(c.data, "index.csv"), filepath.Join(c.data, "security_master.csv")) {
+		s, e := os.Stat(p)
+		if e != nil {
+			return e
+		}
+		inputBytes += uint64(s.Size())
+	}
+	for _, p := range paths {
+		target := outputPath(c, p)
+		if e = os.Rename(target+".partial", target); e != nil {
+			return e
+		}
+		s, e := os.Stat(target)
+		if e != nil {
+			return e
+		}
+		mt.bytes += uint64(s.Size())
+	}
+	if e = os.MkdirAll(filepath.Dir(c.metrics), 0755); e != nil {
+		return e
+	}
+	f, e := os.Create(c.metrics)
+	if e != nil {
+		return e
+	}
+	defer f.Close()
+	w := csv.NewWriter(f)
+	w.Write([]string{"language", "scenario", "period", "threads", "days", "input_file_bytes", "rows_read", "rows_retained", "groups", "effect_values", "output_rows", "output_bytes", "parsed_input_bytes", "read_parse_seconds", "filter_seconds", "aggregate_seconds", "compute_seconds", "write_seconds", "wall_seconds"})
+	u := func(v uint64) string { return strconv.FormatUint(v, 10) }
+	w.Write([]string{"go", c.scenario, c.period, strconv.Itoa(c.threads), strconv.Itoa(days), u(inputBytes), u(mt.rows), u(mt.retained), u(mt.groups), u(mt.effects), u(mt.written), u(mt.bytes), u(mt.parsed), number(mt.read), number(mt.filter), number(mt.aggregate), number(mt.compute), number(mt.write), number(seconds(wall))})
+	w.Flush()
+	fmt.Printf("%d rows written; metrics %s\n", mt.written, c.metrics)
+	return w.Error()
+}
+func main() {
+	if e := run(); e != nil {
+		fmt.Fprintln(os.Stderr, "error:", e)
+		os.Exit(1)
+	}
+}

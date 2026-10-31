@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1370" viewBox="0 0 1440 1370" role="img" aria-labelledby="title desc">
+<title id="title">05  Monthly: partition calendar dates, emit linked period summaries</title>
+<desc id="desc">Calendar buckets differ from weekly buckets • same engine supports quarter/year keys</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#475569"/></marker></defs>
+<rect width="1440" height="1370" fill="white"/>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#0f172a}.title{font-size:32px;font-weight:700}.sub{font-size:18px;fill:#475569}.head{font-size:20px;font-weight:700}.body{font-size:17px}.label{font-size:16px;fill:#475569}.edge{fill:none;stroke:#475569;stroke-width:2.2;marker-end:url(#arrow)}</style>
+<text x="65" y="58" class="title" text-anchor="start">
+<tspan x="65" dy="0">05  Monthly: partition calendar dates, emit linked period summaries</tspan>
+</text>
+<text x="65" y="94" class="sub" text-anchor="start">
+<tspan x="65" dy="0">Calendar buckets differ from weekly buckets • same engine supports quarter/year keys</tspan>
+</text>
+<rect x="160" y="140" width="1120" height="100" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="720.0" y="170" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">STREAM DAILY SECURITY INPUTS IN EFFECTIVE-DATE ORDER</tspan>
+</text>
+<text x="720.0" y="201" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Maintain current portfolio/index day; reuse buffers; use shared immutable index data.</tspan>
+</text>
+<path d="M720 240 V295" class="edge"/>
+<rect x="160" y="295" width="1120" height="100" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+<text x="720.0" y="325" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">SELECT CALENDAR BUCKET KEY</tspan>
+</text>
+<text x="720.0" y="356" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">month: YYYY-MM   |   quarter override: YYYY-Qn   |   year override: YYYY</tspan>
+</text>
+<path d="M720 395 V435 H435 V485" class="edge"/>
+<rect x="85" y="485" width="700" height="155" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="435.0" y="515" class="head" text-anchor="middle">
+<tspan x="435.0" dy="0">JANUARY • ONE ACTIVE ACCUMULATOR</tspan>
+</text>
+<text x="435.0" y="546" class="body" text-anchor="middle">
+<tspan x="435.0" dy="0">Jan 1: daily effects → initialize linked state</tspan>
+<tspan x="435.0" dy="25">Jan 2 … Jan 30: daily effects → update same state</tspan>
+<tspan x="435.0" dy="25">Jan 31: daily effects → update same state</tspan>
+<tspan x="435.0" dy="25">No daily security output history is retained.</tspan>
+</text>
+<rect x="885" y="485" width="420" height="155" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="1095.0" y="515" class="head" text-anchor="middle">
+<tspan x="1095.0" dy="0">FEBRUARY • NEXT ACCUMULATOR</tspan>
+</text>
+<text x="1095.0" y="546" class="body" text-anchor="middle">
+<tspan x="1095.0" dy="0">Feb 1 creates a new bucket.</tspan>
+<tspan x="1095.0" dy="25">Feb 2 … Feb 28 update it.</tspan>
+<tspan x="1095.0" dy="25">Starts only after January is emitted.</tspan>
+</text>
+<path d="M435 640 V705" class="edge"/>
+<path d="M435 705.0 L740.0 775 L435 845.0 L130.0 775 Z" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+<text x="435" y="767" class="body" text-anchor="middle">
+<tspan x="435" dy="0">Next date is in a new month,</tspan>
+<tspan x="435" dy="25">or input has reached EOF?</tspan>
+</text>
+<path d="M130 775 H35 V435 H435 V485" class="edge"/>
+<text x="210" y="690" class="label" text-anchor="middle">
+<tspan x="210" dy="0">No: keep accumulating</tspan>
+</text>
+<path d="M435 845 V915" class="edge"/>
+<text x="590" y="885" class="label" text-anchor="middle">
+<tspan x="590" dy="0">Yes: close observed period</tspan>
+</text>
+<rect x="85" y="915" width="700" height="135" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="435.0" y="945" class="head" text-anchor="middle">
+<tspan x="435.0" dy="0">EMIT JANUARY’S LINKED CSV ROWS</tspan>
+</text>
+<text x="435.0" y="976" class="body" text-anchor="middle">
+<tspan x="435.0" dy="0">Per-security allocation, selection, interaction + portfolio totals.</tspan>
+<tspan x="435.0" dy="25">Period returns = compounded returns, not sums of daily returns.</tspan>
+<tspan x="435.0" dy="25">Weights = mean daily weights, including absent days as zero.</tspan>
+</text>
+<path d="M785 975 H1345 V435 H1095 V485" class="edge"/>
+<text x="1100" y="865" class="label" text-anchor="middle">
+<tspan x="1100" dy="0">Feb 1: reset and start February</tspan>
+</text>
+<path d="M1095 640 V1090" class="edge"/>
+<rect x="885" y="1090" width="420" height="120" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="1095.0" y="1120" class="head" text-anchor="middle">
+<tspan x="1095.0" dy="0">EMIT FEBRUARY AT NEXT BOUNDARY</tspan>
+</text>
+<text x="1095.0" y="1151" class="body" text-anchor="middle">
+<tspan x="1095.0" dy="0">Continue month by month.</tspan>
+<tspan x="1095.0" dy="25">EOF also emits a partial final month.</tspan>
+</text>
+<rect x="85" y="1125" width="700" height="145" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="435.0" y="1155" class="head" text-anchor="middle">
+<tspan x="435.0" dy="0">PER-COMPONENT LINKING, BASE AND LOCAL</tspan>
+</text>
+<text x="435.0" y="1186" class="body" text-anchor="middle">
+<tspan x="435.0" dy="0">E_new = E_previous × (1 + b_today) + e_today × P_before</tspan>
+<tspan x="435.0" dy="25">Only one calendar period is held per worker.</tspan>
+<tspan x="435.0" dy="25">Final EOF: flush/fsync and publish validated files.</tspan>
+</text>
+</svg>

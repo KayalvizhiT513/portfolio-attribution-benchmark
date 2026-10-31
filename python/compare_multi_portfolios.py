@@ -55,7 +55,7 @@ def main():
                 if args.language=="go":
                     command=[str(day_binary if architecture=="baseline" else stream_binary)]
                 else:
-                    command=[sys.executable,"brinson_day_parallel.py" if architecture=="baseline" else "brinson_streaming_days.py"]
+                    command=[sys.executable,str(Path(__file__).with_name("brinson_day_parallel.py" if architecture=="baseline" else "brinson_streaming_days.py"))]
                 proc=subprocess.run(command+["--data",str(folder),"--output",str(path),
                                      "--architecture",selected],capture_output=True,text=True,env=env)
                 if proc.returncode:raise RuntimeError(f"{architecture}/{folder.name}: {proc.stderr}\n{proc.stdout}")

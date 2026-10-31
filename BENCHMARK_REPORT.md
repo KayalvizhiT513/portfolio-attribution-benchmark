@@ -176,10 +176,10 @@ Numba took **19.2% less time than Go** and **45.4% less time than threaded NumPy
 ### Reproduce the 100k test
 
 ```bash
-python generate.py --securities 100000 --days 252 --seed 42 --output data/100k
-python benchmark.py --data data/100k --mode numpy-threaded --workers 4 --runs 20
-python benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
-go build -o benchmark-go .
+python python/generate.py --securities 100000 --days 252 --seed 42 --output data/100k
+python python/benchmark.py --data data/100k --mode numpy-threaded --workers 4 --runs 20
+python python/benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
+go -C go build -o ../benchmark-go .
 ./benchmark-go --data data/100k --workers 4 --runs 20
 ```
 
@@ -188,7 +188,7 @@ go build -o benchmark-go .
 Use the **original** `data/` fixture without regenerating it, so it remains comparable to the historical 15k Numba and Go measurements:
 
 ```bash
-python benchmark.py --data data --mode numpy-threaded --workers 4 --runs 20
+python python/benchmark.py --data data --mode numpy-threaded --workers 4 --runs 20
 ```
 
 My recorded 20-run median for this command was **0.0018060000002151355 seconds (1.806 ms)**; maximum reconciliation error was **1.1180834903756764e-19**.
@@ -196,21 +196,21 @@ My recorded 20-run median for this command was **0.0018060000002151355 seconds (
 ## 7. Reproduction
 
 ```bash
-python -m pip install -r requirements.txt
-python generate.py --securities 15000 --days 252 --seed 42
+python -m pip install -r python/requirements.txt
+python python/generate.py --securities 15000 --days 252 --seed 42
 
 # Initial five-run comparison
-python benchmark.py --mode numpy-threaded --workers 4 --runs 20
-python benchmark.py --mode numba
-python benchmark.py --mode numba-parallel --workers 4
-go build -o benchmark-go .
+python python/benchmark.py --mode numpy-threaded --workers 4 --runs 20
+python python/benchmark.py --mode numba
+python python/benchmark.py --mode numba-parallel --workers 4
+go -C go build -o ../benchmark-go .
 ./benchmark-go --workers 4
 
 # Twenty-run worker scaling
-python benchmark.py --mode numba-parallel --workers 1 --runs 20
-python benchmark.py --mode numba-parallel --workers 2 --runs 20
-python benchmark.py --mode numba-parallel --workers 4 --runs 20
-python benchmark.py --mode numba-parallel --workers 8 --runs 20
+python python/benchmark.py --mode numba-parallel --workers 1 --runs 20
+python python/benchmark.py --mode numba-parallel --workers 2 --runs 20
+python python/benchmark.py --mode numba-parallel --workers 4 --runs 20
+python python/benchmark.py --mode numba-parallel --workers 8 --runs 20
 
 ./benchmark-go --workers 1 --runs 20
 ./benchmark-go --workers 2 --runs 20
@@ -234,8 +234,8 @@ The numbers reconcile to the same allocation and selection totals. My measured m
 **Architectural interpretation:** Numba may benefit from finer task scheduling (504 day/effect tasks instead of 252 day tasks). Go's extra task dispatch and separate traversals may outweigh that benefit. These are hypotheses, not conclusions from profiling. The Numba improvement is modest and should be reproduced across interleaved trials. Both cases still use the same number of workers; **task granularity**, not hardware parallelism, changes.
 
 ```bash
-python benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
-python benchmark.py --data data/100k --mode numba-steps --workers 4 --runs 20
+python python/benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
+python python/benchmark.py --data data/100k --mode numba-steps --workers 4 --runs 20
 ./benchmark-go --data data/100k --mode fused --workers 4 --runs 20
 ./benchmark-go --data data/100k --mode steps --workers 4 --runs 20
 ```
@@ -243,7 +243,7 @@ python benchmark.py --data data/100k --mode numba-steps --workers 4 --runs 20
 
 ## Concurrent compounded-return stress test (measured, 100k)
 
-I ran the separately added `risk_stress.py` and `cmd/riskstress` workloads on the 100k fixture: 10 jobs, up to 4 concurrent jobs, 8 synthetic return-shock scenarios, 12 sequential compounding updates, two paths, and 252 trading days. Each job uses the same shared input arrays with small job-specific shocks.
+I ran the separately added `python/risk_stress.py` and `cmd/riskstress` workloads on the 100k fixture: 10 jobs, up to 4 concurrent jobs, 8 synthetic return-shock scenarios, 12 sequential compounding updates, two paths, and 252 trading days. Each job uses the same shared input arrays with small job-specific shocks.
 
 | Implementation | Median of 3 runs | Jobs/second | Checksum |
 |---|---:|---:|---:|
@@ -255,7 +255,7 @@ Numba completed the test approximately **27.4% faster by elapsed time**, with ma
 **Scope correction:** Although this test repeatedly compounds returns across scenarios, it is **one type of calculation repeated many times**, not a realistic multi-stage analytics pipeline. Its result must not be presented as evidence that Numba is faster for diverse dependent stages, database access, file I/O, or complete API requests. A separate dependent multi-stage test is required.
 
 ```bash
-python risk_stress.py --data data/100k --jobs 10 --concurrency 4 --scenarios 8 --steps 12 --runs 3
+python python/risk_stress.py --data data/100k --jobs 10 --concurrency 4 --scenarios 8 --steps 12 --runs 3
 ./benchmark-riskstress --data data/100k --jobs 10 --concurrency 4 --scenarios 8 --steps 12 --runs 3
 ```
 
@@ -278,7 +278,7 @@ The full test's three recorded Go times were 2.011192, 1.981683, and 1.976598 se
 **Scope:** Inputs were loaded before timing. Numba JIT warm-up and scratch/output allocations were also excluded. Jobs share the same numerical inputs, with job-specific thresholds. Results represent compute-stage wall time and scheduling only, **not** complete API, storage, or unique-portfolio ingestion performance.
 
 ```bash
-python multistage.py --data data/100k --jobs 10 --concurrency 4 --window 20 --runs 3
+python python/multistage.py --data data/100k --jobs 10 --concurrency 4 --window 20 --runs 3
 ./benchmark-multistage --data data/100k --jobs 10 --concurrency 4 --window 20 --runs 3
 ```
 

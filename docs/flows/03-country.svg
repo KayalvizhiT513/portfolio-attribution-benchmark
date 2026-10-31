@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1240" viewBox="0 0 1440 1240" role="img" aria-labelledby="title desc">
+<title id="title">03  Country: many securities collapse into country aggregates</title>
+<desc id="desc">Group weighted contributions first • country effects are not sums of security effects</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#475569"/></marker></defs>
+<rect width="1440" height="1240" fill="white"/>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#0f172a}.title{font-size:32px;font-weight:700}.sub{font-size:18px;fill:#475569}.head{font-size:20px;font-weight:700}.body{font-size:17px}.label{font-size:16px;fill:#475569}.edge{fill:none;stroke:#475569;stroke-width:2.2;marker-end:url(#arrow)}</style>
+<text x="65" y="58" class="title" text-anchor="start">
+<tspan x="65" dy="0">03  Country: many securities collapse into country aggregates</tspan>
+</text>
+<text x="65" y="94" class="sub" text-anchor="start">
+<tspan x="65" dy="0">Group weighted contributions first • country effects are not sums of security effects</tspan>
+</text>
+<rect x="300" y="140" width="840" height="95" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="720.0" y="170" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">PRECOMPUTE MASTER LOOKUPS</tspan>
+</text>
+<text x="720.0" y="201" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">A → US; B → US; C → DE; D → DE (illustrative holdings).</tspan>
+</text>
+<path d="M720 235 V290" class="edge"/>
+<rect x="160" y="290" width="1120" height="100" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="720.0" y="320" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">STREAM ONE DATE FOR INDEX AND EACH PORTFOLIO</tspan>
+</text>
+<text x="720.0" y="351" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Parse IDs, weights and base/local returns; validate; normalize each side.</tspan>
+</text>
+<rect x="100" y="450" width="280" height="70" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="240.0" y="480" class="head" text-anchor="middle">
+<tspan x="240.0" dy="0">A • US</tspan>
+</text>
+<text x="240.0" y="511" class="body" text-anchor="middle">
+</text>
+<rect x="420" y="450" width="280" height="70" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="560.0" y="480" class="head" text-anchor="middle">
+<tspan x="560.0" dy="0">B • US</tspan>
+</text>
+<text x="560.0" y="511" class="body" text-anchor="middle">
+</text>
+<rect x="740" y="450" width="280" height="70" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="880.0" y="480" class="head" text-anchor="middle">
+<tspan x="880.0" dy="0">C • DE</tspan>
+</text>
+<text x="880.0" y="511" class="body" text-anchor="middle">
+</text>
+<rect x="1060" y="450" width="280" height="70" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="1200.0" y="480" class="head" text-anchor="middle">
+<tspan x="1200.0" dy="0">D • DE</tspan>
+</text>
+<text x="1200.0" y="511" class="body" text-anchor="middle">
+</text>
+<path d="M720 390 V420 H240 V450" class="edge"/>
+<path d="M720 420 H560 V450" class="edge"/>
+<path d="M720 420 H880 V450" class="edge"/>
+<path d="M720 420 H1200 V450" class="edge"/>
+<rect x="145" y="610" width="500" height="135" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+<text x="395.0" y="640" class="head" text-anchor="middle">
+<tspan x="395.0" dy="0">US ACCUMULATOR</tspan>
+</text>
+<text x="395.0" y="671" class="body" text-anchor="middle">
+<tspan x="395.0" dy="0">W_US = w_A + w_B</tspan>
+<tspan x="395.0" dy="25">C_US = w_A × r_A + w_B × r_B</tspan>
+<tspan x="395.0" dy="25">R_US = C_US / W_US</tspan>
+</text>
+<rect x="795" y="610" width="500" height="135" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+<text x="1045.0" y="640" class="head" text-anchor="middle">
+<tspan x="1045.0" dy="0">DE ACCUMULATOR</tspan>
+</text>
+<text x="1045.0" y="671" class="body" text-anchor="middle">
+<tspan x="1045.0" dy="0">W_DE = w_C + w_D</tspan>
+<tspan x="1045.0" dy="25">C_DE = w_C × r_C + w_D × r_D</tspan>
+<tspan x="1045.0" dy="25">R_DE = C_DE / W_DE</tspan>
+</text>
+<path d="M240 520 V565 H395 V610" class="edge"/>
+<path d="M560 520 V565 H395" class="edge"/>
+<path d="M880 520 V565 H1045 V610" class="edge"/>
+<path d="M1200 520 V565 H1045" class="edge"/>
+<path d="M395 745 V790 H720 V835" class="edge"/>
+<path d="M1045 745 V790 H720" class="edge"/>
+<rect x="200" y="835" width="1040" height="110" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="720.0" y="865" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">COUNTRY-LEVEL ATTRIBUTION: US + DE</tspan>
+</text>
+<text x="720.0" y="896" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Perform this aggregation independently for index and portfolio, and for base/local.</tspan>
+<tspan x="720.0" dy="25">Calculate effects from country weights/returns; reconcile the country sum.</tspan>
+</text>
+<path d="M720 945 V1000" class="edge"/>
+<rect x="200" y="1000" width="1040" height="100" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="720.0" y="1030" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">WRITE TWO COUNTRY GROUPS, NOT FOUR SECURITY ROWS</tspan>
+</text>
+<text x="720.0" y="1061" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Daily country detail + totals; stream buffered CSV; repeat for the next date.</tspan>
+</text>
+<text x="720" y="1160" class="sub" text-anchor="middle">
+<tspan x="720" dy="0">Actual supplied holdings are US-only; US/DE above illustrates the many-to-one transformation.</tspan>
+</text>
+</svg>

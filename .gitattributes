@@ -1,0 +1,3 @@
+
+# Keep generated CSV reports consistent in Git.
+*.csv text eol=lf

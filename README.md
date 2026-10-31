@@ -1,3 +1,11 @@
+# Attribution implementations
+
+Source code is organized in `python/`, `go/`, and `rust/`. Shared datasets remain in `data/` and `attribution_data/`. Run Python scripts from the repository root with the `python/` prefix. Build Go binaries from their module, for example `go -C go build -o ../benchmark-brinson ./cmd/brinsoncsv`.
+
+The new Rust and Go CSV implementations support five views: full security detail, a standalone instrument subset, country, weekly linked security attribution, and monthly linked security attribution. Quarter/year overrides are also supported. Both expose stage metrics for read/parse, filtering, aggregation, computation, and writing.
+
+See [scenario flowcharts and complete stage metrics](ATTRIBUTION_STAGE_COMPARISON.md), [native usage, formulas, tests, and benchmark commands](rust/README.md), [five-scenario benchmark](results/native-benchmark/REPORT.md), and [full-history country/subset benchmark](results/native-full-history/REPORT.md). The older benchmarks below remain available.
+
 # Portfolio attribution benchmark: Python vs Go
 
 Reproducible synthetic security-level attribution benchmark comparing threaded NumPy, Numba (serial/parallel), and Go goroutines.
@@ -18,12 +26,12 @@ See [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) for the measured Python/Numba and
 
 ## Commands
 ```bash
-python -m pip install -r requirements.txt
-python generate.py --securities 15000 --days 252 --seed 42
-python benchmark.py --mode numpy-threaded --workers 4 --runs 5
-python benchmark.py --mode numba --runs 5
-python benchmark.py --mode numba-parallel --workers 4 --runs 5
-go build -o benchmark-go .
+python -m pip install -r python/requirements.txt
+python python/generate.py --securities 15000 --days 252 --seed 42
+python python/benchmark.py --mode numpy-threaded --workers 4 --runs 5
+python python/benchmark.py --mode numba --runs 5
+python python/benchmark.py --mode numba-parallel --workers 4 --runs 5
+go -C go build -o ../benchmark-go .
 ./benchmark-go --workers 4 --runs 5
 ```
 
@@ -44,9 +52,9 @@ Sizes are decimal GB; actual peak RAM, file-system cache, temporary arrays and a
 **Recommended first stress test: 100,000 securities per universe, then 250,000** if memory and disk are sufficient. Keep a separate directory for each test:
 
 ```bash
-python generate.py --securities 100000 --days 252 --seed 42 --output data/100k
-python benchmark.py --data data/100k --mode numpy-threaded --workers 4 --runs 20
-python benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
+python python/generate.py --securities 100000 --days 252 --seed 42 --output data/100k
+python python/benchmark.py --data data/100k --mode numpy-threaded --workers 4 --runs 20
+python python/benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
 ./benchmark-go --data data/100k --workers 4 --runs 20
 
 # Repeat across 1, 2, 4, 8 workers for each parallel runtime.
@@ -70,11 +78,11 @@ Run the paired benchmark against the same existing fixture (do not regenerate it
 
 ```bash
 git pull origin main
-go build -o benchmark-go .
+go -C go build -o ../benchmark-go .
 
 # 100k dataset, 4 workers, 20 runs
-python benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
-python benchmark.py --data data/100k --mode numba-steps --workers 4 --runs 20
+python python/benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
+python python/benchmark.py --data data/100k --mode numba-steps --workers 4 --runs 20
 ./benchmark-go --data data/100k --mode fused --workers 4 --runs 20
 ./benchmark-go --data data/100k --mode steps --workers 4 --runs 20
 ```
@@ -87,12 +95,12 @@ The original Go `--mode fused` sends one day at a time through a job channel (25
 
 ```bash
 git pull origin main
-go build -o benchmark-go .
+go -C go build -o ../benchmark-go .
 ./benchmark-go --data data/100k --mode fused --workers 4 --runs 20
 ./benchmark-go --data data/100k --mode static --workers 4 --runs 20
 ./benchmark-go --data data/100k --mode steps --workers 4 --runs 20
-python benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
-python benchmark.py --data data/100k --mode numba-steps --workers 4 --runs 20
+python python/benchmark.py --data data/100k --mode numba-parallel --workers 4 --runs 20
+python python/benchmark.py --data data/100k --mode numba-steps --workers 4 --runs 20
 ```
 
 Repeat at 1, 2, 4 and 8 workers, ideally alternating the order of modes across trials. The three Go modes all preserve the same formulas, output shapes, shared input arrays, and reconciliation checks. The new mode is not yet measured; it is not evidence that Go is faster. This remains a kernel-only comparison.
@@ -104,8 +112,8 @@ The original benchmarks measure **one attribution job** with parallel processing
 Run from the repository root after `git pull origin main`:
 
 ```bash
-go build -o benchmark-multijob ./cmd/multijob
-python multi_job.py --data data/100k --jobs 10 --concurrency 4 --runs 5
+go -C go build -o ../benchmark-multijob ./cmd/multijob
+python python/multi_job.py --data data/100k --jobs 10 --concurrency 4 --runs 5
 ./benchmark-multijob --data data/100k --jobs 10 --concurrency 4 --runs 5
 ```
 
@@ -117,7 +125,7 @@ Results for this concurrency experiment are **not measured yet**.
 
 ## Heavy multi-scenario computation (separate from attribution)
 
-The earlier concurrent-jobs test repeats the existing simple attribution formulas. For a genuinely heavier CPU workload, `risk_stress.py` and `cmd/riskstress/main.go` implement matching **hypothetical compounded-return stress simulations**:
+The earlier concurrent-jobs test repeats the existing simple attribution formulas. For a genuinely heavier CPU workload, `python/risk_stress.py` and `cmd/riskstress/main.go` implement matching **hypothetical compounded-return stress simulations**:
 
 - Every job processes the 252 days and 100k securities, across **8 shock scenarios**.
 - For every security, scenario and day, calculate **12 successive compounded updates** for the portfolio and benchmark paths, then weight and aggregate their results.
@@ -130,15 +138,15 @@ Start with a smaller sanity run (these will take longer than earlier millisecond
 
 ```bash
 git pull origin main
-go build -o benchmark-riskstress ./cmd/riskstress
-python risk_stress.py --data data/100k --jobs 2 --concurrency 2 --scenarios 2 --steps 4 --runs 1
+go -C go build -o ../benchmark-riskstress ./cmd/riskstress
+python python/risk_stress.py --data data/100k --jobs 2 --concurrency 2 --scenarios 2 --steps 4 --runs 1
 ./benchmark-riskstress --data data/100k --jobs 2 --concurrency 2 --scenarios 2 --steps 4 --runs 1
 ```
 
 Then run the full workload, **one process at a time**:
 
 ```bash
-python risk_stress.py --data data/100k --jobs 10 --concurrency 4 --scenarios 8 --steps 12 --runs 3
+python python/risk_stress.py --data data/100k --jobs 10 --concurrency 4 --scenarios 8 --steps 12 --runs 3
 ./benchmark-riskstress --data data/100k --jobs 10 --concurrency 4 --scenarios 8 --steps 12 --runs 3
 ```
 
@@ -157,15 +165,15 @@ Four active jobs at a time; each job runs its four stages sequentially. Differen
 
 ```bash
 git pull origin main
-go build -o benchmark-multistage ./cmd/multistage
-python multistage.py --data data/100k --jobs 2 --concurrency 2 --window 20 --runs 1
+go -C go build -o ../benchmark-multistage ./cmd/multistage
+python python/multistage.py --data data/100k --jobs 2 --concurrency 2 --window 20 --runs 1
 ./benchmark-multistage --data data/100k --jobs 2 --concurrency 2 --window 20 --runs 1
 ```
 
 If the small test completes and checksums agree, run the full test:
 
 ```bash
-python multistage.py --data data/100k --jobs 10 --concurrency 4 --window 20 --runs 3
+python python/multistage.py --data data/100k --jobs 10 --concurrency 4 --window 20 --runs 3
 ./benchmark-multistage --data data/100k --jobs 10 --concurrency 4 --window 20 --runs 3
 ```
 
@@ -179,9 +187,9 @@ The Python implementation uses standard NumPy with a thread pool; it **does not 
 
 ```bash
 git pull origin main
-python generate_csv.py --securities 15000 --days 252 --output data/csv-15k
-go build -o benchmark-csv ./cmd/csvattribution
-python csv_attribution.py --data data/csv-15k
+python python/generate_csv.py --securities 15000 --days 252 --output data/csv-15k
+go -C go build -o ../benchmark-csv ./cmd/csvattribution
+python python/csv_attribution.py --data data/csv-15k
 ./benchmark-csv --data data/csv-15k
 ```
 
@@ -191,13 +199,13 @@ The outputs include detected workers, processed security-day records, elapsed ti
 
 ## Fully independent security-day effect tasks (new experiment)
 
-The earlier `csv_attribution.py` and `cmd/csvattribution` dispatched **one allocation task and one selection task per day**. That grouped all securities together. The newer `csv_finegrain.py` and `cmd/csvfinegrain` dispatch **separate allocation and selection tasks for every (date, security_id)** after joining the two shuffled CSV inputs on those keys. There is no ordering constraint across days, securities or effects. CPU worker availability is auto-detected; neither runner requires a manually chosen worker count. Python uses `multiprocessing` (not GIL-bound Python threads) and Go uses goroutines. Both report total tasks, worker count and elapsed time. The Python queue is bounded to avoid accumulating millions of futures. This benchmark **deliberately tests the scheduling cost of the smallest independently runnable arithmetic units**; it is likely substantially slower than batching because each individual effect only performs a few operations.
+The earlier `python/csv_attribution.py` and `cmd/csvattribution` dispatched **one allocation task and one selection task per day**. That grouped all securities together. The newer `python/csv_finegrain.py` and `cmd/csvfinegrain` dispatch **separate allocation and selection tasks for every (date, security_id)** after joining the two shuffled CSV inputs on those keys. There is no ordering constraint across days, securities or effects. CPU worker availability is auto-detected; neither runner requires a manually chosen worker count. Python uses `multiprocessing` (not GIL-bound Python threads) and Go uses goroutines. Both report total tasks, worker count and elapsed time. The Python queue is bounded to avoid accumulating millions of futures. This benchmark **deliberately tests the scheduling cost of the smallest independently runnable arithmetic units**; it is likely substantially slower than batching because each individual effect only performs a few operations.
 
 ```bash
 git pull origin main
-python generate_csv.py --securities 100 --days 5 --output data/csv-small
-go build -o benchmark-csv-finegrain ./cmd/csvfinegrain
-python csv_finegrain.py --data data/csv-small
+python python/generate_csv.py --securities 100 --days 5 --output data/csv-small
+go -C go build -o ../benchmark-csv-finegrain ./cmd/csvfinegrain
+python python/csv_finegrain.py --data data/csv-small
 ./benchmark-csv-finegrain --data data/csv-small
 ```
 
@@ -215,9 +223,9 @@ The sum of all segment effects must reconcile to the difference between total po
 
 ```bash
 git pull origin main
-python generate_brinson_csv.py --securities 15000 --days 252 --segments 20 --output data/brinson-15k
-go build -o benchmark-brinson ./cmd/brinsoncsv
-python brinson_csv.py --data data/brinson-15k
+python python/generate_brinson_csv.py --securities 15000 --days 252 --segments 20 --output data/brinson-15k
+go -C go build -o ../benchmark-brinson ./cmd/brinsoncsv
+python python/brinson_csv.py --data data/brinson-15k
 ./benchmark-brinson --data data/brinson-15k
 ```
 
@@ -231,8 +239,8 @@ The measured `elapsed_seconds` now includes both input CSV reading and writing t
 
 ```bash
 git pull origin main
-go build -o benchmark-brinson ./cmd/brinsoncsv
-python brinson_csv.py --data data/brinson-15k --output results/brinson-python.csv
+go -C go build -o ../benchmark-brinson ./cmd/brinsoncsv
+python python/brinson_csv.py --data data/brinson-15k --output results/brinson-python.csv
 ./benchmark-brinson --data data/brinson-15k --output results/brinson-go.csv
 ```
 
@@ -248,17 +256,17 @@ Run these commands from the repository root after installing dependencies and ge
 
 ```bash
 # Updated comparison (five measured runs each; historical report used unthreaded NumPy)
-python benchmark.py --mode numpy-threaded --workers 4
-python benchmark.py --mode numba
-python benchmark.py --mode numba-parallel --workers 4
-go build -o benchmark-go .
+python python/benchmark.py --mode numpy-threaded --workers 4
+python python/benchmark.py --mode numba
+python python/benchmark.py --mode numba-parallel --workers 4
+go -C go build -o ../benchmark-go .
 ./benchmark-go --workers 4
 
 # Multicore scaling comparison (20 measured runs per configuration)
-python benchmark.py --mode numba-parallel --workers 1 --runs 20
-python benchmark.py --mode numba-parallel --workers 2 --runs 20
-python benchmark.py --mode numba-parallel --workers 4 --runs 20
-python benchmark.py --mode numba-parallel --workers 8 --runs 20
+python python/benchmark.py --mode numba-parallel --workers 1 --runs 20
+python python/benchmark.py --mode numba-parallel --workers 2 --runs 20
+python python/benchmark.py --mode numba-parallel --workers 4 --runs 20
+python python/benchmark.py --mode numba-parallel --workers 8 --runs 20
 
 ./benchmark-go --workers 1 --runs 20
 ./benchmark-go --workers 2 --runs 20
@@ -290,8 +298,8 @@ The new `pipeline.segments_released_before_full_benchmark` reports the count of 
 Rebuild and rerun both implementations to measure the new architecture:
 ```bash
 git pull origin main
-go build -o benchmark-brinson ./cmd/brinsoncsv
-python brinson_csv.py --data data/brinson-15k --output results/brinson-python.csv
+go -C go build -o ../benchmark-brinson ./cmd/brinsoncsv
+python python/brinson_csv.py --data data/brinson-15k --output results/brinson-python.csv
 ./benchmark-brinson --data data/brinson-15k --output results/brinson-go.csv
 ```
 
@@ -306,8 +314,8 @@ The new runner executes each of the four combinations sequentially, rotates exec
 
 ```bash
 git pull origin main
-go build -o benchmark-brinson ./cmd/brinsoncsv
-python compare_architectures.py --data data/brinson-15k --go ./benchmark-brinson --runs 10
+go -C go build -o ../benchmark-brinson ./cmd/brinsoncsv
+python python/compare_architectures.py --data data/brinson-15k --go ./benchmark-brinson --runs 10
 ```
 
 Outputs: `results/architecture-comparison/runs.csv`, `summary.csv`, `summary.json`, and individual per-run attribution CSV files. There is no warm-up run; the first runs can reflect cold caches and process startup. The runner checks numerical equivalence but does not prove parallel CPU usage. Run on an otherwise quiet computer for more meaningful results.
@@ -319,9 +327,9 @@ This experiment tests whether independent **portfolio-level jobs** provide more 
 
 ```bash
 git pull origin main
-go build -o benchmark-brinson ./cmd/brinsoncsv
-python generate_multi_portfolios.py --source data/brinson-15k --output data/brinson-multi --portfolios 4
-python compare_multi_portfolios.py --data data/brinson-multi --go ./benchmark-brinson --runs 10
+go -C go build -o ../benchmark-brinson ./cmd/brinsoncsv
+python python/generate_multi_portfolios.py --source data/brinson-15k --output data/brinson-multi --portfolios 4
+python python/compare_multi_portfolios.py --data data/brinson-multi --go ./benchmark-brinson --runs 10
 ```
 
 The driver runs **all portfolios simultaneously** per architecture up to the detected logical CPU count, sets `GOMAXPROCS` per child process to approximately `detected CPUs / concurrent portfolio jobs`, and compares *batch wall-clock latency*, not the sum of child runtimes. It alternates baseline-first vs streaming-first by round, performs numerical CSV output comparisons for each portfolio, and saves `results/multi-portfolio/runs.csv`, `summary.csv`, and `summary.json` plus per-run attribution CSVs. `batch_effective_cores` is sum of child process CPU seconds divided by batch wall time (an average CPU equivalent, not simultaneous peak physical cores). Repeated shared benchmark reads may benefit from OS caching, which is part of the measured workload.
@@ -331,24 +339,24 @@ Do not confuse this with a shared-reader or in-process multi-portfolio scheduler
 
 ## True day-parallel vs dependency-aware fine-grained attribution (Go and Python)
 
-The previously named `baseline` in `brinson_csv.py` / `cmd/brinsoncsv` only delayed effect dispatch and still processed dates sequentially. **That is not day parallelism.**
+The previously named `baseline` in `python/brinson_csv.py` / `cmd/brinsoncsv` only delayed effect dispatch and still processed dates sequentially. **That is not day parallelism.**
 
-The new **coarse-grained baseline** is `cmd/brinsonday/main.go` for Go and `brinson_day_parallel.py` for Python: one **complete trading day** per task. Workers independently match securities, aggregate segment returns, calculate all three Brinson–Fachler effects, and reconcile the day's results. Days may finish out of order; the collector writes the output CSV in original date order. Each day-parallel process has a bounded task queue and a CPU budget determined from the machine's logical CPUs. Python uses a `ProcessPoolExecutor` for actual CPU parallelism; Go uses worker goroutines. Input CSV grouping/reading remains a single producer in both.
+The new **coarse-grained baseline** is `cmd/brinsonday/main.go` for Go and `python/brinson_day_parallel.py` for Python: one **complete trading day** per task. Workers independently match securities, aggregate segment returns, calculate all three Brinson–Fachler effects, and reconcile the day's results. Days may finish out of order; the collector writes the output CSV in original date order. Each day-parallel process has a bounded task queue and a CPU budget determined from the machine's logical CPUs. Python uses a `ProcessPoolExecutor` for actual CPU parallelism; Go uses worker goroutines. Input CSV grouping/reading remains a single producer in both.
 
-The **fine-grained streaming** comparison stays in `cmd/brinsoncsv` and `brinson_csv.py`: days processed sequentially, with separate selection/interaction/allocation tasks per segment, selection and interaction released as soon as a segment's benchmark records are complete.
+The **fine-grained streaming** comparison stays in `cmd/brinsoncsv` and `python/brinson_csv.py`: days processed sequentially, with separate selection/interaction/allocation tasks per segment, selection and interaction released as soon as a segment's benchmark records are complete.
 
 For a fair multi-portfolio comparison the runner now labels `baseline` as **true day_parallel**, and `streaming` as per-segment early-release. The runner alternates the order every round, executes portfolios concurrently, validates every baseline/streaming CSV pair, and records latency, I/O timing and CPU usage.
 
 ```bash
 git pull origin main
-go build -o benchmark-brinson ./cmd/brinsoncsv
-go build -o benchmark-brinson-day ./cmd/brinsonday
+go -C go build -o ../benchmark-brinson ./cmd/brinsoncsv
+go -C go build -o ../benchmark-brinson-day ./cmd/brinsonday
 
 # Four distinct portfolios already generated:
-python compare_multi_portfolios.py --language go --data data/brinson-multi --runs 10 --output-dir results/multi-day-vs-stream-go
+python python/compare_multi_portfolios.py --language go --data data/brinson-multi --runs 10 --output-dir results/multi-day-vs-stream-go
 
 # Python, same inputs and architecture comparison:
-python compare_multi_portfolios.py --language python --data data/brinson-multi --runs 10 --output-dir results/multi-day-vs-stream-python
+python python/compare_multi_portfolios.py --language python --data data/brinson-multi --runs 10 --output-dir results/multi-day-vs-stream-python
 ```
 
 For an initial smoke test replace `--runs 10` with `--runs 2`. Python child-process CPU time is included in the effective-core calculation for the day-parallel runner. The CSV timings for day-parallel programs measure reading/parsing by the parent reader and writing/syncing by the parent writer, with worker IPC and computations included in total elapsed time. Because the previous benchmarks used a different baseline, do not compare their medians as if the architecture were unchanged.
@@ -358,7 +366,7 @@ For an initial smoke test replace `--runs 10` with `--runs 2`. Python child-proc
 
 ## Corrected comparison: both architectures parallelize independent dates
 
-The previous comparison accidentally gave only the day-level baseline concurrent trading days. This is corrected with **two new streaming-day implementations**, `cmd/brinsonstreamdays` (Go) and `brinson_streaming_days.py` (Python).
+The previous comparison accidentally gave only the day-level baseline concurrent trading days. This is corrected with **two new streaming-day implementations**, `cmd/brinsonstreamdays` (Go) and `python/brinson_streaming_days.py` (Python).
 
 - **Baseline**: separate trading-day workers, each computes all three effects inline for every segment (one scheduled job per date).
 - **Streaming-days**: separate trading-day workers **also run concurrently**. Within each day, selection and interaction are independently scheduled when a segment's matching benchmark records are complete; allocation is independently scheduled after that day's benchmark total has been finalized. Go launches individual effect goroutines; Python uses separate thread tasks within each day process. Both pipelines read input CSV day-by-day in one producer; reading is not per-day-parallel. Both produce date-ordered CSV output.
@@ -366,10 +374,10 @@ The previous comparison accidentally gave only the day-level baseline concurrent
 
 ```bash
 git pull origin main
-go build -o benchmark-brinson-day ./cmd/brinsonday
-go build -o benchmark-brinson-stream-days ./cmd/brinsonstreamdays
-python compare_multi_portfolios.py --language go --data data/brinson-multi --runs 10 --output-dir results/multi-day-fair-go
-python compare_multi_portfolios.py --language python --data data/brinson-multi --runs 10 --output-dir results/multi-day-fair-python
+go -C go build -o ../benchmark-brinson-day ./cmd/brinsonday
+go -C go build -o ../benchmark-brinson-stream-days ./cmd/brinsonstreamdays
+python python/compare_multi_portfolios.py --language go --data data/brinson-multi --runs 10 --output-dir results/multi-day-fair-go
+python python/compare_multi_portfolios.py --language python --data data/brinson-multi --runs 10 --output-dir results/multi-day-fair-python
 ```
 
 For a quick validation run first use `--runs 2`. The new implementations have been committed but not yet verified on your local Mac. Prior measurements cannot be treated as comparable to this revised experiment.
@@ -381,9 +389,9 @@ The multi-portfolio runner now explicitly removes `GOMAXPROCS` from the environm
 
 ```bash
 git pull origin main
-go build -o benchmark-brinson-day ./cmd/brinsonday
-go build -o benchmark-brinson-stream-days ./cmd/brinsonstreamdays
-python compare_multi_portfolios.py --language go --data data/brinson-multi --runs 10 --output-dir results/multi-day-go-uncapped
+go -C go build -o ../benchmark-brinson-day ./cmd/brinsonday
+go -C go build -o ../benchmark-brinson-stream-days ./cmd/brinsonstreamdays
+python python/compare_multi_portfolios.py --language go --data data/brinson-multi --runs 10 --output-dir results/multi-day-go-uncapped
 ```
 
 The Go JSON's `workers` and summary's `gomaxprocs_per_process` report the actual Go runtime concurrency setting rather than the former forced allocation of 3. This change has not been benchmarked on the user's Mac yet.
@@ -395,17 +403,17 @@ The **current** benchmark fixture has six distinct physical CSV files for four p
 
 - `portfolio.csv`, `benchmark.csv` header: `date,security_id,weight,return`.
 - `security_segments.csv` header: `security_id,segment_id`; one mapping row per security, reused across dates and portfolios.
-- Go `cmd/brinsonday` and `cmd/brinsonstreamdays` and Python `brinson_day_parallel.py` and `brinson_streaming_days.py` read the mapping and lookup the segment for every security ID when parsing daily input. Each portfolio process loads its own in-memory mapping; mapping files are symlinked to the shared file on disk.
+- Go `cmd/brinsonday` and `cmd/brinsonstreamdays` and Python `python/brinson_day_parallel.py` and `python/brinson_streaming_days.py` read the mapping and lookup the segment for every security ID when parsing daily input. Each portfolio process loads its own in-memory mapping; mapping files are symlinked to the shared file on disk.
 
 Old fixtures have the obsolete five-column schema and **must be regenerated** before running the new implementation:
 
 ```bash
 git pull origin main
-python generate_brinson_csv.py --securities 15000 --days 252 --segments 20 --seed 42 --output data/brinson-15k-mapped
-python generate_multi_portfolios.py --source data/brinson-15k-mapped --output data/brinson-multi-mapped --portfolios 4
-go build -o benchmark-brinson-day ./cmd/brinsonday
-go build -o benchmark-brinson-stream-days ./cmd/brinsonstreamdays
-python compare_multi_portfolios.py --language go --data data/brinson-multi-mapped --runs 2 --output-dir results/mapped-smoke-go
+python python/generate_brinson_csv.py --securities 15000 --days 252 --segments 20 --seed 42 --output data/brinson-15k-mapped
+python python/generate_multi_portfolios.py --source data/brinson-15k-mapped --output data/brinson-multi-mapped --portfolios 4
+go -C go build -o ../benchmark-brinson-day ./cmd/brinsonday
+go -C go build -o ../benchmark-brinson-stream-days ./cmd/brinsonstreamdays
+python python/compare_multi_portfolios.py --language go --data data/brinson-multi-mapped --runs 2 --output-dir results/mapped-smoke-go
 ```
 
-After validation, use `--runs 10` with a new output folder. This is a **new I/O/join workload**, so compare its timings separately from the previous embedded-segment experiments. The older sequential-day scripts `brinson_csv.py` and `cmd/brinsoncsv` still expect embedded segment IDs and are legacy paths, not part of the updated multi-portfolio comparator.
+After validation, use `--runs 10` with a new output folder. This is a **new I/O/join workload**, so compare its timings separately from the previous embedded-segment experiments. The older sequential-day scripts `python/brinson_csv.py` and `cmd/brinsoncsv` still expect embedded segment IDs and are legacy paths, not part of the updated multi-portfolio comparator.

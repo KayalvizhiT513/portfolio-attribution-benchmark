@@ -37,7 +37,7 @@ def main():
         order=variants[index%4:]+variants[:index%4]
         for language,arch in order:
             output=folder/f"{language}-{arch}-run{index+1:02d}.csv"
-            cmd=([sys.executable,"brinson_csv.py"] if language=="python" else [a.go])
+            cmd=([sys.executable,str(Path(__file__).with_name("brinson_csv.py"))] if language=="python" else [a.go])
             cmd+=["--architecture",arch,"--data",a.data,"--output",str(output)]
             process=subprocess.run(cmd,capture_output=True,text=True)
             if process.returncode:
