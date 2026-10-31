@@ -1,4 +1,4 @@
-# Streaming attribution with compact final reports
+# Streaming attribution with final reports
 
 Rust and Go implement the same attribution contracts with native CSV streaming, bounded immutable index broadcasts and independent portfolio workers. Python provides independent correctness checks and benchmark orchestration.
 
@@ -35,7 +35,7 @@ go -C go build -trimpath -ldflags='-s -w' -o ../benchmark-go-attribution ./cmd/a
 
 The temporary validation toolchain is under `/tmp`: use `CARGO_HOME=/tmp/attribution-cargo RUSTUP_HOME=/tmp/attribution-rustup /tmp/attribution-cargo/bin/cargo` if Rust is not on PATH. This installation did not change the shell profile.
 
-Every execution calculates, links, validates and writes its compact attribution CSV report, plus a metrics CSV. There is no execution-mode option.
+Every execution calculates, links, validates and writes its attribution CSV report, plus a metrics CSV. There is no execution-mode option.
 
 The default is all input dates (`--max-days 0`). `--max-days N` is available for explicit tests. `--period all|day|week|month|quarter|year` overrides the reporting period; defaults follow the table above. Scenario controls output grain independently of the period. Weekly/monthly produce portfolio-level rows; security/subset/country retain their groups.
 
@@ -94,7 +94,7 @@ python3 python/render_stage_report.py
 
 The independent oracle uses closed-form forward linking instead of the native recurrence. Nine scenario/period combinations cover mixed countries, changing holdings, missing-side and never-held benchmark instruments, standalone normalization, invalid inputs and zero selected weights.
 
-The new benchmark uses two fresh complete repetitions per language/scenario, alternating language order. It compares **every field of every compact CSV row** across Rust/Go and compares logical counts and all three checksum components across repetitions. Use `--output-dir` with a fresh directory for a new benchmark; default output paths are not overwritten.
+The new benchmark uses two fresh complete repetitions per language/scenario, alternating language order. It compares **every field of every CSV row** across Rust/Go and compares logical counts and all three checksum components across repetitions. Use `--output-dir` with a fresh directory for a new benchmark; default output paths are not overwritten.
 
 Metrics distinguish logical `report_rows` from physical `output_rows`; include checksum components, rows read/retained, input groups, daily effect values, parsed input bytes, attribution bytes, five stage durations, OS process wall/CPU time, peak RSS and average cores. Worker-stage elapsed times overlap and are not CPU times or additive wall time. Read includes parse/lookup/validation; aggregate includes normalization/grouping; compute includes linking/report planning/checksums; write includes attribution formatting, flush and fsync. Metrics file I/O, setup and channel waits are in overall process time. Throughput uses matching work counters.
 

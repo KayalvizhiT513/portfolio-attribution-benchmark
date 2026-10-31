@@ -92,6 +92,6 @@
 <tspan x="720.0" dy="0">Jan 1: partial prior week • Jan 2–8: one week • Jan 9: begins another bucket.</tspan>
 </text>
 <text x="65" y="1422" class="label" text-anchor="start">
-<tspan x="65" dy="0">Every execution validates attribution and writes the compact final CSV report.</tspan>
+<tspan x="65" dy="0">Every execution validates attribution and writes the final CSV report.</tspan>
 </text>
 </svg>

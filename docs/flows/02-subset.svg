@@ -147,6 +147,6 @@
 <tspan x="720.0" dy="0">Read/parse remains proportional to input; aggregation/compute slots scale with selected IDs.</tspan>
 </text>
 <text x="65" y="1442" class="label" text-anchor="start">
-<tspan x="65" dy="0">Every execution validates attribution and writes the compact final CSV report.</tspan>
+<tspan x="65" dy="0">Every execution validates attribution and writes the final CSV report.</tspan>
 </text>
 </svg>

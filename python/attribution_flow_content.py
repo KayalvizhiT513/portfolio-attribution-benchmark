@@ -12,19 +12,19 @@ OVERVIEW = """Calculation and output granularity are independent. Every scenario
 All counts include separate base/local rows. Security/subset counts include eight reconciliation rows: one per portfolio and return type. No duplicate total rows are appended. All five use the complete 1,095-date history."""
 
 SCENARIO_FLOWS = {
-    'security': """![Compact security flow](docs/flows/01-security.svg)
+    'security': """![security flow](docs/flows/01-security.svg)
 
 Compute on the full portfolio/index union, tracking whether each ID was ever held by this portfolio during the reporting range. At EOF, emit one linked detail row for each ever-held security and aggregate never-held benchmark IDs into `RowType=benchmark_only`, `Segment=BENCHMARK_ONLY`. The residual bucket preserves the complete active result. Do not renormalize the displayed held-only index weights: the full index remains the benchmark.""",
-    'subset': """![Compact standalone subset flow](docs/flows/02-subset.svg)
+    'subset': """![standalone subset flow](docs/flows/02-subset.svg)
 
 Predicate: `InstrumentId IN selected_ids`. The 400-ID set comprises the inclusive ranges `S000001–S000100`, `S015001–S015100`, `S030001–S030100`, and `S045001–S045100`; see [subset.csv](results/compact-full-history/subset.csv). Each portfolio holds 100 selected IDs; the index holds 400. Normalize each selected side independently every day; fail if either denominator is zero. Link across the full history. Emit 800 held-detail rows plus eight benchmark-only residual rows. Filtered-out input is still parsed and validated, but does not enter attribution.""",
-    'country': """![Compact country flow](docs/flows/03-country.svg)
+    'country': """![country flow](docs/flows/03-country.svg)
 
 No country filter applies. Resolve InstrumentId to Country, aggregate each side’s normalized weights and weighted returns by country, calculate daily country effects, then link across all dates. All held instruments are US/USD, so the report has one country per portfolio and return type: eight rows. This fixture is a weak test of realistic multi-country attribution.""",
-    'weekly': """![Compact weekly flow](docs/flows/04-weekly.svg)
+    'weekly': """![weekly flow](docs/flows/04-weekly.svg)
 
 Calculate daily security effects, reduce them to three portfolio-level components for each return type, then link these six values within a Monday–Sunday bucket. The linked accumulator has one portfolio entry, not 100,000 security entries. At a boundary/EOF, emit two rows per portfolio. There are 158 observed week buckets, including partial boundary weeks: 158 × 4 × 2 = 1,264 rows.""",
-    'monthly': """![Compact monthly flow](docs/flows/05-monthly.svg)
+    'monthly': """![monthly flow](docs/flows/05-monthly.svg)
 
 Use the same portfolio-level reduction and linking engine with calendar-month keys. Emit two rows per portfolio/month, not security/month rows. The full range has 36 month buckets: 36 × 4 × 2 = 288 rows. Quarter/year overrides use the same engine with a different bucket key; boundary periods can be partial.""",
 }

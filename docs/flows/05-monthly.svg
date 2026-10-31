@@ -91,6 +91,6 @@
 <tspan x="435.0" dy="25">Final EOF: flush/fsync and publish validated files.</tspan>
 </text>
 <text x="65" y="1352" class="label" text-anchor="start">
-<tspan x="65" dy="0">Every execution validates attribution and writes the compact final CSV report.</tspan>
+<tspan x="65" dy="0">Every execution validates attribution and writes the final CSV report.</tspan>
 </text>
 </svg>

@@ -98,6 +98,6 @@
 <tspan x="720.0" dy="0">Full union is used for calculation; only 120,000 held-detail + 8 residual rows are written.</tspan>
 </text>
 <text x="65" y="1262" class="label" text-anchor="start">
-<tspan x="65" dy="0">Every execution validates attribution and writes the compact final CSV report.</tspan>
+<tspan x="65" dy="0">Every execution validates attribution and writes the final CSV report.</tspan>
 </text>
 </svg>

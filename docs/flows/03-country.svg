@@ -104,6 +104,6 @@
 <tspan x="720" dy="0">Actual supplied holdings are US-only; US/DE above illustrates the many-to-one transformation.</tspan>
 </text>
 <text x="65" y="1222" class="label" text-anchor="start">
-<tspan x="65" dy="0">Every execution validates attribution and writes the compact final CSV report.</tspan>
+<tspan x="65" dy="0">Every execution validates attribution and writes the final CSV report.</tspan>
 </text>
 </svg>

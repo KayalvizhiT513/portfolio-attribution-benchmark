@@ -1,6 +1,6 @@
 # Portfolio attribution: Rust and Go
 
-Both implementations stream daily input CSVs, calculate and link attribution, and write compact final reports. Python provides independent correctness checks and benchmark orchestration.
+Both implementations stream daily input CSVs, calculate and link attribution, and write final reports. Python provides independent correctness checks and benchmark orchestration.
 
 | Scenario | Final output | Rows across four portfolios and both return types |
 |---|---|---:|
@@ -10,7 +10,7 @@ Both implementations stream daily input CSVs, calculate and link attribution, an
 | Weekly | Linked portfolio summaries per Monday–Sunday week | 1,264 |
 | Monthly | Linked portfolio summaries per calendar month | 288 |
 
-Every execution reads, calculates, validates, and writes the contracted compact CSV report. All benchmarks process all 1,095 dates.
+Every execution reads, calculates, validates, and writes the contracted CSV report. All benchmarks process all 1,095 dates.
 
 - [Five scenarios, SVG flowcharts, stage metrics and winners](ATTRIBUTION_STAGE_COMPARISON.md).
 - [Output sizes by scenario and language](ATTRIBUTION_STAGE_COMPARISON.md#overall-results-and-output-sizes).

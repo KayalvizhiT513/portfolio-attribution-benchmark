@@ -2,7 +2,7 @@
 
 All five scenarios process all **1,095 effective dates**, all four portfolios, and separate base/local returns. Calculation granularity is independent of report granularity. The report contains one section per scenario, comparing Rust and Go.
 
-Each language/scenario has **2 fresh complete repetitions**. Stage times, OS CPU, peak RSS and process wall times are medians; overall ranges are also shown. All displayed measurements use the compact reporting contracts defined below.
+Each language/scenario has **2 fresh complete repetitions**. Stage times, OS CPU, peak RSS and process wall times are medians; overall ranges are also shown. All displayed measurements use the reporting contracts defined below.
 
 ## Output contract and benchmark-only reconciliation
 
@@ -30,7 +30,7 @@ Portfolio-held is presence-based: the ID appears in a portfolio holding record o
 | weekly | 14.720 | 24.671 | 1,264 | 0.274796 | 0.268777 | 0.543573 |
 | monthly | 14.356 | 24.305 | 288 | 0.063190 | 0.061947 | 0.125137 |
 
-MB uses 1,000,000 bytes. Compact sizes include report headers and all four portfolio CSVs, including security/subset reconciliation rows, but exclude metrics/logs. Output files are small and are retained as the final compact reports; no large daily/detail CSV is produced.
+MB uses 1,000,000 bytes. CSV sizes include report headers and all four portfolio CSVs, including security/subset reconciliation rows, but exclude metrics/logs. Output files are small and are retained as the final reports; no large daily/detail CSV is produced.
 
 ## Measurement method
 
@@ -38,15 +38,15 @@ The fixture has four disjoint portfolios of 15,000 fixed instruments each, a sha
 
 Machine: macOS-27.0.1-arm64-arm-64bit-Mach-O, 12 logical CPUs. Rust uses 4 native portfolio workers; Go uses GOMAXPROCS=12 with concurrent portfolio goroutines. Each uses its own optimized parser/buffers/formatter. Language order alternates between repetitions; filesystem cache is OS-managed and first runs are retained. These are workload-specific observations, not controlled cold-cache or universal language claims.
 
-**Stage seconds are accumulated worker elapsed time, include scheduling pauses and overlap across threads. They are not stage CPU time and cannot be added to obtain wall time.** Read includes decoding, numeric parsing, lookup and validation. Filter includes selection and denominator scan; only subset applies an instrument predicate. Aggregate includes normalization, dense slot construction and weighted contributions. Compute includes daily effects, linking, reconciliation, compact report planning, residual reduction and checksums. Write includes only attribution file creation/header, numeric/CSV formatting, buffering, flush and fsync. Metrics-file writing, setup, channel waits and publication contribute to external overall time, not the attribution write stage.
+**Stage seconds are accumulated worker elapsed time, include scheduling pauses and overlap across threads. They are not stage CPU time and cannot be added to obtain wall time.** Read includes decoding, numeric parsing, lookup and validation. Filter includes selection and denominator scan; only subset applies an instrument predicate. Aggregate includes normalization, dense slot construction and weighted contributions. Compute includes daily effects, linking, reconciliation, report planning, residual reduction and checksums. Write includes only attribution file creation/header, numeric/CSV formatting, buffering, flush and fsync. Metrics-file writing, setup, channel waits and publication contribute to external overall time, not the attribution write stage.
 
-Per-stage rates divide work by the corresponding median stage duration. Groups are input entity/group/date combinations, not output row counts. Logical output effect components count three components per compact report row. Daily effect components count the daily engine’s values before linking/reduction. Average cores is process CPU time divided by process wall time; it is descriptive, not a metric where larger is automatically better.
+Per-stage rates divide work by the corresponding median stage duration. Groups are input entity/group/date combinations, not output row counts. Logical output effect components count three components per report row. Daily effect components count the daily engine’s values before linking/reduction. Average cores is process CPU time divided by process wall time; it is descriptive, not a metric where larger is automatically better.
 
 ## Five scenarios
 
 ### 1. Security
 
-![Compact security flow](docs/flows/01-security.svg)
+![security flow](docs/flows/01-security.svg)
 
 Compute on the full portfolio/index union, tracking whether each ID was ever held by this portfolio during the reporting range. At EOF, emit one linked detail row for each ever-held security and aggregate never-held benchmark IDs into `RowType=benchmark_only`, `Segment=BENCHMARK_ONLY`. The residual bucket preserves the complete active result. Do not renormalize the displayed held-only index weights: the full index remains the benchmark.
 
@@ -81,7 +81,7 @@ Compute on the full portfolio/index union, tracking whether each ID was ever hel
 
 ### 2. Standalone subset
 
-![Compact standalone subset flow](docs/flows/02-subset.svg)
+![standalone subset flow](docs/flows/02-subset.svg)
 
 Predicate: `InstrumentId IN selected_ids`. The 400-ID set comprises the inclusive ranges `S000001–S000100`, `S015001–S015100`, `S030001–S030100`, and `S045001–S045100`; see [subset.csv](results/compact-full-history/subset.csv). Each portfolio holds 100 selected IDs; the index holds 400. Normalize each selected side independently every day; fail if either denominator is zero. Link across the full history. Emit 800 held-detail rows plus eight benchmark-only residual rows. Filtered-out input is still parsed and validated, but does not enter attribution.
 
@@ -116,7 +116,7 @@ Predicate: `InstrumentId IN selected_ids`. The 400-ID set comprises the inclusiv
 
 ### 3. Country
 
-![Compact country flow](docs/flows/03-country.svg)
+![country flow](docs/flows/03-country.svg)
 
 No country filter applies. Resolve InstrumentId to Country, aggregate each side’s normalized weights and weighted returns by country, calculate daily country effects, then link across all dates. All held instruments are US/USD, so the report has one country per portfolio and return type: eight rows. This fixture is a weak test of realistic multi-country attribution.
 
@@ -151,7 +151,7 @@ No country filter applies. Resolve InstrumentId to Country, aggregate each side�
 
 ### 4. Weekly
 
-![Compact weekly flow](docs/flows/04-weekly.svg)
+![weekly flow](docs/flows/04-weekly.svg)
 
 Calculate daily security effects, reduce them to three portfolio-level components for each return type, then link these six values within a Monday–Sunday bucket. The linked accumulator has one portfolio entry, not 100,000 security entries. At a boundary/EOF, emit two rows per portfolio. There are 158 observed week buckets, including partial boundary weeks: 158 × 4 × 2 = 1,264 rows.
 
@@ -186,7 +186,7 @@ Calculate daily security effects, reduce them to three portfolio-level component
 
 ### 5. Monthly
 
-![Compact monthly flow](docs/flows/05-monthly.svg)
+![monthly flow](docs/flows/05-monthly.svg)
 
 Use the same portfolio-level reduction and linking engine with calendar-month keys. Emit two rows per portfolio/month, not security/month rows. The full range has 36 month buckets: 36 × 4 × 2 = 288 rows. Quarter/year overrides use the same engine with a different bucket key; boundary periods can be partial.
 
@@ -258,7 +258,7 @@ See [the implementation guide](rust/README.md) for CLI options, output columns a
 | weekly | 1,264 | 3.47e-18 | PASS | PASS |
 | monthly | 288 | 1.04e-17 | PASS | PASS |
 
-Every numeric field of the final compact Rust and Go CSVs is compared (absolute tolerance 1e-10 or relative tolerance 1e-8), not a sample. Every execution validates daily and linked reconciliation. Logical row counts and all three checksum components must agree across languages and repetitions. An independent Python closed-form linking oracle covers nine small scenario/period combinations, changing holdings, full-history held membership, benchmark-only reconciliation and invalid inputs. Checksum equality and reconciliation are consistency evidence, not independent proof of an economically realistic model.
+Every numeric field of the final Rust and Go CSVs is compared (absolute tolerance 1e-10 or relative tolerance 1e-8), not a sample. Every execution validates daily and linked reconciliation. Logical row counts and all three checksum components must agree across languages and repetitions. An independent Python closed-form linking oracle covers nine small scenario/period combinations, changing holdings, full-history held membership, benchmark-only reconciliation and invalid inputs. Checksum equality and reconciliation are consistency evidence, not independent proof of an economically realistic model.
 
 ## Who wins, and where?
 

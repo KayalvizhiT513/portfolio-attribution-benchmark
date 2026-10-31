@@ -1,4 +1,4 @@
-"""Full-history read, attribution and compact CSV benchmark for five scenarios."""
+"""Full-history read, attribution and CSV benchmark for five scenarios."""
 import argparse
 import csv
 import hashlib
@@ -80,7 +80,7 @@ def main():
         assert count==COUNTS[scenario]
         checks.append({'scenario':scenario,'status':'PASS','rows_compared':count,'max_absolute_difference':maximum,'checksum_repetitions':'PASS'})
         save(root,runs,checks,metadata)
-        print(f'{scenario}: PASS; every compact CSV row compared; all repetition checksums agree',flush=True)
+        print(f'{scenario}: PASS; every CSV row compared; all repetition checksums agree',flush=True)
     assert len(runs)==len(SCENARIOS)*2*args.runs
     assert all(hashlib.sha256(p.read_bytes()).hexdigest()==metadata['executables'][l]['sha256'] for l,p in binaries.items())
     subprocess.run([__import__('sys').executable,str(ROOT/'python/render_stage_report.py')],check=True,cwd=ROOT)

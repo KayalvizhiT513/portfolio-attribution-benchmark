@@ -30,7 +30,7 @@ class Canvas:
         self.parts.append(f'<path d="M{cx} {cy-h/2} L{cx+w/2} {cy} L{cx} {cy+h/2} L{cx-w/2} {cy} Z" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>')
         self.text(cx, cy-8 if len(lines)>1 else cy+6, lines)
     def finish(self, name):
-        self.text(65, self.height-18, ['Every execution validates attribution and writes the compact final CSV report.'], 'label', 'start')
+        self.text(65, self.height-18, ['Every execution validates attribution and writes the final CSV report.'], 'label', 'start')
         self.parts.append('</svg>')
         svg='\n'.join(self.parts)
         ET.fromstring(svg)
