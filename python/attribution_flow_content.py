@@ -1,99 +1,59 @@
-"""Flowchart sections embedded by render_stage_report.py in the combined report."""
+"""Compact-contract explanations embedded in the current benchmark report."""
+OVERVIEW = """Calculation and output granularity are independent. Every scenario reads daily inputs, validates and normalizes them, and calculates the required daily effects. Only the requested linked summaries are emitted.
 
-OVERVIEW = """These diagrams describe the implemented Rust and Go logic, rather than a proposed redesign. Each SVG is standalone and can be opened in a browser, enlarged, or embedded in a document.
+| Scenario | Calculation state | Final output contract | Rows for this dataset |
+|---|---|---|---:|
+| Security | Daily full security union; full-history linked accumulator per instrument | Portfolio-held IDs plus explicit benchmark-only reconciliation bucket | 120,000 + 8 |
+| Standalone subset | Independently normalized selected sides; compact selected-ID slots; full-history linking | Selected portfolio-held IDs plus benchmark-only reconciliation bucket | 800 + 8 |
+| Country | Daily weighted country grouping; full-history linking | One country/portfolio/return-type row | 8 |
+| Weekly | Sum daily security effects to portfolio components; link within Monday–Sunday buckets | One portfolio/week/return-type row | 1,264 |
+| Monthly | Sum daily security effects to portfolio components; link within calendar months | One portfolio/month/return-type row | 288 |
 
-## Five scenarios at a glance
-
-| Scenario | Efficient read/filter | Efficient compute | Efficient write |
-|---|---|---|---|
-| Full security | Stream one date at a time; reuse CSV/day buffers; read index once per active portfolio batch | Dense instrument slots; union of portfolio/index holdings; independent base/local effects | Stream daily security details and total rows to each portfolio’s buffered CSV |
-| Standalone subset | Parse and validate all rows; apply a precomputed selection mask on both sides | Independently normalize selected weights; use compact selected-ID slots so aggregation/effect loops avoid the full master | Write selected-universe details and totals; excluded instruments produce no output |
-| Country | Resolve instrument-to-country mapping once; stream current-day holdings | Aggregate weight and weighted contributions by country before calculating effects | Write country details and totals rather than security rows |
-| Weekly | Stream daily holdings; assign dates to Monday–Sunday buckets | Calculate daily security effects, then update one linked weekly accumulator | Write once per observed week at the next bucket boundary or EOF; include partial weeks |
-| Monthly | Stream daily holdings; assign dates to calendar-month buckets | Calculate daily security effects, then update one linked monthly accumulator | Write once per observed month at the next bucket boundary or EOF; quarter/year use the same path |
-
-The diagrams use different structures to expose the actual transformation in each scenario: security union, filter/reject branches, a many-to-one country funnel, a weekly state machine, and a calendar-month progression. Holdings and dates shown inside nodes are illustrative; the country diagram explicitly distinguishes its US/DE example from the US-only supplied data. January and February are successive active periods, not parallel accumulators.
-
-The shared execution engine remains the same: one index producer broadcasts immutable daily arrays to portfolio workers through bounded channels. Each portfolio worker reads its own input and owns its accumulator and CSV writer. The diagrams focus on scenario logic; the Rust/Go execution table below documents the shared concurrency layer."""
+All counts include separate base/local rows. Security/subset counts include eight reconciliation rows: one per portfolio and return type. No duplicate total rows are appended. All five use the complete 1,095-date history."""
 
 SCENARIO_FLOWS = {
-    "security": """[Open standalone SVG](docs/flows/01-security.svg)
+    'security': """![Compact security flow](docs/flows/01-security.svg)
 
-![Full security-level attribution flow](docs/flows/01-security.svg)
+Compute on the full portfolio/index union, tracking whether each ID was ever held by this portfolio during the reporting range. At EOF, emit one linked detail row for each ever-held security and aggregate never-held benchmark IDs into `RowType=benchmark_only`, `Segment=BENCHMARK_ONLY`. The residual bucket preserves the complete active result. Do not renormalize the displayed held-only index weights: the full index remains the benchmark.""",
+    'subset': """![Compact standalone subset flow](docs/flows/02-subset.svg)
 
-Dense numeric instrument slots remove string-key joins from the effect loop. Presence flags preserve instruments held on only one side. The daily effects reconcile to portfolio minus index return. Full daily output still has a large inherent write cost: approximately 876 million detail rows for the supplied full history.""",
-    "subset": """[Open standalone SVG](docs/flows/02-subset.svg)
+Predicate: `InstrumentId IN selected_ids`. The 400-ID set comprises the inclusive ranges `S000001–S000100`, `S015001–S015100`, `S030001–S030100`, and `S045001–S045100`; see [subset.csv](results/compact-full-history/subset.csv). Each portfolio holds 100 selected IDs; the index holds 400. Normalize each selected side independently every day; fail if either denominator is zero. Link across the full history. Emit 800 held-detail rows plus eight benchmark-only residual rows. Filtered-out input is still parsed and validated, but does not enter attribution.""",
+    'country': """![Compact country flow](docs/flows/03-country.svg)
 
-![Standalone instrument subset flow](docs/flows/02-subset.svg)
+No country filter applies. Resolve InstrumentId to Country, aggregate each side’s normalized weights and weighted returns by country, calculate daily country effects, then link across all dates. All held instruments are US/USD, so the report has one country per portfolio and return type: eight rows. This fixture is a weak test of realistic multi-country attribution.""",
+    'weekly': """![Compact weekly flow](docs/flows/04-weekly.svg)
 
-Selected IDs are mapped once to a mask and compact output slots. The filter is applied after CSV parsing and validation: it reduces aggregation, computation and output work, but does not avoid reading the source CSVs. Each side’s selected weights are normalized independently on every date. A zero selected-weight denominator fails explicitly. The selected index supplies the benchmark return; full-index weights and returns are not used for this scenario’s attribution.""",
-    "country": """[Open standalone SVG](docs/flows/03-country.svg)
+Calculate daily security effects, reduce them to three portfolio-level components for each return type, then link these six values within a Monday–Sunday bucket. The linked accumulator has one portfolio entry, not 100,000 security entries. At a boundary/EOF, emit two rows per portfolio. There are 158 observed week buckets, including partial boundary weeks: 158 × 4 × 2 = 1,264 rows.""",
+    'monthly': """![Compact monthly flow](docs/flows/05-monthly.svg)
 
-![Country attribution flow](docs/flows/03-country.svg)
-
-For each country, accumulate `sum(weight)`, `sum(weight × BaseReturn)` and `sum(weight × LocalReturn)`. Divide contribution by group weight to obtain group return, then calculate country-level effects. This is attribution calculated at country level, rather than a sum of previously calculated security effects. The supplied holdings produce one country group, US.""",
-    "weekly": """[Open standalone SVG](docs/flows/04-weekly.svg)
-
-![Weekly linked security attribution flow](docs/flows/04-weekly.svg)
-
-Each worker retains current-day inputs and a single active week accumulator. A Monday starts a new bucket; the previous bucket is emitted when the next date reveals the boundary. EOF also closes the active bucket. No complete list of daily effects is retained for later linking.""",
-    "monthly": """[Open standalone SVG](docs/flows/05-monthly.svg)
-
-![Monthly linked security attribution flow](docs/flows/05-monthly.svg)
-
-The calendar-month key replaces the weekly key; the streaming, attribution and linking logic is otherwise the same. `--period quarter` or `--period year` changes bucket assignment without introducing a separate processing engine. Observed first/last dates label partial periods.""",
+Use the same portfolio-level reduction and linking engine with calendar-month keys. Emit two rows per portfolio/month, not security/month rows. The full range has 36 month buckets: 36 × 4 × 2 = 288 rows. Quarter/year overrides use the same engine with a different bucket key; boundary periods can be partial.""",
 }
 
-SHARED_LOGIC = """## Linking without retaining daily history
+SHARED_LOGIC = """## Linking and reconciliation
 
-For each instrument, each attribution component, and each return type:
+For each component and return type, update `E_new = E_previous × (1 + index_return_today) + daily_effect × portfolio_growth_before_today`, then update portfolio/index compounded growth. Security/subset/country link across the full requested range by default; weekly/monthly reset at calendar boundaries.
 
-```text
-E_new = E_previous × (1 + index_return_today)
-        + daily_effect × portfolio_growth_before_today
+The same date’s portfolio and index weights are each normalized to one. Missing-side group returns use the held side’s return, assigning that missing-side effect to allocation. Daily effects must reconcile within 1e-9 and linked period effects within 1e-8. Security/subset displayed held detail plus benchmark-only rows reconcile to the complete active return. Country rows sum to active return. Weekly/monthly rows directly contain the portfolio’s linked effects.
 
-portfolio_growth_new = portfolio_growth_before_today × (1 + portfolio_return_today)
-index_growth_new     = index_growth_before_today × (1 + index_return_today)
-```
+Weights on full-history group rows are mean daily weights; missing groups contribute zero on absent days. They are descriptive averages, not inputs to a new one-period attribution formula. PortfolioReturn, BenchmarkReturn and ActiveReturn are whole-period portfolio quantities repeated on group rows; do not sum those fields. Only effect components should be summed across detail and benchmark-only rows. Weekly/monthly portfolio weights are 1.
 
-`E` is an accumulated allocation, selection, or interaction effect. Daily effects must reconcile before linking; linked period effects must sum to compounded portfolio return minus compounded index return. The recurrence avoids division by the difference between portfolio/index returns, so equal returns do not require a special division case. Period weights in output are arithmetic mean daily weights, not summed weights.
+## Execution and output
 
-## Language-specific execution
-
-| Concern | Rust implementation | Go implementation |
+| Concern | Rust | Go |
 |---|---|---|
-| CSV input | Native `csv` reader with a reusable record and 1 MiB input buffer | `encoding/csv`, `ReuseRecord`, and a 1 MiB buffered reader |
-| Day storage | Reusable raw-day vector and duplicate-check storage | Reusable raw-day slice and duplicate-check storage |
-| Index sharing | `Arc<Day>` references sent over bounded synchronous channels | Shared immutable `*day` pointers sent over buffered channels |
-| Backpressure | Channel capacity one per worker | Channel capacity one per worker |
-| Parallelism | Native portfolio worker threads; `--threads` limits the active batch | Goroutine per portfolio; `--threads` sets GOMAXPROCS |
-| Index passes | Once per worker batch; four supplied portfolios share one pass with four workers | Once across all portfolio goroutines |
-| Effect storage | Dense arrays; compact selected-ID arrays for subsets | Dense slices; compact selected-ID slices for subsets |
-| CSV formatting | Reusable `ByteRecord` and Ryū round-trip float formatting | Reusable escaped byte buffer and `strconv.AppendFloat` |
-| Write coordination | Each worker owns its output; coordinator publishes files after worker success | Each goroutine owns its output; coordinator publishes files after worker success |
+| Input | Native csv parser, reusable record, day buffers and duplicate flags | encoding/csv ReuseRecord, reusable day slices and duplicate flags |
+| Shared index | Arc immutable days; bounded channel capacity one | Shared immutable day pointers; buffered channel capacity one |
+| Concurrency | Native portfolio workers; four workers for this dataset | Portfolio goroutines; GOMAXPROCS=12 on this machine |
+| Group arithmetic | Dense slots; compact slots for selected IDs | Dense slices; compact slots for selected IDs |
+| Formatting | Reused ByteRecord with Ryū float conversion | Reused escaped byte buffer with strconv.AppendFloat |
+| Output | Emit only the requested final rows; flush/fsync and publish after validation | Emit only the requested final rows; flush/fsync and publish after validation |
 
-With fewer Rust workers than portfolios, the index is reread once per batch. This bounds native worker concurrency at the cost of additional input I/O; benchmark counters include those passes. Go keeps concurrent I/O goroutines while its runtime caps concurrently executing Go code with GOMAXPROCS. These are independently chosen execution models.
+No year-scale observations or daily effect table are retained. Working memory holds the master, bounded current/in-flight days, and required active accumulators. Security/subset require per-security full-history accumulators; country requires country accumulators; weekly/monthly require one portfolio accumulator per active period. Rust with fewer workers than portfolios rereads the index per worker batch; the benchmark uses four workers and one index pass.
 
-The one-item channel buffers and immutable index sharing bound queued input. Memory holds reusable reader buffers, current/queued/in-flight index days, portfolio current-day arrays, and one active period accumulator per worker. It does not retain a full-history security table or a full-history output table. Slow workers apply backpressure to the producer instead of allowing unbounded queued days. Output files grow with history even though working memory does not.
+Each execution writes the contracted attribution CSV report and a small metrics CSV. The checksum components and row counts validate the emitted report.
 
-## Stage timing locations
+## Interpretation limits
 
-| Stage | What the diagrams measure |
-|---|---|
-| Read and parse CSV | CSV decode, numeric parse, mapping lookup, duplicate/date/value checks and reusable day-buffer fill |
-| Filter | Selection predicate when applicable and selected/full weight-denominator scan |
-| Aggregate | Normalization, dense-slot allocation, weighted contributions and group construction |
-| Compute attribution and linking | Daily effects, compounded growth, period recurrence and reconciliation |
-| Write CSV | Numeric formatting, escaping, buffered row writes, final flush and fsync |
-| Overall | Entire process including master setup, channel waits, coordination and file publication |
+The input is synthetic. The generator samples returns independently by entity, so a shared InstrumentId can have different portfolio/index returns. These benchmarks establish computational behavior, not validated investment-selection insight. We assume supplied weights apply to that day’s returns; no transaction/cash-flow or beginning/end-of-day timing model has been established. Base/local are separate analyses, not a dedicated currency attribution model. The same pricing/model limitations exist in both languages.
 
-Stage durations are accumulated elapsed time across threads and can overlap. They do not add up to overall process wall time. See [the scenario metrics above](#five-scenario-comparison).
-
-## Implementation references
-
-- [Rust stream, attribution, linking, workers and coordinator](rust/src/main.rs).
-- [Go stream, attribution, linking, workers and coordinator](go/cmd/attribution/main.go).
-- [CLI options and formulas](rust/README.md).
-- [SVG generation script](python/render_attribution_flows.py).
-
-Regenerate the SVGs using `python3 python/render_attribution_flows.py`."""
+See [the implementation guide](rust/README.md) for CLI options, output columns and validation."""

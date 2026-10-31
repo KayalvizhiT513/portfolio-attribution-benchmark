@@ -32,3 +32,25 @@ benchmark-go-attribution
 /results/size-guarded-full-history/*
 !/results/size-guarded-full-history/estimates.json
 !/results/size-guarded-full-history/runs.json
+
+!/results/period-full-history/
+/results/period-full-history/*
+!/results/period-full-history/REPORT.md
+!/results/period-full-history/runs.json
+!/results/period-full-history/checks.json
+!/results/period-full-history/environment.json
+
+# Preserve period-run evidence, never attribution data CSVs.
+/results/period-full-history/**
+!/results/period-full-history/**/
+!/results/period-full-history/**/*.json
+!/results/period-full-history/**/metrics-run-*.csv
+!/results/period-full-history/REPORT.md
+
+!/results/compact-full-history/
+/results/compact-full-history/**
+!/results/compact-full-history/**/
+!/results/compact-full-history/*.json
+!/results/compact-full-history/runs.csv
+!/results/compact-full-history/subset.csv
+!/results/compact-full-history/**/metrics-run-*.csv

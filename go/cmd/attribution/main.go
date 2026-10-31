@@ -41,6 +41,8 @@ type master struct {
 type metrics struct {
 	read, filter, aggregate, compute, write                 float64
 	rows, retained, groups, effects, written, bytes, parsed uint64
+	reportRows                                              uint64
+	checksum                                                [3]float64
 }
 
 func (m *metrics) add(b metrics) {
@@ -56,6 +58,10 @@ func (m *metrics) add(b metrics) {
 	m.written += b.written
 	m.bytes += b.bytes
 	m.parsed += b.parsed
+	m.reportRows += b.reportRows
+	for j := 0; j < 3; j++ {
+		m.checksum[j] += b.checksum[j]
+	}
 }
 func seconds(t time.Time) float64 { return time.Since(t).Seconds() }
 func openCSV(path string, header []string) (*os.File, *csv.Reader, error) {
@@ -309,6 +315,9 @@ func parseDate(s string) (time.Time, error) {
 	return t, nil
 }
 func bucket(date, period string) (string, error) {
+	if period == "all" {
+		return "ALL", nil
+	}
 	d, e := parseDate(date)
 	if e != nil {
 		return "", e
@@ -344,6 +353,7 @@ func effect(p, b stat, t int, benchmark float64) [3]float64 {
 }
 
 type acc struct {
+	held    bool
 	w       [2]float64
 	e       [2][3]float64
 	present bool
@@ -391,10 +401,16 @@ type period struct {
 	days            int
 	growth          [2][2]float64
 	acc             []acc
+	portfolioOnly   bool
 }
 
-func newPeriod(d *day, key string) *period {
-	return &period{key: key, start: d.date, end: d.date, growth: [2][2]float64{{1, 1}, {1, 1}}, acc: make([]acc, len(d.stats))}
+func newPeriod(d *day, key string, c config) *period {
+	portfolioOnly := c.scenario == "weekly" || c.scenario == "monthly"
+	n := len(d.stats)
+	if portfolioOnly {
+		n = 1
+	}
+	return &period{key: key, start: d.date, end: d.date, growth: [2][2]float64{{1, 1}, {1, 1}}, acc: make([]acc, n), portfolioOnly: portfolioOnly}
 }
 func (p *period) add(pd, bd *day, mt *metrics) error {
 	start := time.Now()
@@ -409,27 +425,37 @@ func (p *period) add(pd, bd *day, mt *metrics) error {
 			totals[1][t] += s.r[t]
 		}
 	}
-	var sum [2]float64
-	for k := range p.acc {
+	var daily [2][3]float64
+	for k := range pd.stats {
 		ps, bs := pd.stats[k], bd.stats[k]
-		a := &p.acc[k]
 		if ps.present || bs.present {
-			a.present = true
 			mt.effects += 6
 		}
-		a.w[0] += ps.w
-		a.w[1] += bs.w
 		for t := 0; t < 2; t++ {
 			e := effect(ps, bs, t, totals[1][t])
 			for j := 0; j < 3; j++ {
-				a.e[t][j] = a.e[t][j]*(1+totals[1][t]) + e[j]*p.growth[0][t]
-				sum[t] += e[j]
+				daily[t][j] += e[j]
+				if !p.portfolioOnly {
+					p.acc[k].e[t][j] = p.acc[k].e[t][j]*(1+totals[1][t]) + e[j]*p.growth[0][t]
+				}
 			}
+		}
+		if !p.portfolioOnly {
+			a := &p.acc[k]
+			a.present = a.present || ps.present || bs.present
+			a.held = a.held || ps.present
+			a.w[0] += ps.w
+			a.w[1] += bs.w
 		}
 	}
 	for t := 0; t < 2; t++ {
-		if math.Abs(sum[t]-(totals[0][t]-totals[1][t])) > 1e-9 {
+		if math.Abs(daily[t][0]+daily[t][1]+daily[t][2]-(totals[0][t]-totals[1][t])) > 1e-9 {
 			return errors.New("daily reconciliation failed")
+		}
+		if p.portfolioOnly {
+			for j := 0; j < 3; j++ {
+				p.acc[0].e[t][j] = p.acc[0].e[t][j]*(1+totals[1][t]) + daily[t][j]*p.growth[0][t]
+			}
 		}
 		for side := 0; side < 2; side++ {
 			p.growth[side][t] *= 1 + totals[side][t]
@@ -438,58 +464,93 @@ func (p *period) add(pd, bd *day, mt *metrics) error {
 			}
 		}
 	}
+	if p.portfolioOnly {
+		a := &p.acc[0]
+		a.present = true
+		a.held = true
+		a.w[0]++
+		a.w[1]++
+	}
 	p.days++
 	p.end = pd.date
 	mt.compute += seconds(start)
 	return nil
 }
 func number(v float64) string { return strconv.FormatFloat(v, 'g', -1, 64) }
-func (p *period) row(c config, entity, kind, name string, t int, weights [2]float64, e [3]float64, w *rowWriter) error {
+func (p *period) row(c config, entity, kind, name string, t int, weights [2]float64, e [3]float64, w *rowWriter, mt *metrics) error {
+	mt.reportRows++
+	for j := 0; j < 3; j++ {
+		mt.checksum[j] += e[j]
+	}
+	start := time.Now()
 	rp, rb := p.growth[0][t]-1, p.growth[1][t]-1
 	rt := "base"
 	if t == 1 {
 		rt = "local"
 	}
-	return w.record([]string{c.scenario, entity, p.start, p.end, p.dayText, kind, name, rt}, []float64{weights[0] / float64(p.days), weights[1] / float64(p.days), e[0], e[1], e[2], e[0] + e[1] + e[2], rp, rb, rp - rb})
+	err := w.record([]string{c.scenario, entity, p.start, p.end, p.dayText, kind, name, rt}, []float64{weights[0] / float64(p.days), weights[1] / float64(p.days), e[0], e[1], e[2], e[0] + e[1] + e[2], rp, rb, rp - rb})
+	mt.written++
+	mt.write += seconds(start)
+	return err
 }
 func (p *period) write(c config, entity string, names []string, w *rowWriter, mt *metrics) error {
-	p.dayText = strconv.Itoa(p.days)
 	start := time.Now()
+	writeBefore := mt.write
+	p.dayText = strconv.Itoa(p.days)
 	var totals [2][3]float64
+	var residual acc
+	security := c.scenario == "security" || c.scenario == "subset"
 	for _, a := range p.acc {
 		for t := 0; t < 2; t++ {
 			for j := 0; j < 3; j++ {
 				totals[t][j] += a.e[t][j]
 			}
 		}
-	}
-	for t := 0; t < 2; t++ {
-		active := p.growth[0][t] - p.growth[1][t]
-		if math.Abs(totals[t][0]+totals[t][1]+totals[t][2]-active) > 1e-8 {
-			return errors.New("linked reconciliation failed")
-		}
-	}
-	mt.compute += seconds(start)
-	start = time.Now()
-	for k, a := range p.acc {
-		if a.present {
+		if security && a.present && !a.held {
+			residual.present = true
+			for side := 0; side < 2; side++ {
+				residual.w[side] += a.w[side]
+			}
 			for t := 0; t < 2; t++ {
-				if e := p.row(c, entity, "detail", names[k], t, a.w, a.e[t], w); e != nil {
-					return e
+				for j := 0; j < 3; j++ {
+					residual.e[t][j] += a.e[t][j]
 				}
-				mt.written++
 			}
 		}
 	}
 	for t := 0; t < 2; t++ {
-		if e := p.row(c, entity, "total", "ALL", t, [2]float64{float64(p.days), float64(p.days)}, totals[t], w); e != nil {
-			return e
+		if math.Abs(totals[t][0]+totals[t][1]+totals[t][2]-(p.growth[0][t]-p.growth[1][t])) > 1e-8 {
+			return errors.New("linked reconciliation failed")
 		}
-		mt.written++
 	}
-	mt.write += seconds(start)
+	if p.portfolioOnly {
+		for t := 0; t < 2; t++ {
+			if e := p.row(c, entity, "total", "ALL", t, p.acc[0].w, totals[t], w, mt); e != nil {
+				return e
+			}
+		}
+	} else {
+		for k, a := range p.acc {
+			if a.present && (!security || a.held) {
+				for t := 0; t < 2; t++ {
+					if e := p.row(c, entity, "detail", names[k], t, a.w, a.e[t], w, mt); e != nil {
+						return e
+					}
+				}
+			}
+		}
+		if residual.present {
+			for t := 0; t < 2; t++ {
+				if e := p.row(c, entity, "benchmark_only", "BENCHMARK_ONLY", t, residual.w, residual.e[t], w, mt); e != nil {
+					return e
+				}
+			}
+		}
+	}
+	mt.compute += math.Max(0, seconds(start)-(mt.write-writeBefore))
 	return nil
 }
+
 func outputPath(c config, path string) string {
 	return filepath.Join(c.output, c.scenario+"-"+strings.TrimSuffix(filepath.Base(path), ".csv")+".csv")
 }
@@ -499,16 +560,23 @@ func worker(path string, c config, m *master, input <-chan *day) (mt metrics, er
 		return mt, e
 	}
 	defer s.f.Close()
-	f, e := os.Create(outputPath(c, path) + ".partial")
+	var f *os.File
+	var bw *bufio.Writer
+	var w *rowWriter
+
+	start := time.Now()
+	f, e = os.Create(outputPath(c, path) + ".partial")
 	if e != nil {
 		return mt, e
 	}
 	defer f.Close()
-	bw := bufio.NewWriterSize(f, 1024*1024)
-	w := &rowWriter{w: bw, buffer: make([]byte, 0, 512)}
+	bw = bufio.NewWriterSize(f, 1024*1024)
+	w = &rowWriter{w: bw, buffer: make([]byte, 0, 512)}
 	if e = w.Write(outputHeader); e != nil {
 		return mt, e
 	}
+	mt.write += seconds(start)
+
 	var p *period
 	entity := ""
 	names := m.names
@@ -541,7 +609,7 @@ func worker(path string, c config, m *master, input <-chan *day) (mt metrics, er
 			p = nil
 		}
 		if p == nil {
-			p = newPeriod(d, key)
+			p = newPeriod(d, key, c)
 		}
 		if e = p.add(d, b, &mt); e != nil {
 			return mt, e
@@ -563,7 +631,8 @@ func worker(path string, c config, m *master, input <-chan *day) (mt metrics, er
 	if e = p.write(c, entity, names, w, &mt); e != nil {
 		return mt, e
 	}
-	start := time.Now()
+
+	start = time.Now()
 	if e = bw.Flush(); e != nil {
 		return mt, e
 	}
@@ -571,6 +640,7 @@ func worker(path string, c config, m *master, input <-chan *day) (mt metrics, er
 		return mt, e
 	}
 	mt.write += seconds(start)
+
 	return mt, nil
 }
 func run() error {
@@ -580,7 +650,7 @@ func run() error {
 	flag.StringVar(&c.output, "output-dir", "results/go", "CSV output directory")
 	flag.StringVar(&c.metrics, "metrics", "results/go-metrics.csv", "metrics CSV")
 	flag.StringVar(&c.scenario, "scenario", "country", "security|subset|country|weekly|monthly")
-	flag.StringVar(&c.period, "period", "", "day|week|month|quarter|year")
+	flag.StringVar(&c.period, "period", "", "all|day|week|month|quarter|year")
 	flag.StringVar(&c.subset, "instruments-file", "", "one-column InstrumentId CSV")
 	flag.IntVar(&c.threads, "threads", runtime.NumCPU(), "GOMAXPROCS")
 	flag.IntVar(&c.maxDays, "max-days", 0, "0 reads all dates")
@@ -594,7 +664,7 @@ func run() error {
 		return errors.New("invalid scenario")
 	}
 	if c.period == "" {
-		c.period = "day"
+		c.period = "all"
 		if c.scenario == "weekly" {
 			c.period = "week"
 		}
@@ -603,7 +673,7 @@ func run() error {
 		}
 	}
 	switch c.period {
-	case "day", "week", "month", "quarter", "year":
+	case "all", "day", "week", "month", "quarter", "year":
 	default:
 		return errors.New("invalid period")
 	}
@@ -704,17 +774,19 @@ func run() error {
 		}
 		inputBytes += uint64(s.Size())
 	}
+
 	for _, p := range paths {
 		target := outputPath(c, p)
 		if e = os.Rename(target+".partial", target); e != nil {
 			return e
 		}
-		s, e := os.Stat(target)
+		st, e := os.Stat(target)
 		if e != nil {
 			return e
 		}
-		mt.bytes += uint64(s.Size())
+		mt.bytes += uint64(st.Size())
 	}
+
 	if e = os.MkdirAll(filepath.Dir(c.metrics), 0755); e != nil {
 		return e
 	}
@@ -724,9 +796,9 @@ func run() error {
 	}
 	defer f.Close()
 	w := csv.NewWriter(f)
-	w.Write([]string{"language", "scenario", "period", "threads", "days", "input_file_bytes", "rows_read", "rows_retained", "groups", "effect_values", "output_rows", "output_bytes", "parsed_input_bytes", "read_parse_seconds", "filter_seconds", "aggregate_seconds", "compute_seconds", "write_seconds", "wall_seconds"})
+	w.Write([]string{"language", "scenario", "period", "threads", "days", "input_file_bytes", "rows_read", "rows_retained", "groups", "effect_values", "output_rows", "output_bytes", "parsed_input_bytes", "read_parse_seconds", "filter_seconds", "aggregate_seconds", "compute_seconds", "write_seconds", "wall_seconds", "report_rows", "checksum_allocation", "checksum_selection", "checksum_interaction"})
 	u := func(v uint64) string { return strconv.FormatUint(v, 10) }
-	w.Write([]string{"go", c.scenario, c.period, strconv.Itoa(c.threads), strconv.Itoa(days), u(inputBytes), u(mt.rows), u(mt.retained), u(mt.groups), u(mt.effects), u(mt.written), u(mt.bytes), u(mt.parsed), number(mt.read), number(mt.filter), number(mt.aggregate), number(mt.compute), number(mt.write), number(seconds(wall))})
+	w.Write([]string{"go", c.scenario, c.period, strconv.Itoa(c.threads), strconv.Itoa(days), u(inputBytes), u(mt.rows), u(mt.retained), u(mt.groups), u(mt.effects), u(mt.written), u(mt.bytes), u(mt.parsed), number(mt.read), number(mt.filter), number(mt.aggregate), number(mt.compute), number(mt.write), number(seconds(wall)), u(mt.reportRows), number(mt.checksum[0]), number(mt.checksum[1]), number(mt.checksum[2])})
 	w.Flush()
 	fmt.Printf("%d rows written; metrics %s\n", mt.written, c.metrics)
 	return w.Error()

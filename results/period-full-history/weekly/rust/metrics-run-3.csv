@@ -1,0 +1,2 @@
+language,scenario,period,threads,days,input_file_bytes,rows_read,rows_retained,groups,effect_values,output_rows,output_bytes,parsed_input_bytes,read_parse_seconds,filter_seconds,aggregate_seconds,compute_seconds,write_seconds,wall_seconds
+rust,weekly,week,4,1095,11083965925,175200000,175200000,175200000,2628000000,126401264,26452438040,11081405574,24.819813835000005,0.09764159599999994,0.8979927820000003,3.7396345140000005,80.47280767499998,33.357239917

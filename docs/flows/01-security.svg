@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1280" viewBox="0 0 1440 1280" role="img" aria-labelledby="title desc">
-<title id="title">01  Full security: align instruments, then calculate daily effects</title>
-<desc id="desc">No group reduction and no time linking • all portfolio/index instruments remain visible</desc>
+<title id="title">01  Security: daily calculation, full-history held-security output</title>
+<desc id="desc">Compute the full union • link across all dates • write held securities plus a benchmark-only bucket</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#475569"/></marker></defs>
 <rect width="1440" height="1280" fill="white"/>
 <style>text{font-family:Arial,Helvetica,sans-serif;fill:#0f172a}.title{font-size:32px;font-weight:700}.sub{font-size:18px;fill:#475569}.head{font-size:20px;font-weight:700}.body{font-size:17px}.label{font-size:16px;fill:#475569}.edge{fill:none;stroke:#475569;stroke-width:2.2;marker-end:url(#arrow)}</style>
 <text x="65" y="58" class="title" text-anchor="start">
-<tspan x="65" dy="0">01  Full security: align instruments, then calculate daily effects</tspan>
+<tspan x="65" dy="0">01  Security: daily calculation, full-history held-security output</tspan>
 </text>
 <text x="65" y="94" class="sub" text-anchor="start">
-<tspan x="65" dy="0">No group reduction and no time linking • all portfolio/index instruments remain visible</tspan>
+<tspan x="65" dy="0">Compute the full union • link across all dates • write held securities plus a benchmark-only bucket</tspan>
 </text>
 <rect x="75" y="145" width="570" height="110" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
 <text x="360.0" y="175" class="head" text-anchor="middle">
@@ -68,22 +68,25 @@
 <path d="M1155 625 V675 H720" class="edge"/>
 <rect x="250" y="715" width="940" height="110" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
 <text x="720.0" y="745" class="head" text-anchor="middle">
-<tspan x="720.0" dy="0">COMPUTE DAILY SECURITY ATTRIBUTION</tspan>
+<tspan x="720.0" dy="0">DAILY EFFECTS → FULL-HISTORY LINKING</tspan>
 </text>
 <text x="720.0" y="776" class="body" text-anchor="middle">
-<tspan x="720.0" dy="0">Total index return B = 0.005; calculate allocation, selection, interaction.</tspan>
-<tspan x="720.0" dy="25">Run base and local independently; reconcile the sum to active return.</tspan>
+<tspan x="720.0" dy="0">Calculate daily allocation, selection and interaction; reconcile daily active return.</tspan>
+<tspan x="720.0" dy="25">Update linked per-security components; track IDs ever held by the portfolio.</tspan>
 </text>
 <path d="M720 825 V885" class="edge"/>
+<text x="770" y="860" class="label" text-anchor="middle">
+<tspan x="770" dy="0">EOF</tspan>
+</text>
 <rect x="250" y="885" width="940" height="110" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
 <text x="720.0" y="915" class="head" text-anchor="middle">
-<tspan x="720.0" dy="0">WRITE A, B, C DETAIL ROWS + PORTFOLIO TOTALS</tspan>
+<tspan x="720.0" dy="0">AT EOF: WRITE HELD IDs + BENCHMARK-ONLY RECONCILIATION</tspan>
 </text>
 <text x="720.0" y="946" class="body" text-anchor="middle">
-<tspan x="720.0" dy="0">One row per instrument / date / return type.</tspan>
-<tspan x="720.0" dy="25">Buffered CSV → .partial; reuse row-formatting storage.</tspan>
+<tspan x="720.0" dy="0">One row per held instrument / return type over the full requested range.</tspan>
+<tspan x="720.0" dy="25">Sum never-held index instruments into one explicit residual row per return type.</tspan>
 </text>
-<path d="M250 940 H35 V125 H360 V145" class="edge"/>
+<path d="M250 770 H35 V125 H360 V145" class="edge"/>
 <text x="190" y="1090" class="label" text-anchor="middle">
 <tspan x="190" dy="0">Next date: reuse reader buffers</tspan>
 </text>
@@ -92,6 +95,9 @@
 <tspan x="720.0" dy="0">DISTINGUISHING COST</tspan>
 </text>
 <text x="720.0" y="1186" class="body" text-anchor="middle">
-<tspan x="720.0" dy="0">No cross-instrument rollup: compute and CSV volume scale with the instrument union.</tspan>
+<tspan x="720.0" dy="0">Full union is used for calculation; only 120,000 held-detail + 8 residual rows are written.</tspan>
+</text>
+<text x="65" y="1262" class="label" text-anchor="start">
+<tspan x="65" dy="0">Every execution validates attribution and writes the compact final CSV report.</tspan>
 </text>
 </svg>

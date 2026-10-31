@@ -9,6 +9,7 @@ COLORS = {'read': ('#e0f2fe', '#0284c7'), 'filter': ('#fef3c7', '#d97706'), 'agg
 
 class Canvas:
     def __init__(self, title, subtitle, height=1250):
+        self.height = height
         self.parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="{height}" viewBox="0 0 1440 {height}" role="img" aria-labelledby="title desc">', f'<title id="title">{escape(title)}</title>', f'<desc id="desc">{escape(subtitle)}</desc>', '<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#475569"/></marker></defs>', f'<rect width="1440" height="{height}" fill="white"/>', '<style>text{font-family:Arial,Helvetica,sans-serif;fill:#0f172a}.title{font-size:32px;font-weight:700}.sub{font-size:18px;fill:#475569}.head{font-size:20px;font-weight:700}.body{font-size:17px}.label{font-size:16px;fill:#475569}.edge{fill:none;stroke:#475569;stroke-width:2.2;marker-end:url(#arrow)}</style>']
         self.text(65, 58, [title], 'title', 'start')
         self.text(65, 94, [subtitle], 'sub', 'start')
@@ -29,6 +30,7 @@ class Canvas:
         self.parts.append(f'<path d="M{cx} {cy-h/2} L{cx+w/2} {cy} L{cx} {cy+h/2} L{cx-w/2} {cy} Z" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>')
         self.text(cx, cy-8 if len(lines)>1 else cy+6, lines)
     def finish(self, name):
+        self.text(65, self.height-18, ['Every execution validates attribution and writes the compact final CSV report.'], 'label', 'start')
         self.parts.append('</svg>')
         svg='\n'.join(self.parts)
         ET.fromstring(svg)
@@ -36,7 +38,7 @@ class Canvas:
 
 
 def security():
-    c=Canvas('01  Full security: align instruments, then calculate daily effects', 'No group reduction and no time linking • all portfolio/index instruments remain visible', 1280)
+    c=Canvas('01  Security: daily calculation, full-history held-security output', 'Compute the full union • link across all dates • write held securities plus a benchmark-only bucket', 1280)
     c.box(75,145,570,110,'read','STREAM PORTFOLIO • one date',['A: weight 60%, return 2%','B: weight 40%, return −1%'])
     c.box(795,145,570,110,'read','STREAM INDEX • same date',['A: weight 50%, return 1%','C: weight 50%, return 0%'])
     c.edge('M360 255 V310 H720 V345');c.edge('M1080 255 V310 H720')
@@ -45,11 +47,11 @@ def security():
         c.box(x,515,420,110,'compute',title,lines)
     c.edge('M720 450 V480 H285 V515');c.edge('M720 480 V515');c.edge('M720 480 H1155 V515')
     c.edge('M285 625 V675 H720 V715');c.edge('M720 625 V715');c.edge('M1155 625 V675 H720')
-    c.box(250,715,940,110,'compute','COMPUTE DAILY SECURITY ATTRIBUTION',['Total index return B = 0.005; calculate allocation, selection, interaction.','Run base and local independently; reconcile the sum to active return.'])
-    c.edge('M720 825 V885')
-    c.box(250,885,940,110,'write','WRITE A, B, C DETAIL ROWS + PORTFOLIO TOTALS',['One row per instrument / date / return type.','Buffered CSV → .partial; reuse row-formatting storage.'])
-    c.edge('M250 940 H35 V125 H360 V145','Next date: reuse reader buffers',(190,1090))
-    c.box(250,1125,940,95,'note','DISTINGUISHING COST',['No cross-instrument rollup: compute and CSV volume scale with the instrument union.'])
+    c.box(250,715,940,110,'compute','DAILY EFFECTS → FULL-HISTORY LINKING',['Calculate daily allocation, selection and interaction; reconcile daily active return.','Update linked per-security components; track IDs ever held by the portfolio.'])
+    c.edge('M720 825 V885','EOF',(770,860))
+    c.box(250,885,940,110,'write','AT EOF: WRITE HELD IDs + BENCHMARK-ONLY RECONCILIATION',['One row per held instrument / return type over the full requested range.','Sum never-held index instruments into one explicit residual row per return type.'])
+    c.edge('M250 770 H35 V125 H360 V145','Next date: reuse reader buffers',(190,1090))
+    c.box(250,1125,940,95,'note','DISTINGUISHING COST',['Full union is used for calculation; only 120,000 held-detail + 8 residual rows are written.'])
     c.finish('01-security.svg')
 
 
@@ -72,9 +74,10 @@ def subset():
     c.box(785,780,430,120,'aggregate','INDEX ÷ 0.40',['A = 25%; C = 75%','Normalize weights AND weighted returns.','Use this subset’s index return.'])
     c.edge('M475 705 V780');c.edge('M965 705 V780')
     c.edge('M440 900 V945 H720 V990');c.edge('M1000 900 V945 H720')
-    c.box(225,990,990,110,'compute','CALCULATE A + C AS STANDALONE INVESTMENTS',['Union the selected holdings; calculate base/local effects using renormalized weights.','Reconcile against selected portfolio return − selected index return.'])
-    c.edge('M720 1100 V1160')
-    c.box(225,1160,990,110,'write','WRITE ONLY SELECTED-UNIVERSE DETAILS + TOTALS',['No B rows; stream each day to the portfolio CSV.','EOF: flush/fsync; coordinator publishes files after all workers succeed.'])
+    c.box(225,990,990,110,'compute','CALCULATE DAILY SUBSET EFFECTS; LINK ACROSS ALL DATES',['Union the selected holdings; calculate base/local effects using renormalized weights.','Reconcile daily results, then update full-history linked accumulators.'])
+    c.edge('M225 1045 H10 V265 H360 V285','Next date',(95,1090))
+    c.edge('M720 1100 V1160','EOF',(770,1138))
+    c.box(225,1160,990,110,'write','AT EOF: WRITE SELECTED HELD IDs + ANY INDEX-ONLY BUCKET',['No B rows; one row per held selected ID / return type over the full range.','EOF: flush/fsync; coordinator publishes files after all workers succeed.'])
     c.box(225,1320,990,90,'note','EFFICIENCY',['Read/parse remains proportional to input; aggregation/compute slots scale with selected IDs.'])
     c.finish('02-subset.svg')
 
@@ -92,30 +95,31 @@ def country():
     c.edge('M240 520 V565 H395 V610');c.edge('M560 520 V565 H395')
     c.edge('M880 520 V565 H1045 V610');c.edge('M1200 520 V565 H1045')
     c.edge('M395 745 V790 H720 V835');c.edge('M1045 745 V790 H720')
-    c.box(200,835,1040,110,'compute','COUNTRY-LEVEL ATTRIBUTION: US + DE',['Perform this aggregation independently for index and portfolio, and for base/local.','Calculate effects from country weights/returns; reconcile the country sum.'])
-    c.edge('M720 945 V1000')
-    c.box(200,1000,1040,100,'write','WRITE TWO COUNTRY GROUPS, NOT FOUR SECURITY ROWS',['Daily country detail + totals; stream buffered CSV; repeat for the next date.'])
+    c.box(200,835,1040,110,'compute','DAILY COUNTRY EFFECTS → FULL-HISTORY LINKING',['Aggregate each side independently; calculate country effects, then link across dates.','At EOF, reconcile linked country effects to compounded active return.'])
+    c.edge('M200 890 H40 V270 H720 V290','Next date',(100,960))
+    c.edge('M720 945 V1000','EOF',(760,980))
+    c.box(200,1000,1040,100,'write','AT EOF: WRITE COUNTRY SUMMARIES, NOT DAILY ROWS',['One row per country / portfolio / return type over the full date range.'])
     c.text(720,1160,['Actual supplied holdings are US-only; US/DE above illustrates the many-to-one transformation.'],'sub')
     c.finish('03-country.svg')
 
 
 def weekly():
-    c=Canvas('04  Weekly: accumulate daily security effects within Monday–Sunday', 'A streaming state machine • keep one week, not a table of historical daily effects', 1440)
+    c=Canvas('04  Weekly: reduce daily effects to portfolio totals, then link', 'A streaming state machine • keep one week, no table of daily effects', 1440)
     c.box(180,140,1080,95,'read','READ NEXT MATCHED PORTFOLIO / INDEX DATE',['Normalize full weights; build daily security arrays; EOF closes the active week.'])
     c.edge('M720 235 V290')
     c.box(180,290,1080,110,'aggregate','ASSIGN MONDAY–SUNDAY WEEK KEY',['Sunday 2023-01-01 → week starting 2022-12-26','Monday 2023-01-02 through Sunday 2023-01-08 → week starting 2023-01-02'])
     c.edge('M720 400 V450')
     c.diamond(720,520,520,140,['Active week exists AND','new date has a different week key?'])
-    c.box(980,650,400,130,'write','CLOSE PREVIOUS WEEK',['Reconcile compounded active return.','Write linked security effects + totals.','Reset active accumulator.'])
+    c.box(980,650,400,130,'write','CLOSE ACTIVE WEEK',['Reconcile compounded active return.','Write one portfolio row per return type.','Reset active accumulator.'])
     c.edge('M980 520 H1180 V650','Yes: Monday boundary',(1190,560))
-    c.box(330,710,570,110,'compute','CALCULATE CURRENT DAY’S SECURITY EFFECTS',['Base/local allocation, selection, interaction.','Reconcile daily effects before linking.'])
+    c.box(330,710,570,110,'compute','SUM DAILY EFFECTS TO PORTFOLIO',['Reduce to allocation, selection, interaction for each return type.','Reconcile the daily sum before linking the portfolio totals.'])
     c.edge('M720 590 V710','No: first/same week',(550,650))
     c.edge('M1180 780 V850 H935 V765 H900')
     c.edge('M615 820 V885')
-    c.box(300,885,840,130,'compute','UPDATE ACTIVE WEEK IN PLACE',['E ← E × (1 + index return today) + e_today × portfolio growth before today','Update compounded returns and sums of daily weights.','Retain per-security accumulated components; release current-day inputs.'])
+    c.box(300,885,840,130,'compute','UPDATE ACTIVE WEEK IN PLACE',['E ← E × (1 + index return today) + e_today × portfolio growth before today','Update compounded returns and sums of daily weights.','Retain one portfolio accumulator; no per-security period effect table.'])
     c.edge('M300 950 H55 V115 H720 V140','Next date',(145,1070))
     c.edge('M720 1015 V1090','At EOF',(770,1060))
-    c.box(230,1090,980,115,'write','FLUSH THE LAST WEEK, EVEN IF PARTIAL',['Write observed start/end dates, linked effects and mean daily weights.','Flush/fsync; publish per-portfolio CSVs after worker validation.'])
+    c.box(230,1090,980,115,'write','FLUSH THE LAST WEEK, EVEN IF PARTIAL',['Write observed dates and portfolio effects: 1,264 rows over the supplied history.','Flush/fsync; publish per-portfolio CSVs after worker validation.'])
     c.box(230,1260,980,100,'note','ILLUSTRATIVE WEEK OUTPUT',['Jan 1: partial prior week • Jan 2–8: one week • Jan 9: begins another bucket.'])
     c.finish('04-weekly.svg')
 
@@ -126,17 +130,17 @@ def monthly():
     c.edge('M720 240 V295')
     c.box(160,295,1120,100,'aggregate','SELECT CALENDAR BUCKET KEY',['month: YYYY-MM   |   quarter override: YYYY-Qn   |   year override: YYYY'])
     c.edge('M720 395 V435 H435 V485')
-    c.box(85,485,700,155,'compute','JANUARY • ONE ACTIVE ACCUMULATOR',['Jan 1: daily effects → initialize linked state','Jan 2 … Jan 30: daily effects → update same state','Jan 31: daily effects → update same state','No daily security output history is retained.'])
+    c.box(85,485,700,155,'compute','JANUARY • ONE ACTIVE ACCUMULATOR',['Jan 1: sum security effects → initialize portfolio linked state','Jan 2 … Jan 30: sum daily effects → update same portfolio state','Jan 31: reduce daily effects → update same state','No daily security output history is retained.'])
     c.box(885,485,420,155,'compute','FEBRUARY • NEXT ACCUMULATOR',['Feb 1 creates a new bucket.','Feb 2 … Feb 28 update it.','Starts only after January is emitted.'])
     c.edge('M435 640 V705')
     c.diamond(435,775,610,140,['Next date is in a new month,','or input has reached EOF?'])
     c.edge('M130 775 H35 V435 H435 V485','No: keep accumulating',(210,690))
     c.edge('M435 845 V915','Yes: close observed period',(590,885))
-    c.box(85,915,700,135,'write','EMIT JANUARY’S LINKED CSV ROWS',['Per-security allocation, selection, interaction + portfolio totals.','Period returns = compounded returns, not sums of daily returns.','Weights = mean daily weights, including absent days as zero.'])
+    c.box(85,915,700,135,'write','EMIT JANUARY’S LINKED CSV ROWS',['One portfolio row per return type; no per-security monthly output.','Period returns = compounded returns, not sums of daily returns.','Portfolio/index report weights are 1; 288 rows over the full supplied history.'])
     c.edge('M785 975 H1345 V435 H1095 V485','Feb 1: reset and start February',(1100,865))
     c.edge('M1095 640 V1090')
     c.box(885,1090,420,120,'write','EMIT FEBRUARY AT NEXT BOUNDARY',['Continue month by month.','EOF also emits a partial final month.'])
-    c.box(85,1125,700,145,'note','PER-COMPONENT LINKING, BASE AND LOCAL',['E_new = E_previous × (1 + b_today) + e_today × P_before','Only one calendar period is held per worker.','Final EOF: flush/fsync and publish validated files.'])
+    c.box(85,1125,700,145,'note','PORTFOLIO-COMPONENT LINKING, BASE AND LOCAL',['E_new = E_previous × (1 + b_today) + e_today × P_before','Only one portfolio-level calendar period is held per worker.','Final EOF: flush/fsync and publish validated files.'])
     c.finish('05-monthly.svg')
 
 

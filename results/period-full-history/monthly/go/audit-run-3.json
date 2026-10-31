@@ -1,0 +1,26 @@
+[
+  {
+    "file": "monthly-portfolio_PF1.csv",
+    "bytes": 1493383328,
+    "rows": 7200072,
+    "sha256": "0ad72b1683ceae77b284ba2c2ec16af6e793c074cb2ba788c68d6d6c68fef087"
+  },
+  {
+    "file": "monthly-portfolio_PF2.csv",
+    "bytes": 1493881688,
+    "rows": 7200072,
+    "sha256": "ca1af72658c7a43bb4a2ea3b852ab7ca1299c9a79f66b9f907dbf49553d536f3"
+  },
+  {
+    "file": "monthly-portfolio_PF3.csv",
+    "bytes": 1494882611,
+    "rows": 7200072,
+    "sha256": "32f58051bb8c3b951e440a6dc1ebc4ab265166b77c9754fc8658103139fdde8b"
+  },
+  {
+    "file": "monthly-portfolio_PF4.csv",
+    "bytes": 1494476459,
+    "rows": 7200072,
+    "sha256": "16fb3f2ca32d3bb625d0c9466bf73aab5d8bdc0afce4f62c68acafdd15f5aca2"
+  }
+]

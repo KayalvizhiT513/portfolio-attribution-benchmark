@@ -31,9 +31,9 @@
 <tspan x="435.0" dy="0">JANUARY • ONE ACTIVE ACCUMULATOR</tspan>
 </text>
 <text x="435.0" y="546" class="body" text-anchor="middle">
-<tspan x="435.0" dy="0">Jan 1: daily effects → initialize linked state</tspan>
-<tspan x="435.0" dy="25">Jan 2 … Jan 30: daily effects → update same state</tspan>
-<tspan x="435.0" dy="25">Jan 31: daily effects → update same state</tspan>
+<tspan x="435.0" dy="0">Jan 1: sum security effects → initialize portfolio linked state</tspan>
+<tspan x="435.0" dy="25">Jan 2 … Jan 30: sum daily effects → update same portfolio state</tspan>
+<tspan x="435.0" dy="25">Jan 31: reduce daily effects → update same state</tspan>
 <tspan x="435.0" dy="25">No daily security output history is retained.</tspan>
 </text>
 <rect x="885" y="485" width="420" height="155" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
@@ -64,9 +64,9 @@
 <tspan x="435.0" dy="0">EMIT JANUARY’S LINKED CSV ROWS</tspan>
 </text>
 <text x="435.0" y="976" class="body" text-anchor="middle">
-<tspan x="435.0" dy="0">Per-security allocation, selection, interaction + portfolio totals.</tspan>
+<tspan x="435.0" dy="0">One portfolio row per return type; no per-security monthly output.</tspan>
 <tspan x="435.0" dy="25">Period returns = compounded returns, not sums of daily returns.</tspan>
-<tspan x="435.0" dy="25">Weights = mean daily weights, including absent days as zero.</tspan>
+<tspan x="435.0" dy="25">Portfolio/index report weights are 1; 288 rows over the full supplied history.</tspan>
 </text>
 <path d="M785 975 H1345 V435 H1095 V485" class="edge"/>
 <text x="1100" y="865" class="label" text-anchor="middle">
@@ -83,11 +83,14 @@
 </text>
 <rect x="85" y="1125" width="700" height="145" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
 <text x="435.0" y="1155" class="head" text-anchor="middle">
-<tspan x="435.0" dy="0">PER-COMPONENT LINKING, BASE AND LOCAL</tspan>
+<tspan x="435.0" dy="0">PORTFOLIO-COMPONENT LINKING, BASE AND LOCAL</tspan>
 </text>
 <text x="435.0" y="1186" class="body" text-anchor="middle">
 <tspan x="435.0" dy="0">E_new = E_previous × (1 + b_today) + e_today × P_before</tspan>
-<tspan x="435.0" dy="25">Only one calendar period is held per worker.</tspan>
+<tspan x="435.0" dy="25">Only one portfolio-level calendar period is held per worker.</tspan>
 <tspan x="435.0" dy="25">Final EOF: flush/fsync and publish validated files.</tspan>
+</text>
+<text x="65" y="1352" class="label" text-anchor="start">
+<tspan x="65" dy="0">Every execution validates attribution and writes the compact final CSV report.</tspan>
 </text>
 </svg>

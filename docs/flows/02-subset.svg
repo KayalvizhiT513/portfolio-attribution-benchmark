@@ -117,19 +117,26 @@
 <path d="M1000 900 V945 H720" class="edge"/>
 <rect x="225" y="990" width="990" height="110" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
 <text x="720.0" y="1020" class="head" text-anchor="middle">
-<tspan x="720.0" dy="0">CALCULATE A + C AS STANDALONE INVESTMENTS</tspan>
+<tspan x="720.0" dy="0">CALCULATE DAILY SUBSET EFFECTS; LINK ACROSS ALL DATES</tspan>
 </text>
 <text x="720.0" y="1051" class="body" text-anchor="middle">
 <tspan x="720.0" dy="0">Union the selected holdings; calculate base/local effects using renormalized weights.</tspan>
-<tspan x="720.0" dy="25">Reconcile against selected portfolio return − selected index return.</tspan>
+<tspan x="720.0" dy="25">Reconcile daily results, then update full-history linked accumulators.</tspan>
+</text>
+<path d="M225 1045 H10 V265 H360 V285" class="edge"/>
+<text x="95" y="1090" class="label" text-anchor="middle">
+<tspan x="95" dy="0">Next date</tspan>
 </text>
 <path d="M720 1100 V1160" class="edge"/>
+<text x="770" y="1138" class="label" text-anchor="middle">
+<tspan x="770" dy="0">EOF</tspan>
+</text>
 <rect x="225" y="1160" width="990" height="110" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
 <text x="720.0" y="1190" class="head" text-anchor="middle">
-<tspan x="720.0" dy="0">WRITE ONLY SELECTED-UNIVERSE DETAILS + TOTALS</tspan>
+<tspan x="720.0" dy="0">AT EOF: WRITE SELECTED HELD IDs + ANY INDEX-ONLY BUCKET</tspan>
 </text>
 <text x="720.0" y="1221" class="body" text-anchor="middle">
-<tspan x="720.0" dy="0">No B rows; stream each day to the portfolio CSV.</tspan>
+<tspan x="720.0" dy="0">No B rows; one row per held selected ID / return type over the full range.</tspan>
 <tspan x="720.0" dy="25">EOF: flush/fsync; coordinator publishes files after all workers succeed.</tspan>
 </text>
 <rect x="225" y="1320" width="990" height="90" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
@@ -138,5 +145,8 @@
 </text>
 <text x="720.0" y="1381" class="body" text-anchor="middle">
 <tspan x="720.0" dy="0">Read/parse remains proportional to input; aggregation/compute slots scale with selected IDs.</tspan>
+</text>
+<text x="65" y="1442" class="label" text-anchor="start">
+<tspan x="65" dy="0">Every execution validates attribution and writes the compact final CSV report.</tspan>
 </text>
 </svg>

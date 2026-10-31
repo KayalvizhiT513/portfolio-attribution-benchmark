@@ -1,0 +1,14 @@
+[
+  {
+    "scenario": "monthly",
+    "status": "PASS_SAMPLED",
+    "sampled_rows": 1028,
+    "max_absolute_difference": 7.806255641895632e-18
+  },
+  {
+    "scenario": "weekly",
+    "status": "PASS_SAMPLED",
+    "sampled_rows": 1028,
+    "max_absolute_difference": 6.505213034913027e-19
+  }
+]

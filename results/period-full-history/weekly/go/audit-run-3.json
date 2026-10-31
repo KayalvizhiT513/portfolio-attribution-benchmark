@@ -1,0 +1,26 @@
+[
+  {
+    "file": "weekly-portfolio_PF1.csv",
+    "bytes": 6513003363,
+    "rows": 31600316,
+    "sha256": "ed3bf17e9e4bf849eed9f3bd50dc50431cdfc4a468697537eb9024295b48750e"
+  },
+  {
+    "file": "weekly-portfolio_PF2.csv",
+    "bytes": 6510422310,
+    "rows": 31600316,
+    "sha256": "bc8f2e0909bfc97d08922de8d3b3460439241d5e4e4387b2d321c557f6b4b586"
+  },
+  {
+    "file": "weekly-portfolio_PF3.csv",
+    "bytes": 6518214153,
+    "rows": 31600316,
+    "sha256": "3b2814ca88cc3a427d30e0aa2046ce484192e1a347dd5fb042f1c32212ac1f3b"
+  },
+  {
+    "file": "weekly-portfolio_PF4.csv",
+    "bytes": 6513903701,
+    "rows": 31600316,
+    "sha256": "071ce8b2a079e53524ac8621b9121c53ca143bd0455b0a3b9b59f495c9aab634"
+  }
+]

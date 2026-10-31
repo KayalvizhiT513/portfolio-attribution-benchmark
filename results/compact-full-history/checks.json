@@ -1,0 +1,37 @@
+[
+  {
+    "scenario": "security",
+    "status": "PASS",
+    "rows_compared": 120008,
+    "max_absolute_difference": 1.496198998029996e-17,
+    "checksum_repetitions": "PASS"
+  },
+  {
+    "scenario": "subset",
+    "status": "PASS",
+    "rows_compared": 808,
+    "max_absolute_difference": 1.3010426069826053e-16,
+    "checksum_repetitions": "PASS"
+  },
+  {
+    "scenario": "country",
+    "status": "PASS",
+    "rows_compared": 8,
+    "max_absolute_difference": 1.6306400674181987e-16,
+    "checksum_repetitions": "PASS"
+  },
+  {
+    "scenario": "weekly",
+    "status": "PASS",
+    "rows_compared": 1264,
+    "max_absolute_difference": 3.469446951953614e-18,
+    "checksum_repetitions": "PASS"
+  },
+  {
+    "scenario": "monthly",
+    "status": "PASS",
+    "rows_compared": 288,
+    "max_absolute_difference": 1.0408340855860843e-17,
+    "checksum_repetitions": "PASS"
+  }
+]

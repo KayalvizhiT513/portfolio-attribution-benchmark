@@ -1,0 +1,2 @@
+language,scenario,period,threads,days,input_file_bytes,rows_read,rows_retained,groups,effect_values,output_rows,output_bytes,parsed_input_bytes,read_parse_seconds,filter_seconds,aggregate_seconds,compute_seconds,write_seconds,wall_seconds
+go,monthly,month,12,1095,11083965925,175200000,175200000,175200000,2628000000,28800288,5976624086,11081405569,38.82456146500001,0.3126957999999997,1.153514709,8.754683167000003,10.558670707,25.277829375

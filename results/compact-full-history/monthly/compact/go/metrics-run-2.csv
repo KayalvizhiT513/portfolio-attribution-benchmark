@@ -1,0 +1,2 @@
+language,scenario,period,threads,days,input_file_bytes,rows_read,rows_retained,groups,effect_values,output_rows,output_bytes,parsed_input_bytes,read_parse_seconds,filter_seconds,aggregate_seconds,compute_seconds,write_seconds,wall_seconds,report_rows,checksum_allocation,checksum_selection,checksum_interaction
+go,monthly,month,12,1095,11083965925,175200000,175200000,175200000,2628000000,288,61947,11081405569,37.927678964000016,0.31908016900000014,1.6536445260000003,6.827485795999998,0.053689577,24.232111583,288,0.005650329978321188,-0.00884696096838083,-0.06668348872662883

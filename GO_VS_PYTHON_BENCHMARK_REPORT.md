@@ -1,10 +1,10 @@
-# Portfolio Attribution Compute Benchmark
+# Go vs Python: Portfolio Attribution Benchmark
 ### Python / NumPy / Numba vs Go / Goroutines
 
 **Experiment:** security-level, daily synthetic allocation and selection effects  
 **Run date:** 28 October 2026 (benchmarks executed locally on the user's MacBook Pro)  
 **Status:** measured kernel results; architectural hypotheses are not yet profiled  
-**Repository:** [portfolio-attribution-benchmark](../README.md)
+**Repository:** [portfolio-attribution-benchmark](README.md)
 
 ## Visual comparison
 

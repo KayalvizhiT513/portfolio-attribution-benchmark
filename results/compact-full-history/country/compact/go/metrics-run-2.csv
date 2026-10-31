@@ -1,0 +1,2 @@
+language,scenario,period,threads,days,input_file_bytes,rows_read,rows_retained,groups,effect_values,output_rows,output_bytes,parsed_input_bytes,read_parse_seconds,filter_seconds,aggregate_seconds,compute_seconds,write_seconds,wall_seconds,report_rows,checksum_allocation,checksum_selection,checksum_interaction
+go,country,all,12,1095,11083965925,175200000,175200000,5475,26280,8,2582,11081405569,35.08252942700004,0.3117515499999996,0.34355590099999994,0.000657563000000002,0.03701320600000001,22.278860125,8,6.234977507085068e-30,-0.06891502713809154,8.14674037542348e-16

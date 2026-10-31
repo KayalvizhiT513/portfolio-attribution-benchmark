@@ -61,7 +61,7 @@ fn config() -> Result<Config> {
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         if a == "--help" {
-            println!("--scenario security|subset|country|weekly|monthly --data DIR --output-dir DIR --metrics FILE --threads N --max-days N --instruments-file CSV --period week|month|quarter|year");
+            println!("--scenario security|subset|country|weekly|monthly --data DIR --output-dir DIR --metrics FILE --threads N --max-days N --instruments-file CSV --period all|day|week|month|quarter|year");
             std::process::exit(0);
         }
         let v = args.next().ok_or("missing option value")?;
@@ -86,11 +86,11 @@ fn config() -> Result<Config> {
         c.period = match c.scenario.as_str() {
             "weekly" => "week",
             "monthly" => "month",
-            _ => "day",
+            _ => "all",
         }
         .into()
     }
-    if !["day", "week", "month", "quarter", "year"].contains(&c.period.as_str()) {
+    if !["all", "day", "week", "month", "quarter", "year"].contains(&c.period.as_str()) {
         return Err("invalid period".into());
     }
     if c.scenario == "subset" && c.subset.is_none() {
@@ -191,6 +191,8 @@ struct Metrics {
     written: u64,
     bytes: u64,
     parsed: u64,
+    report_rows: u64,
+    checksum: [f64; 3],
 }
 impl Metrics {
     fn add(&mut self, b: &Self) {
@@ -206,6 +208,10 @@ impl Metrics {
         self.written += b.written;
         self.bytes += b.bytes;
         self.parsed += b.parsed;
+        self.report_rows += b.report_rows;
+        for j in 0..3 {
+            self.checksum[j] += b.checksum[j];
+        }
     }
 }
 struct Day {
@@ -394,6 +400,9 @@ fn civil(s: &str) -> Result<(i32, u32, u32, i64)> {
     Ok((y, m, d, days))
 }
 fn bucket(date: &str, period: &str) -> Result<String> {
+    if period == "all" {
+        return Ok("ALL".into());
+    }
     let (y, m, _, days) = civil(date)?;
     Ok(match period {
         "week" => format!("W{}", (days + 3).div_euclid(7)),
@@ -423,6 +432,7 @@ struct Acc {
     w: [f64; 2],
     e: [[f64; 3]; 2],
     present: bool,
+    held: bool,
 }
 struct Period {
     key: String,
@@ -431,16 +441,19 @@ struct Period {
     days: usize,
     growth: [[f64; 2]; 2],
     acc: Vec<Acc>,
+    portfolio_only: bool,
 }
 impl Period {
-    fn new(day: &Day, key: String) -> Self {
+    fn new(day: &Day, key: String, c: &Config) -> Self {
+        let portfolio_only = ["weekly", "monthly"].contains(&c.scenario.as_str());
         Self {
             key,
             start: day.date.clone(),
             end: day.date.clone(),
             days: 0,
             growth: [[1.0; 2]; 2],
-            acc: vec![Acc::default(); day.stats.len()],
+            acc: vec![Acc::default(); if portfolio_only { 1 } else { day.stats.len() }],
+            portfolio_only,
         }
     }
     fn add(&mut self, p: &Day, b: &Day, metrics: &mut Metrics) -> Result<()> {
@@ -448,38 +461,48 @@ impl Period {
         let mut totals = [[0.0; 2]; 2];
         for s in &p.stats {
             for t in 0..2 {
-                totals[0][t] += s.r[t]
+                totals[0][t] += s.r[t];
             }
         }
         for s in &b.stats {
             for t in 0..2 {
-                totals[1][t] += s.r[t]
+                totals[1][t] += s.r[t];
             }
         }
-        let mut sum = [0.0; 2];
-        for k in 0..self.acc.len() {
+        let mut daily = [[0.0; 3]; 2];
+        for k in 0..p.stats.len() {
             let ps = p.stats[k];
             let bs = b.stats[k];
-            let a = &mut self.acc[k];
-            if ps.present || bs.present {
-                a.present = true;
-            }
-            a.w[0] += ps.w;
-            a.w[1] += bs.w;
-            for t in 0..2 {
-                let e = effect(ps, bs, t, totals[1][t]);
-                for j in 0..3 {
-                    a.e[t][j] = a.e[t][j] * (1.0 + totals[1][t]) + e[j] * self.growth[0][t];
-                    sum[t] += e[j];
-                }
-            }
             if ps.present || bs.present {
                 metrics.effects += 6;
             }
+            for t in 0..2 {
+                let e = effect(ps, bs, t, totals[1][t]);
+                for j in 0..3 {
+                    daily[t][j] += e[j];
+                    if !self.portfolio_only {
+                        self.acc[k].e[t][j] =
+                            self.acc[k].e[t][j] * (1.0 + totals[1][t]) + e[j] * self.growth[0][t];
+                    }
+                }
+            }
+            if !self.portfolio_only {
+                let a = &mut self.acc[k];
+                a.present |= ps.present || bs.present;
+                a.held |= ps.present;
+                a.w[0] += ps.w;
+                a.w[1] += bs.w;
+            }
         }
         for t in 0..2 {
-            if (sum[t] - (totals[0][t] - totals[1][t])).abs() > 1e-9 {
+            if (daily[t].iter().sum::<f64>() - (totals[0][t] - totals[1][t])).abs() > 1e-9 {
                 return Err("daily reconciliation failed".into());
+            }
+            if self.portfolio_only {
+                for j in 0..3 {
+                    self.acc[0].e[t][j] = self.acc[0].e[t][j] * (1.0 + totals[1][t])
+                        + daily[t][j] * self.growth[0][t];
+                }
             }
             for side in 0..2 {
                 self.growth[side][t] *= 1.0 + totals[side][t];
@@ -487,6 +510,13 @@ impl Period {
                     return Err("nonfinite compounded return".into());
                 }
             }
+        }
+        if self.portfolio_only {
+            let a = &mut self.acc[0];
+            a.present = true;
+            a.held = true;
+            a.w[0] += 1.0;
+            a.w[1] += 1.0;
         }
         self.days += 1;
         self.end = p.date.clone();
@@ -502,59 +532,93 @@ impl Period {
         metrics: &mut Metrics,
     ) -> Result<()> {
         let start = Instant::now();
+        let write_before = metrics.write;
         let mut totals = [[0.0; 3]; 2];
+        let mut residual = Acc::default();
+        let security = ["security", "subset"].contains(&c.scenario.as_str());
         for a in &self.acc {
             for t in 0..2 {
                 for j in 0..3 {
-                    totals[t][j] += a.e[t][j]
+                    totals[t][j] += a.e[t][j];
+                }
+            }
+            if security && a.present && !a.held {
+                residual.present = true;
+                for side in 0..2 {
+                    residual.w[side] += a.w[side];
+                }
+                for t in 0..2 {
+                    for j in 0..3 {
+                        residual.e[t][j] += a.e[t][j];
+                    }
                 }
             }
         }
         for t in 0..2 {
-            let active = self.growth[0][t] - self.growth[1][t];
-            if (totals[t].iter().sum::<f64>() - active).abs() > 1e-8 {
+            if (totals[t].iter().sum::<f64>() - (self.growth[0][t] - self.growth[1][t])).abs()
+                > 1e-8
+            {
                 return Err("linked reconciliation failed".into());
             }
         }
-        metrics.compute += start.elapsed().as_secs_f64();
-        let start = Instant::now();
         let mut record = csv::ByteRecord::new();
         let days = self.days.to_string();
-        for (k, a) in self.acc.iter().enumerate() {
-            if a.present {
+        if self.portfolio_only {
+            for t in 0..2 {
+                self.row(
+                    c,
+                    entity,
+                    "total",
+                    "ALL",
+                    t,
+                    self.acc[0].w,
+                    totals[t],
+                    &days,
+                    &mut record,
+                    w,
+                    metrics,
+                )?;
+            }
+        } else {
+            for (k, a) in self.acc.iter().enumerate() {
+                if a.present && (!security || a.held) {
+                    for t in 0..2 {
+                        self.row(
+                            c,
+                            entity,
+                            "detail",
+                            &names[k],
+                            t,
+                            a.w,
+                            a.e[t],
+                            &days,
+                            &mut record,
+                            w,
+                            metrics,
+                        )?;
+                    }
+                }
+            }
+            if residual.present {
                 for t in 0..2 {
                     self.row(
                         c,
                         entity,
-                        "detail",
-                        &names[k],
+                        "benchmark_only",
+                        "BENCHMARK_ONLY",
                         t,
-                        a.w,
-                        a.e[t],
+                        residual.w,
+                        residual.e[t],
                         &days,
                         &mut record,
                         w,
+                        metrics,
                     )?;
-                    metrics.written += 1;
                 }
             }
         }
-        for t in 0..2 {
-            self.row(
-                c,
-                entity,
-                "total",
-                "ALL",
-                t,
-                [self.days as f64; 2],
-                totals[t],
-                &days,
-                &mut record,
-                w,
-            )?;
-            metrics.written += 1;
-        }
-        metrics.write += start.elapsed().as_secs_f64();
+        metrics.compute +=
+            (start.elapsed().as_secs_f64() - (metrics.write - write_before)).max(0.0);
         Ok(())
     }
     fn row(
@@ -569,7 +633,13 @@ impl Period {
         days: &str,
         record: &mut csv::ByteRecord,
         w: &mut csv::Writer<BufWriter<File>>,
+        metrics: &mut Metrics,
     ) -> Result<()> {
+        metrics.report_rows += 1;
+        for j in 0..3 {
+            metrics.checksum[j] += e[j];
+        }
+        let start = Instant::now();
         let rp = self.growth[0][t] - 1.0;
         let rb = self.growth[1][t] - 1.0;
         record.clear();
@@ -600,14 +670,18 @@ impl Period {
             record.push_field(buffer.format(value).as_bytes());
         }
         w.write_byte_record(record)?;
+        metrics.written += 1;
+        metrics.write += start.elapsed().as_secs_f64();
         Ok(())
     }
 }
+
 fn worker(path: &Path, c: &Config, m: &Master, rx: mpsc::Receiver<Arc<Day>>) -> Result<Metrics> {
     let mut metrics = Metrics::default();
     let mut stream = Stream::new(path)?;
     let stem = path.file_stem().unwrap().to_string_lossy();
     let partial = c.output.join(format!("{}-{stem}.csv.partial", c.scenario));
+    let start = Instant::now();
     let mut writer = csv::WriterBuilder::new()
         .buffer_capacity(1024 * 1024)
         .from_writer(BufWriter::with_capacity(
@@ -615,6 +689,7 @@ fn worker(path: &Path, c: &Config, m: &Master, rx: mpsc::Receiver<Arc<Day>>) -> 
             File::create(partial)?,
         ));
     writer.write_record(OUT)?;
+    metrics.write += start.elapsed().as_secs_f64();
     let mut period: Option<Period> = None;
     let mut entity = String::new();
     let names = if c.scenario == "country" {
@@ -641,7 +716,7 @@ fn worker(path: &Path, c: &Config, m: &Master, rx: mpsc::Receiver<Arc<Day>>) -> 
                 .write(c, &entity, names, &mut writer, &mut metrics)?;
         }
         if period.is_none() {
-            period = Some(Period::new(&p, key))
+            period = Some(Period::new(&p, key, c))
         }
         period.as_mut().unwrap().add(&p, &b, &mut metrics)?;
         count += 1;
@@ -656,9 +731,11 @@ fn worker(path: &Path, c: &Config, m: &Master, rx: mpsc::Receiver<Arc<Day>>) -> 
         .unwrap()
         .write(c, &entity, names, &mut writer, &mut metrics)?;
     let start = Instant::now();
+
     writer.flush()?;
     writer.get_ref().get_ref().sync_all()?;
     metrics.write += start.elapsed().as_secs_f64();
+
     Ok(metrics)
 }
 fn run() -> Result<()> {
@@ -733,6 +810,7 @@ fn run() -> Result<()> {
         input_bytes += fs::metadata(path)?.len();
         let stem = path.file_stem().unwrap().to_string_lossy();
         let target = c.output.join(format!("{}-{stem}.csv", c.scenario));
+
         fs::rename(target.with_extension("csv.partial"), &target)?;
         metrics.bytes += fs::metadata(target)?.len();
     }
@@ -760,6 +838,10 @@ fn run() -> Result<()> {
         "compute_seconds",
         "write_seconds",
         "wall_seconds",
+        "report_rows",
+        "checksum_allocation",
+        "checksum_selection",
+        "checksum_interaction",
     ])?;
     w.write_record(vec![
         "rust".into(),
@@ -781,6 +863,10 @@ fn run() -> Result<()> {
         metrics.compute.to_string(),
         metrics.write.to_string(),
         wall.elapsed().as_secs_f64().to_string(),
+        metrics.report_rows.to_string(),
+        metrics.checksum[0].to_string(),
+        metrics.checksum[1].to_string(),
+        metrics.checksum[2].to_string(),
     ])?;
     w.flush()?;
     println!(

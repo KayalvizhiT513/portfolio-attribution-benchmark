@@ -1,0 +1,48 @@
+{
+  "dates_requested": "all",
+  "repetitions": 3,
+  "rust_threads": 4,
+  "go_GOMAXPROCS": 12,
+  "executables": {
+    "rust": {
+      "path": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/rust/target/release/portfolio-attribution",
+      "sha256": "157420c8b034d121e30dbc3079658f4cba36fb5fbb50bad02d1954de3aaa96bf"
+    },
+    "go": {
+      "path": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/benchmark-go-attribution",
+      "sha256": "f2b470c495d73de02c273297730360d7f0c8d24d367f75a6dc657eb5f5cb2ba3"
+    }
+  },
+  "inputs": [
+    {
+      "name": "index.csv",
+      "bytes": 7008003887,
+      "mtime_ns": 1793463602850911887
+    },
+    {
+      "name": "portfolio_PF1.csv",
+      "bytes": 1018344961,
+      "mtime_ns": 1793463401839934359
+    },
+    {
+      "name": "portfolio_PF2.csv",
+      "bytes": 1018352361,
+      "mtime_ns": 1793463422061815423
+    },
+    {
+      "name": "portfolio_PF3.csv",
+      "bytes": 1018358723,
+      "mtime_ns": 1793463442671061947
+    },
+    {
+      "name": "portfolio_PF4.csv",
+      "bytes": 1018345962,
+      "mtime_ns": 1793463463345815530
+    },
+    {
+      "name": "security_master.csv",
+      "bytes": 2560031,
+      "mtime_ns": 1793463381978061062
+    }
+  ]
+}

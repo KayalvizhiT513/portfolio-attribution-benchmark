@@ -79,21 +79,31 @@
 <path d="M1045 745 V790 H720" class="edge"/>
 <rect x="200" y="835" width="1040" height="110" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
 <text x="720.0" y="865" class="head" text-anchor="middle">
-<tspan x="720.0" dy="0">COUNTRY-LEVEL ATTRIBUTION: US + DE</tspan>
+<tspan x="720.0" dy="0">DAILY COUNTRY EFFECTS → FULL-HISTORY LINKING</tspan>
 </text>
 <text x="720.0" y="896" class="body" text-anchor="middle">
-<tspan x="720.0" dy="0">Perform this aggregation independently for index and portfolio, and for base/local.</tspan>
-<tspan x="720.0" dy="25">Calculate effects from country weights/returns; reconcile the country sum.</tspan>
+<tspan x="720.0" dy="0">Aggregate each side independently; calculate country effects, then link across dates.</tspan>
+<tspan x="720.0" dy="25">At EOF, reconcile linked country effects to compounded active return.</tspan>
+</text>
+<path d="M200 890 H40 V270 H720 V290" class="edge"/>
+<text x="100" y="960" class="label" text-anchor="middle">
+<tspan x="100" dy="0">Next date</tspan>
 </text>
 <path d="M720 945 V1000" class="edge"/>
+<text x="760" y="980" class="label" text-anchor="middle">
+<tspan x="760" dy="0">EOF</tspan>
+</text>
 <rect x="200" y="1000" width="1040" height="100" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
 <text x="720.0" y="1030" class="head" text-anchor="middle">
-<tspan x="720.0" dy="0">WRITE TWO COUNTRY GROUPS, NOT FOUR SECURITY ROWS</tspan>
+<tspan x="720.0" dy="0">AT EOF: WRITE COUNTRY SUMMARIES, NOT DAILY ROWS</tspan>
 </text>
 <text x="720.0" y="1061" class="body" text-anchor="middle">
-<tspan x="720.0" dy="0">Daily country detail + totals; stream buffered CSV; repeat for the next date.</tspan>
+<tspan x="720.0" dy="0">One row per country / portfolio / return type over the full date range.</tspan>
 </text>
 <text x="720" y="1160" class="sub" text-anchor="middle">
 <tspan x="720" dy="0">Actual supplied holdings are US-only; US/DE above illustrates the many-to-one transformation.</tspan>
+</text>
+<text x="65" y="1222" class="label" text-anchor="start">
+<tspan x="65" dy="0">Every execution validates attribution and writes the compact final CSV report.</tspan>
 </text>
 </svg>

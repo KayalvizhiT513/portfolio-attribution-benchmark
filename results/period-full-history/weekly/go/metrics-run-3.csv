@@ -1,0 +1,2 @@
+language,scenario,period,threads,days,input_file_bytes,rows_read,rows_retained,groups,effect_values,output_rows,output_bytes,parsed_input_bytes,read_parse_seconds,filter_seconds,aggregate_seconds,compute_seconds,write_seconds,wall_seconds
+go,weekly,week,12,1095,11083965925,175200000,175200000,175200000,2628000000,126401264,26055543527,11081405569,41.196348986999965,0.319486756,1.0626647189999996,9.224353905999992,46.543290416000005,30.752557292

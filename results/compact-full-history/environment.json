@@ -1,0 +1,51 @@
+{
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "logical_cpus": 12,
+  "days": 1095,
+  "runs": 2,
+  "rust_threads": 4,
+  "go_GOMAXPROCS": 12,
+  "cache_policy": "OS-managed; language order alternates; first runs included",
+  "executables": {
+    "rust": {
+      "path": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/rust/target/release/portfolio-attribution",
+      "sha256": "bf868725b2ec16e427095d3685153bae8c40c3ad98ce5d869a9822a828c7f75d"
+    },
+    "go": {
+      "path": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/benchmark-go-attribution",
+      "sha256": "e25843cd72a5ad84f0eccfb888936aedbffbb2cad8a8598c6db28bbdfa52bff5"
+    }
+  },
+  "inputs": [
+    {
+      "name": "index.csv",
+      "bytes": 7008003887,
+      "mtime_ns": 1793463602850911887
+    },
+    {
+      "name": "portfolio_PF1.csv",
+      "bytes": 1018344961,
+      "mtime_ns": 1793463401839934359
+    },
+    {
+      "name": "portfolio_PF2.csv",
+      "bytes": 1018352361,
+      "mtime_ns": 1793463422061815423
+    },
+    {
+      "name": "portfolio_PF3.csv",
+      "bytes": 1018358723,
+      "mtime_ns": 1793463442671061947
+    },
+    {
+      "name": "portfolio_PF4.csv",
+      "bytes": 1018345962,
+      "mtime_ns": 1793463463345815530
+    },
+    {
+      "name": "security_master.csv",
+      "bytes": 2560031,
+      "mtime_ns": 1793463381978061062
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+language,scenario,period,threads,days,input_file_bytes,rows_read,rows_retained,groups,effect_values,output_rows,output_bytes,parsed_input_bytes,read_parse_seconds,filter_seconds,aggregate_seconds,compute_seconds,write_seconds,wall_seconds,report_rows,checksum_allocation,checksum_selection,checksum_interaction
+rust,subset,all,4,1095,11083965925,175200000,876000,876000,10512000,808,202497,11081405574,23.573526685000004,0.07154400600000005,0.007156768999999977,0.011032425000000016,0.041973776,12.956995708000001,808,0.1140522928404093,0.017212872786437176,-0.17678654066493202

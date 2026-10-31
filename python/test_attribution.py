@@ -70,6 +70,8 @@ def fixture(folder):
 
 
 def period_key(d, period):
+    if period == 'all':
+        return 'ALL'
     dt = date.fromisoformat(d)
     if period == 'week':
         return str(dt - timedelta(days=dt.weekday()))
@@ -131,7 +133,30 @@ def reference(countries, data, entity, scenario, period):
         for t in range(2):
             k = (entity, days[0][0], days[-1][0], str(len(days)), 'total', 'ALL', ['base', 'local'][t])
             expected[k] = [1., 1.] + totals[t] + [sum(totals[t]), growth[0][t], growth[1][t], growth[0][t] - growth[1][t]]
-    return expected
+    # Map the detailed closed-form oracle to the requested final report contract.
+    compact = {}
+    residuals = {}
+    for k, values in expected.items():
+        if scenario in ['weekly', 'monthly']:
+            if k[4] == 'total':
+                compact[k] = values
+            continue
+        if k[4] != 'detail':
+            continue
+        if scenario == 'country':
+            compact[k] = values
+            continue
+        held = {sid for day, holdings in data[entity] if k[1] <= day <= k[2] for sid in holdings if scenario != 'subset' or sid in {'A', 'B'}}
+        if k[5] in held:
+            compact[k] = values
+        else:
+            rk = (*k[:4], 'benchmark_only', 'BENCHMARK_ONLY', k[6])
+            if rk not in residuals:
+                residuals[rk] = [0.] * 6 + values[6:]
+            for i in range(6):
+                residuals[rk][i] += values[i]
+    compact.update(residuals)
+    return compact
 
 
 def main():
@@ -145,7 +170,7 @@ def main():
         data_dir = root / 'input'
         data_dir.mkdir()
         countries, data = fixture(data_dir)
-        cases = [('security', 'day'), ('subset', 'day'), ('country', 'day'), ('weekly', 'week'), ('monthly', 'month'), ('monthly', 'quarter'), ('monthly', 'year'), ('subset', 'month'), ('country', 'month')]
+        cases = [('security', 'all'), ('subset', 'all'), ('country', 'all'), ('weekly', 'week'), ('monthly', 'month'), ('monthly', 'quarter'), ('monthly', 'year'), ('subset', 'month'), ('country', 'month')]
         for scenario, period in cases:
             for language, binary in zip(['rust', 'go'], binaries):
                 out = root / language / f'{scenario}-{period}'
@@ -182,7 +207,7 @@ def main():
         for binary in binaries:
             result = subprocess.run([str(binary), '--data', str(data_dir), '--output-dir', str(root / 'zero'), '--scenario', 'subset', '--instruments-file', str(data_dir / 'subset.csv')], capture_output=True, text=True)
             assert result.returncode != 0 and 'zero selected weight' in result.stderr
-    print('PASS: both languages match independent reference across 9 scenario/period combinations; invalid inputs rejected')
+    print('PASS: both languages match independent reference across 9 compact scenario/period combinations; benchmark-only residuals reconcile; invalid inputs rejected')
 
 
 if __name__ == '__main__':
