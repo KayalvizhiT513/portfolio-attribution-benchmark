@@ -1,0 +1,92 @@
+[
+  {
+    "scenario": "security",
+    "language": "rust",
+    "dates": 1095,
+    "periods": 1095,
+    "output_rows": 876008760,
+    "estimated_bytes": 185231384790,
+    "basis": "measured sampled bytes/row \u00d7 estimated full-history rows"
+  },
+  {
+    "scenario": "security",
+    "language": "go",
+    "dates": 1095,
+    "periods": 1095,
+    "output_rows": 876008760,
+    "estimated_bytes": 182690446050,
+    "basis": "measured sampled bytes/row \u00d7 estimated full-history rows"
+  },
+  {
+    "scenario": "subset",
+    "language": "rust",
+    "dates": 1095,
+    "periods": 1095,
+    "output_rows": 3512760,
+    "estimated_bytes": 759396377,
+    "basis": "previous full-history measurement"
+  },
+  {
+    "scenario": "subset",
+    "language": "go",
+    "dates": 1095,
+    "periods": 1095,
+    "output_rows": 3512760,
+    "estimated_bytes": 740854715,
+    "basis": "previous full-history measurement"
+  },
+  {
+    "scenario": "country",
+    "language": "rust",
+    "dates": 1095,
+    "periods": 1095,
+    "output_rows": 17520,
+    "estimated_bytes": 4096710,
+    "basis": "previous full-history measurement"
+  },
+  {
+    "scenario": "country",
+    "language": "go",
+    "dates": 1095,
+    "periods": 1095,
+    "output_rows": 17520,
+    "estimated_bytes": 4043282,
+    "basis": "previous full-history measurement"
+  },
+  {
+    "scenario": "weekly",
+    "language": "rust",
+    "dates": 1095,
+    "periods": 158,
+    "output_rows": 126401264,
+    "estimated_bytes": 26530512488,
+    "basis": "measured sampled bytes/row \u00d7 estimated full-history rows"
+  },
+  {
+    "scenario": "weekly",
+    "language": "go",
+    "dates": 1095,
+    "periods": 158,
+    "output_rows": 126401264,
+    "estimated_bytes": 26126815378,
+    "basis": "measured sampled bytes/row \u00d7 estimated full-history rows"
+  },
+  {
+    "scenario": "monthly",
+    "language": "rust",
+    "dates": 1095,
+    "periods": 36,
+    "output_rows": 28800288,
+    "estimated_bytes": 6027791868,
+    "basis": "measured sampled bytes/row \u00d7 estimated full-history rows"
+  },
+  {
+    "scenario": "monthly",
+    "language": "go",
+    "dates": 1095,
+    "periods": 36,
+    "output_rows": 28800288,
+    "estimated_bytes": 5954813136,
+    "basis": "measured sampled bytes/row \u00d7 estimated full-history rows"
+  }
+]

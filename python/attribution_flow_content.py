@@ -87,7 +87,7 @@ The one-item channel buffers and immutable index sharing bound queued input. Mem
 | Write CSV | Numeric formatting, escaping, buffered row writes, final flush and fsync |
 | Overall | Entire process including master setup, channel waits, coordination and file publication |
 
-Stage durations are accumulated elapsed time across threads and can overlap. They do not add up to overall process wall time. See [the scenario metrics above](#five-scenario-comparison--first-three-effective-dates).
+Stage durations are accumulated elapsed time across threads and can overlap. They do not add up to overall process wall time. See [the scenario metrics above](#five-scenario-comparison).
 
 ## Implementation references
 

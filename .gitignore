@@ -27,3 +27,8 @@ benchmark-go-attribution
 !/results/native-full-history/summary.csv
 !/results/native-full-history/environment.json
 !/results/native-full-history/subset.csv
+
+!/results/size-guarded-full-history/
+/results/size-guarded-full-history/*
+!/results/size-guarded-full-history/estimates.json
+!/results/size-guarded-full-history/runs.json

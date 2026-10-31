@@ -1,17 +1,19 @@
 # Attribution flows and stage comparison: Rust and Go
 
-All five scenarios were compared. This document records every requested stage metric for all five scenarios, followed by the additional full-history measurements.
+This report contains five scenario comparisons, each with its flowchart, conditions and one Rust/Go metrics table. Subset and country use the completed full-history runs across all 1,095 dates. Security, weekly and monthly retain the three-date benchmark because their full-history attempts exceeded the output-size guard. Repeated measurements are combined into medians and ranges in one table per scenario.
 
 Each scenario below combines its SVG flowchart, efficiency explanation and measured stage metrics. Shared linking and Rust/Go execution details follow the five scenario comparisons.
+
+For full-history size estimates and actual runs stopped at a 5 GB combined-output guard, see [output-size estimates and guarded run outcomes](ATTRIBUTION_OUTPUT_SIZE_REPORT.md). Guard-stopped outputs are incomplete and do not establish full-history performance winners.
 
 ## Coverage and method
 
 | Comparison | Scenarios | Effective dates | Repetitions |
 |---|---|---|---:|
-| Five-scenario comparison | Security, standalone subset, country, weekly, monthly | 2023-01-01 through 2023-01-03 | 3 per language/scenario |
-| Additional full-history comparison | Country, standalone subset | All 1,095 dates | 2 per language/scenario |
+| Date-limited benchmark | Security, weekly, monthly | 2023-01-01 through 2023-01-03 | 3 per language/scenario |
+| Completed full-history runs | Standalone subset, country | 2023-01-01 through 2025-12-30 (1,095 dates) | 3 per language/scenario |
 
-All runs include all four portfolios and their index. Rust uses four native portfolio workers; Go uses GOMAXPROCS=12 and concurrent I/O goroutines. Each implementation uses its own optimized parser, buffering, formatting and runtime approach. Runs alternate language order and use the OS-managed filesystem cache; they are not controlled cold-cache measurements. Times, memory and CPU values are medians; ranges are included for overall wall time. Rates divide the recorded work by the median corresponding stage duration.
+All runs include all four portfolios and their index. Rust uses four native portfolio workers; Go uses GOMAXPROCS=12 and concurrent I/O goroutines. Each implementation uses its own optimized parser, buffering, formatting and runtime approach. Runs alternate language order and use the OS-managed filesystem cache; they are not controlled cold-cache measurements. Security, weekly and monthly values are three-run medians, with overall wall-time ranges. Subset and country combine the two original full-history runs with the subsequent completed size-guarded run per language, reporting three-run medians and min–max wall times. The third run includes size-monitoring overhead, so these are descriptive pooled results across slightly different monitoring conditions, not three identically instrumented trials. Rates divide work by the corresponding median stage duration. Individual source runs remain available for inspection.
 
 **Stage seconds are accumulated elapsed time inside each stage across threads. They can overlap, include scheduling pauses, and must not be added together or interpreted as stage CPU time.** Overall wall time is measured externally for the complete process. Peak memory is the per-process maximum resident set; CPU time includes all process threads; average cores is CPU time divided by process wall time.
 
@@ -19,7 +21,21 @@ Read includes CSV decoding, numeric parsing, security lookup and validation. Its
 
 **Output effects** below count the three attribution components (allocation, selection, interaction) on every written row, including portfolio-total rows. The derived `Total` field is not counted as a fourth component. Output effects/sec divides this count by compute-stage seconds; it excludes CSV formatting, which belongs to the write stage. Daily detail effect counts are shown separately because linking reduces the number of period output rows.
 
-The first-three-date weekly sample contains two partial weeks; the monthly sample contains one partial month. These are linked results for observed dates, not completed calendar periods. Full-history daily security output would contain approximately 876 million detail rows, around 180 GiB per language at the observed CSV width, exceeding the available space for both languages. Full-history write performance for security/weekly/monthly has therefore **not** been measured.
+The first-three-date weekly sample contains two partial weeks; the monthly sample contains one partial month. These are linked results for observed dates, not completed calendar periods. Full-history daily security output would contain approximately 876 million detail rows, about 183–185 GB (170–173 GiB) per language at the observed CSV width, exceeding the available space for both languages. Full-history write performance for security/weekly/monthly has therefore **not** been measured.
+
+## Industry relevance and modelling limits
+
+| View | Practical role | Interpretation of this benchmark |
+|---|---|---|
+| Security detail | Explain individual-company contributions and investigate winners/losers | Useful calculation/drilldown grain; exporting every benchmark constituent every day is an output-design choice, not an industry requirement |
+| Weekly linked view | Assessment: useful for tactical/internal monitoring when a team needs weekly review | A calendar reporting frequency of the daily engine, not another attribution model |
+| Monthly linked view | Established performance reporting/analysis interval; longer periods require consistent compounding/linking | Same engine as weekly, with a different bucket key and fewer emitted rows |
+
+FactSet describes benchmark-relative analysis at company or group level in its [performance attribution explanation](https://insight.factset.com/keeping-up-with-compliant-benchmarks-for-performance-attribution). MathWorks documents [monthly and compounded multi-period Brinson analysis](https://www.mathworks.com/help/finance/performance-attribution-using-brinson-model.html), using category/sector weights and returns. These support the usefulness of granular drilldown and period reporting; the weekly monitoring use above is an assessment, not a claim of a mandatory industry standard.
+
+Brinson allocation/selection is commonly interpreted over decision groups such as sectors or countries. Treating every InstrumentId as its own Brinson group is a modelling choice. For an identical security on the same return basis, if its portfolio and index returns are equal, the per-security selection term is zero by this implementation’s formula. The [synthetic generator](python/generate_attribution_csvs.py) samples returns independently by entity, so the same ID can have different portfolio/index returns. Its nonzero security selection effects demonstrate software calculations, not validated economic security-selection insight.
+
+For production use, my recommendation is security-level calculation with requested drilldowns, plus linked period summaries by portfolio and meaningful decision groups. The current benchmark deliberately emits detailed CSVs, so its write volume should not be mistaken for a necessary industry delivery format. The all-US country fixture also tests reading/reduction performance more than realistic cross-country allocation.
 
 ## Scenario flow overview
 
@@ -39,7 +55,7 @@ The diagrams use different structures to expose the actual transformation in eac
 
 The shared execution engine remains the same: one index producer broadcasts immutable daily arrays to portfolio workers through bounded channels. Each portfolio worker reads its own input and owns its accumulator and CSV writer. The diagrams focus on scenario logic; the Rust/Go execution table below documents the shared concurrency layer.
 
-## Five-scenario comparison — first three effective dates
+## Five-scenario comparison
 
 ### 1. Full security-level attribution
 
@@ -48,6 +64,8 @@ The shared execution engine remains the same: one index producer broadcasts immu
 ![Full security-level attribution flow](docs/flows/01-security.svg)
 
 Dense numeric instrument slots remove string-key joins from the effect loop. Presence flags preserve instruments held on only one side. The daily effects reconcile to portfolio minus index return. Full daily output still has a large inherent write cost: approximately 876 million detail rows for the supplied full history.
+
+**Scope:** first three dates (2023-01-01 through 2023-01-03), all four portfolios; median of three runs per language. Full-history attempts were guard-stopped and are not included as completed performance results.
 
 #### Stage metrics
 
@@ -88,38 +106,51 @@ Dense numeric instrument slots remove string-key joins from the effect loop. Pre
 
 Selected IDs are mapped once to a mask and compact output slots. The filter is applied after CSV parsing and validation: it reduces aggregation, computation and output work, but does not avoid reading the source CSVs. Each side’s selected weights are normalized independently on every date. A zero selected-weight denominator fails explicitly. The selected index supplies the benchmark return; full-index weights and returns are not used for this scenario’s attribution.
 
-#### Stage metrics
+**Scope:** all 1,095 dates, all four portfolios; median of three completed runs per language (two original runs plus one run under the combined 5 GB output guard).
 
-The selected universe is the union of the first 100 instruments in each portfolio (400 IDs). Each portfolio and the index are independently normalized to 100% on each date.
+#### Conditions
+
+Predicate: `InstrumentId IN selected_ids`, where `selected_ids` is the union of these four inclusive ranges:
+
+- `S000001`–`S000100`
+- `S015001`–`S015100`
+- `S030001`–`S030100`
+- `S045001`–`S045100`
+
+This is exactly 400 IDs, listed in [subset.csv](results/native-full-history/subset.csv): the first 100 IDs from each portfolio. Apply the same predicate to both portfolio and index. Each portfolio retains 100 holdings/day; the index retains 400 holdings/day. Normalize each selected side independently to 100% every date, and compare against the selected index. This is a standalone-subset return, not those instruments’ contribution to the original full portfolio.
+
+Across all files: 175,200,000 input rows examined, 876,000 retained, 174,324,000 excluded. Both languages wrote 3,512,760 attribution rows; every numeric field matched (maximum difference 0). Attribution CSV size: Rust 759,396,377 bytes; Go 740,854,715 bytes; combined 1,500,251,092 bytes (1.500 GB), excluding the small metrics CSVs.
+
+#### Stage metrics
 
 | Stage | Metric | Rust | Go |
 |---|---|---:|---:|
-| Read and parse CSV | Seconds | 0.062719 | 0.103951 |
-|  | Million rows/sec | 7.653 | 4.618 |
-|  | Input MiB/sec | 461.585 | 278.496 |
-|  | Rows read | 480,000 | 480,000 |
-| Filter | Seconds | 0.000204 | 0.000480 |
-|  | Rows examined | 480,000 | 480,000 |
-|  | Rows retained | 2,400 | 2,400 |
-|  | Rows excluded | 477,600 | 477,600 |
-| Aggregate | Seconds | 0.000028 | 0.000034 |
-|  | Records processed/sec | 84,581,497.80 | 70,669,297.13 |
-|  | Records processed | 2,400 | 2,400 |
-|  | Groups produced (input entity/group/date combinations) | 2,400 | 2,400 |
-| Compute attribution and linking | Seconds | 0.000033 | 0.000090 |
-|  | Output effects/sec (3 components × CSV rows) | 865,078,651.69 | 320,803,564.48 |
-|  | Output effect components (includes total rows) | 28,872 | 28,872 |
-|  | Daily detail effect components computed | 28,800 | 28,800 |
-| Write CSV | Seconds | 0.036916 | 0.035553 |
-|  | Rows/sec | 260,697.61 | 270,693.51 |
-|  | Output MiB/sec | 53.827 | 54.502 |
-|  | Rows written (detail + total) | 9,624 | 9,624 |
-|  | Output MiB | 1.987 | 1.938 |
-| Overall | Wall time (seconds) | 0.086201 | 0.103150 |
-|  | Wall time min–max (seconds) | 0.085503–0.089450 | 0.101943–0.103267 |
-|  | Peak memory (MiB) | 42.188 | 64.000 |
-|  | CPU time (seconds) | 0.103028 | 0.159812 |
-|  | Average cores used | 1.177 | 1.568 |
+| Read and parse CSV | Seconds | 23.461249 | 35.373401 |
+|  | Million rows/sec | 7.468 | 4.953 |
+|  | Input MiB/sec | 450.447 | 298.757 |
+|  | Rows read | 175,200,000 | 175,200,000 |
+| Filter | Seconds | 0.072126 | 0.164994 |
+|  | Rows examined | 175,200,000 | 175,200,000 |
+|  | Rows retained | 876,000 | 876,000 |
+|  | Rows excluded | 174,324,000 | 174,324,000 |
+| Aggregate | Seconds | 0.007064 | 0.009949 |
+|  | Records processed/sec | 124,015,555.74 | 88,048,235.96 |
+|  | Records processed | 876,000 | 876,000 |
+|  | Groups produced (input entity/group/date combinations) | 876,000 | 876,000 |
+| Compute attribution and linking | Seconds | 0.012133 | 0.033013 |
+|  | Output effects/sec (3 components × CSV rows) | 868,581,677.11 | 319,220,011.56 |
+|  | Output effect components (includes total rows) | 10,538,280 | 10,538,280 |
+|  | Daily detail effect components computed | 10,512,000 | 10,512,000 |
+| Write CSV | Seconds | 1.214315 | 1.472222 |
+|  | Rows/sec | 2,892,790.24 | 2,386,025.89 |
+|  | Output MiB/sec | 596.399 | 479.910 |
+|  | Rows written (detail + total) | 3,512,760 | 3,512,760 |
+|  | Output MiB | 724.217 | 706.534 |
+| Overall | Wall time (seconds) | 13.067591 | 22.117497 |
+|  | Wall time min–max (seconds) | 12.873905–13.334116 | 21.592720–22.224089 |
+|  | Peak memory (MiB) | 42.875 | 78.734 |
+|  | CPU time (seconds) | 24.622424 | 39.285313 |
+|  | Average cores used | 1.857 | 1.776 |
 
 ### 3. Country attribution
 
@@ -129,38 +160,44 @@ The selected universe is the union of the first 100 instruments in each portfoli
 
 For each country, accumulate `sum(weight)`, `sum(weight × BaseReturn)` and `sum(weight × LocalReturn)`. Divide contribution by group weight to obtain group return, then calculate country-level effects. This is attribution calculated at country level, rather than a sum of previously calculated security effects. The supplied holdings produce one country group, US.
 
-#### Stage metrics
+**Scope:** all 1,095 dates, all four portfolios; median of three completed runs per language (two original runs plus one run under the combined 5 GB output guard).
 
-The supplied holdings are all US/USD, so each input entity has one country group per date.
+#### Conditions
+
+No instrument or country filter is applied. Read all input rows, join `InstrumentId` to the security master, and group by `Country`. US is the only country in the supplied holdings; `Country = US` is an observed grouping result, not a filter predicate. Use the complete portfolio/index weights, normalized to remove rounding drift.
+
+Across all files: 175,200,000 input rows examined and retained. The 5,475 input entity/country/date groups are five entities × 1,095 dates. Both languages wrote 17,520 attribution rows; every numeric field matched (maximum difference 0). Attribution CSV size: Rust 4,096,710 bytes; Go 4,043,282 bytes; combined 8,139,992 bytes (8.140 MB), excluding metrics CSVs.
+
+#### Stage metrics
 
 | Stage | Metric | Rust | Go |
 |---|---|---:|---:|
-| Read and parse CSV | Seconds | 0.060531 | 0.106906 |
-|  | Million rows/sec | 7.930 | 4.490 |
-|  | Input MiB/sec | 478.265 | 270.798 |
-|  | Rows read | 480,000 | 480,000 |
-| Filter | Seconds | 0.000258 | 0.000866 |
-|  | Rows examined | 480,000 | 480,000 |
-|  | Rows retained | 480,000 | 480,000 |
+| Read and parse CSV | Seconds | 23.027120 | 34.891394 |
+|  | Million rows/sec | 7.608 | 5.021 |
+|  | Input MiB/sec | 458.939 | 302.884 |
+|  | Rows read | 175,200,000 | 175,200,000 |
+| Filter | Seconds | 0.094424 | 0.311988 |
+|  | Rows examined | 175,200,000 | 175,200,000 |
+|  | Rows retained | 175,200,000 | 175,200,000 |
 |  | Rows excluded | 0 | 0 |
-| Aggregate | Seconds | 0.000472 | 0.000888 |
-|  | Records processed/sec | 1,018,025,412.46 | 540,820,086.06 |
-|  | Records processed | 480,000 | 480,000 |
-|  | Groups produced (input entity/group/date combinations) | 15 | 15 |
-| Compute attribution and linking | Seconds | 0.000002 | 0.000004 |
-|  | Output effects/sec (3 components × CSV rows) | 72,000,000.00 | 39,290,586.63 |
-|  | Output effect components (includes total rows) | 144 | 144 |
-|  | Daily detail effect components computed | 72 | 72 |
-| Write CSV | Seconds | 0.032863 | 0.029613 |
-|  | Rows/sec | 1,460.62 | 1,620.92 |
-|  | Output MiB/sec | 0.347 | 0.382 |
-|  | Rows written (detail + total) | 48 | 48 |
-|  | Output MiB | 0.011 | 0.011 |
-| Overall | Wall time (seconds) | 0.087380 | 0.106897 |
-|  | Wall time min–max (seconds) | 0.082452–0.090186 | 0.101578–0.116841 |
-|  | Peak memory (MiB) | 37.109 | 59.828 |
-|  | CPU time (seconds) | 0.097695 | 0.158841 |
-|  | Average cores used | 1.168 | 1.536 |
+| Aggregate | Seconds | 0.205078 | 0.327745 |
+|  | Records processed/sec | 854,310,154.42 | 534,562,623.96 |
+|  | Records processed | 175,200,000 | 175,200,000 |
+|  | Groups produced (input entity/group/date combinations) | 5,475 | 5,475 |
+| Compute attribution and linking | Seconds | 0.000409 | 0.000748 |
+|  | Output effects/sec (3 components × CSV rows) | 128,534,012.85 | 70,303,847.45 |
+|  | Output effect components (includes total rows) | 52,560 | 52,560 |
+|  | Daily detail effect components computed | 26,280 | 26,280 |
+| Write CSV | Seconds | 0.054347 | 0.045929 |
+|  | Rows/sec | 322,370.90 | 381,458.89 |
+|  | Output MiB/sec | 71.888 | 83.955 |
+|  | Rows written (detail + total) | 17,520 | 17,520 |
+|  | Output MiB | 3.907 | 3.856 |
+| Overall | Wall time (seconds) | 13.060402 | 22.114122 |
+|  | Wall time min–max (seconds) | 13.008139–13.067523 | 22.044841–22.305465 |
+|  | Peak memory (MiB) | 45.328 | 74.297 |
+|  | CPU time (seconds) | 23.234523 | 37.983448 |
+|  | Average cores used | 1.779 | 1.710 |
 
 ### 4. Weekly linked security attribution
 
@@ -169,6 +206,8 @@ The supplied holdings are all US/USD, so each input entity has one country group
 ![Weekly linked security attribution flow](docs/flows/04-weekly.svg)
 
 Each worker retains current-day inputs and a single active week accumulator. A Monday starts a new bucket; the previous bucket is emitted when the next date reveals the boundary. EOF also closes the active bucket. No complete list of daily effects is retained for later linking.
+
+**Scope:** first three dates (2023-01-01 through 2023-01-03), all four portfolios; median of three runs per language. Full-history attempts were guard-stopped and are not included as completed performance results.
 
 #### Stage metrics
 
@@ -209,6 +248,8 @@ Each worker retains current-day inputs and a single active week accumulator. A M
 
 The calendar-month key replaces the weekly key; the streaming, attribution and linking logic is otherwise the same. `--period quarter` or `--period year` changes bucket assignment without introducing a separate processing engine. Observed first/last dates label partial periods.
 
+**Scope:** first three dates (2023-01-01 through 2023-01-03), all four portfolios; median of three runs per language. Full-history attempts were guard-stopped and are not included as completed performance results.
+
 #### Stage metrics
 
 | Stage | Metric | Rust | Go |
@@ -239,6 +280,32 @@ The calendar-month key replaces the weekly key; the streaming, attribution and l
 |  | Peak memory (MiB) | 112.062 | 175.203 |
 |  | CPU time (seconds) | 0.375615 | 0.489211 |
 |  | Average cores used | 2.220 | 2.549 |
+
+## Output sizes by scenario and language
+
+Sizes below are attribution CSV totals across all four portfolios for one run per language, including detail and total rows. Repeated runs reuse output paths; sizes are not multiplied by the repeat count. Metrics CSVs, logs and input files are excluded. MB = 1,000,000 bytes; GB = 1,000,000,000 bytes.
+
+### Completed outputs used in the five scenario tables
+
+| Scenario | Completed scope | Rust MB | Go MB | Combined MB |
+|---|---|---:|---:|---:|
+| security | 3 dates | 507.483 | 500.522 | 1008.005 |
+| subset | 1,095 dates | 759.396 | 740.855 | 1500.251 |
+| country | 1,095 dates | 4.097 | 4.043 | 8.140 |
+| weekly | 3 dates | 335.829 | 330.719 | 666.548 |
+| monthly | 3 dates | 167.439 | 165.411 | 332.850 |
+
+### All-date attempts: actual output versus estimated complete output
+
+| Scenario | Rust actual GB | Go actual GB | Combined actual GB | Outcome | Rust estimated full GB | Go estimated full GB |
+|---|---:|---:|---:|---|---:|---:|
+| security | 2.344 | 2.433 | 4.776 | Guard-stopped: partial files | 185.231 | 182.690 |
+| subset | 0.759 | 0.741 | 1.500 | Complete: 1,095 dates | 0.759 | 0.741 |
+| country | 0.004 | 0.004 | 0.008 | Complete: 1,095 dates | 0.004 | 0.004 |
+| weekly | 2.410 | 2.412 | 4.821 | Guard-stopped: partial files | 26.531 | 26.127 |
+| monthly | 2.411 | 2.457 | 4.867 | Guard-stopped: partial files | 6.028 | 5.955 |
+
+Guard-stopped sizes describe partial `.csv.partial` files and are not full-history output sizes. The two languages can stop after different amounts of data; those sizes are not a like-for-like efficiency comparison. Both languages together remained below the 5 GB per-scenario limit. Complete-output estimates for security, weekly and monthly extrapolate sampled row widths; subset and country use measured full-history sizes. See [estimate assumptions and guarded outcomes](ATTRIBUTION_OUTPUT_SIZE_REPORT.md).
 
 ## Linking without retaining daily history
 
@@ -283,7 +350,7 @@ The one-item channel buffers and immutable index sharing bound queued input. Mem
 | Write CSV | Numeric formatting, escaping, buffered row writes, final flush and fsync |
 | Overall | Entire process including master setup, channel waits, coordination and file publication |
 
-Stage durations are accumulated elapsed time across threads and can overlap. They do not add up to overall process wall time. See [the scenario metrics above](#five-scenario-comparison--first-three-effective-dates).
+Stage durations are accumulated elapsed time across threads and can overlap. They do not add up to overall process wall time. See [the scenario metrics above](#five-scenario-comparison).
 
 ## Implementation references
 
@@ -294,92 +361,25 @@ Stage durations are accumulated elapsed time across threads and can overlap. The
 
 Regenerate the SVGs using `python3 python/render_attribution_flows.py`.
 
-## Additional full-history comparison — all 1,095 dates
-
-These measurements exercise all 175.2 million input rows per run. They supplement the five-scenario comparison above; they do not replace its three-date measurements.
-
-### Country attribution
-
-| Stage | Metric | Rust | Go |
-|---|---|---:|---:|
-| Read and parse CSV | Seconds | 22.944748 | 35.024303 |
-|  | Million rows/sec | 7.636 | 5.002 |
-|  | Input MiB/sec | 460.587 | 301.735 |
-|  | Rows read | 175,200,000 | 175,200,000 |
-| Filter | Seconds | 0.094911 | 0.312284 |
-|  | Rows examined | 175,200,000 | 175,200,000 |
-|  | Rows retained | 175,200,000 | 175,200,000 |
-|  | Rows excluded | 0 | 0 |
-| Aggregate | Seconds | 0.205904 | 0.326901 |
-|  | Records processed/sec | 850,883,774.41 | 535,942,798.03 |
-|  | Records processed | 175,200,000 | 175,200,000 |
-|  | Groups produced (input entity/group/date combinations) | 5,475 | 5,475 |
-| Compute attribution and linking | Seconds | 0.000375 | 0.000750 |
-|  | Output effects/sec (3 components × CSV rows) | 140,287,006.50 | 70,043,764.03 |
-|  | Output effect components (includes total rows) | 52,560 | 52,560 |
-|  | Daily detail effect components computed | 26,280 | 26,280 |
-| Write CSV | Seconds | 0.054366 | 0.046367 |
-|  | Rows/sec | 322,257.86 | 377,852.19 |
-|  | Output MiB/sec | 71.863 | 83.161 |
-|  | Rows written (detail + total) | 17,520 | 17,520 |
-|  | Output MiB | 3.907 | 3.856 |
-| Overall | Wall time (seconds) | 13.037831 | 22.175153 |
-|  | Wall time min–max (seconds) | 13.008139–13.067523 | 22.044841–22.305465 |
-|  | Peak memory (MiB) | 45.391 | 74.945 |
-|  | CPU time (seconds) | 23.168737 | 37.849452 |
-|  | Average cores used | 1.777 | 1.707 |
-
-### Standalone instrument subset
-
-| Stage | Metric | Rust | Go |
-|---|---|---:|---:|
-| Read and parse CSV | Seconds | 23.083838 | 35.477697 |
-|  | Million rows/sec | 7.590 | 4.938 |
-|  | Input MiB/sec | 457.812 | 297.879 |
-|  | Rows read | 175,200,000 | 175,200,000 |
-| Filter | Seconds | 0.072971 | 0.165267 |
-|  | Rows examined | 175,200,000 | 175,200,000 |
-|  | Rows retained | 876,000 | 876,000 |
-|  | Rows excluded | 174,324,000 | 174,324,000 |
-| Aggregate | Seconds | 0.007290 | 0.010003 |
-|  | Records processed/sec | 120,172,612.32 | 87,569,643.98 |
-|  | Records processed | 876,000 | 876,000 |
-|  | Groups produced (input entity/group/date combinations) | 876,000 | 876,000 |
-| Compute attribution and linking | Seconds | 0.012200 | 0.033366 |
-|  | Output effects/sec (3 components × CSV rows) | 863,807,922.03 | 315,839,497.92 |
-|  | Output effect components (includes total rows) | 10,538,280 | 10,538,280 |
-|  | Daily detail effect components computed | 10,512,000 | 10,512,000 |
-| Write CSV | Seconds | 1.339314 | 1.449491 |
-|  | Rows/sec | 2,622,805.88 | 2,423,443.77 |
-|  | Output MiB/sec | 540.737 | 487.436 |
-|  | Rows written (detail + total) | 3,512,760 | 3,512,760 |
-|  | Output MiB | 724.217 | 706.534 |
-| Overall | Wall time (seconds) | 13.104010 | 22.170793 |
-|  | Wall time min–max (seconds) | 12.873905–13.334116 | 22.117497–22.224089 |
-|  | Peak memory (MiB) | 41.797 | 78.867 |
-|  | CPU time (seconds) | 24.263123 | 39.313862 |
-|  | Average cores used | 1.852 | 1.773 |
-
 ## Numerical verification
 
 | Scope | Scenario | Rows compared | Maximum absolute numeric difference | Result |
 |---|---|---:|---:|---|
-| First three dates | security | 2,400,024 | 0 | PASS |
-| First three dates | subset | 9,624 | 0 | PASS |
-| First three dates | country | 48 | 0 | PASS |
-| First three dates | weekly | 1,600,016 | 1.73e-18 | PASS |
-| First three dates | monthly | 800,008 | 1.73e-18 | PASS |
-| Full history | country | 17,520 | 0 | PASS |
-| Full history | subset | 3,512,760 | 0 | PASS |
+| 3 dates | security | 2,400,024 | 0 | PASS |
+| 1,095 dates | subset | 3,512,760 | 0 | PASS |
+| 1,095 dates | country | 17,520 | 0 | PASS |
+| 3 dates | weekly | 1,600,016 | 1.73e-18 | PASS |
+| 3 dates | monthly | 800,008 | 1.73e-18 | PASS |
 
 Every date/period also passed native reconciliation. The independent Python oracle covers nine scenario/period combinations, including quarter/year boundaries, changing holdings, missing-side securities, standalone normalization and invalid inputs.
 
 ## Recorded sources and reproduction
 
 - [Five-scenario raw runs](results/native-benchmark/runs.csv) and [summary metrics](results/native-benchmark/summary.csv).
-- [Full-history raw runs](results/native-full-history/runs.csv) and [summary metrics](results/native-full-history/summary.csv).
+- [Original two full-history raw runs](results/native-full-history/runs.csv) and [original two-run summaries](results/native-full-history/summary.csv).
 - [Five-scenario environment and executable hashes](results/native-benchmark/environment.json).
 - [Full-history environment and executable hashes](results/native-full-history/environment.json).
+- [Completed full-history runs, conditions, native stage metrics and guard statuses](results/size-guarded-full-history/runs.json).
 - [Build commands, CLI options and attribution formulas](rust/README.md).
 
 Regenerate this Markdown from the recorded metrics:
@@ -387,3 +387,21 @@ Regenerate this Markdown from the recorded metrics:
 ```sh
 python3 python/render_stage_report.py
 ```
+
+## Who wins, and where?
+
+Winners below have the lower recorded stage time, overall wall time, peak memory, or CPU time. Security, weekly and monthly use three-date, three-run medians; subset and country use three-run full-history medians across all 1,095 dates. These are observed benchmark winners, not statistical significance claims; short runs and tiny stages can be noisy. Filter is N/A when no instrument predicate is applied. Stage comparisons use accumulated worker elapsed time, as defined above.
+
+| Scope | Scenario | Read/parse | Filter | Aggregate | Compute/link | Write CSV | Overall | Lower peak memory | Lower CPU time | Overall speed advantage |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3 dates (3-run median) | security | Rust | N/A | Rust | Rust | Rust | Rust | Rust | Rust | Rust 1.15× |
+| 1,095 dates (3-run median) | subset | Rust | Rust | Rust | Rust | Rust | Rust | Rust | Rust | Rust 1.69× |
+| 1,095 dates (3-run median) | country | Rust | N/A | Rust | Rust | Go | Rust | Rust | Rust | Rust 1.69× |
+| 3 dates (3-run median) | weekly | Rust | N/A | Rust | Rust | Rust | Rust | Rust | Rust | Rust 1.12× |
+| 3 dates (3-run median) | monthly | Rust | N/A | Rust | Rust | Rust | Rust | Rust | Rust | Rust 1.14× |
+
+Rust has the lower overall runtime, peak memory and CPU time in all five scenario comparisons shown here. Go has the lower write-stage time for country. Rust has the lower write-stage time in the other four scenarios. Each winner applies only to the scope shown in its row.
+
+Average cores used is reported in the detailed tables but is not ranked: using more cores can improve throughput or simply consume more CPU. Overall runtime and CPU time together show that tradeoff. Output formatting and byte counts differ slightly between languages; the write winner here is based on stage duration, while both row/sec and MiB/sec remain available above.
+
+Full-history security, weekly and monthly attempts were stopped by the output-size guard; completed full-history results remain unavailable. Their three-date wins must not be presented as full-history wins. These conclusions apply to the recorded implementations, machine and workloads.

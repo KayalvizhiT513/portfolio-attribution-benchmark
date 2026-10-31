@@ -4,7 +4,7 @@ Source code is organized in `python/`, `go/`, and `rust/`. Shared datasets remai
 
 The new Rust and Go CSV implementations support five views: full security detail, a standalone instrument subset, country, weekly linked security attribution, and monthly linked security attribution. Quarter/year overrides are also supported. Both expose stage metrics for read/parse, filtering, aggregation, computation, and writing.
 
-See [scenario flowcharts and complete stage metrics](ATTRIBUTION_STAGE_COMPARISON.md), [native usage, formulas, tests, and benchmark commands](rust/README.md), [five-scenario benchmark](results/native-benchmark/REPORT.md), and [full-history country/subset benchmark](results/native-full-history/REPORT.md). The older benchmarks below remain available.
+See [scenario flowcharts and complete stage metrics](ATTRIBUTION_STAGE_COMPARISON.md), [native usage, formulas, tests, and benchmark commands](rust/README.md), [five-scenario benchmark](results/native-benchmark/REPORT.md), and [full-history country/subset benchmark](results/native-full-history/REPORT.md). See also [full-history size estimates and 5 GB guarded run outcomes](ATTRIBUTION_OUTPUT_SIZE_REPORT.md). The older benchmarks below remain available.
 
 # Portfolio attribution benchmark: Python vs Go
 

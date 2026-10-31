@@ -103,3 +103,13 @@ The independent oracle covers 105 dates across week/month/quarter/year boundarie
 See `results/native-benchmark/REPORT.md`, `runs.csv`, `summary.csv`, and `environment.json`. Stage durations are summed worker elapsed time, not CPU time or end-to-end stage latency; stages overlap. Read includes parse/key lookup/validation; filter measures selection; aggregate includes normalization and weighted group construction; compute includes attribution/linking/reconciliation; write includes formatting, flush, and fsync. Master setup and pipeline waits are accounted for in overall process wall time. Per-stage throughput uses matching work counters; source bytes consumed are distinguished from total file sizes.
 
 The supplied holdings are all US/USD, so country grouping has one group. The full daily security view produces approximately 876 million detail rows, around 180 GiB per language at the observed CSV width. The complete weekly/monthly views also produce large files. The default benchmark intentionally measures three dates for all five scenarios, labels that scope, and reuses output paths between repetitions. Only run full security output on a filesystem with sufficient space. Full-history country/subset runs exercise all input rows without that output expansion.
+
+## Run all dates under an output-size guard
+
+```sh
+python3 python/run_size_guarded.py --run --limit-gb 5
+```
+
+This runner estimates output size for each scenario from recorded sizes and calendar bucket counts, then runs all five scenarios one at a time with `--max-days 0`. Go and Rust each receive half of the 5,000,000,000-byte per-scenario CSV budget. A polling monitor and OS per-file size limits include in-progress `.partial` CSVs. Stopped runs remain explicitly incomplete; only completed runs are compared numerically. It never substitutes a date limit or reports a stopped run as full-history performance. Use a new `--output-dir` for each execution; existing benchmark results are preserved.
+
+The inventory-based estimates apply to the supplied fixed-holdings synthetic data, and reject changed input file metadata. The runner requires POSIX resource limits (macOS/Linux). See [size estimates and actual outcomes](../ATTRIBUTION_OUTPUT_SIZE_REPORT.md).
