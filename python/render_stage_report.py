@@ -18,21 +18,21 @@ def metrics_table(rows,scenario):
     count=lambda r,k:f'{int(r[k]):,}'
     rate=lambda r,n,t:f'{value(r,n)/value(r,t):,.2f}' if value(r,t)>0 else 'N/A'
     metrics=[
-        ('Read/parse','Seconds',lambda r:num(r,'read_parse_seconds')),
+        ('Read/parse','Accumulated reader-seconds',lambda r:num(r,'read_parse_seconds')),
         ('','Million rows/sec',lambda r:f"{value(r,'rows_read')/value(r,'read_parse_seconds')/1e6:.3f}"),
         ('','Input MiB/sec',lambda r:f"{value(r,'parsed_input_bytes')/value(r,'read_parse_seconds')/1024**2:.3f}"),
-        ('Filter','Seconds',lambda r:num(r,'filter_seconds')),
+        ('Filter','Accumulated worker-seconds',lambda r:num(r,'filter_seconds')),
         ('','Rows examined',lambda r:count(r,'rows_read')),
         ('','Rows retained',lambda r:count(r,'rows_retained')),
-        ('Aggregate','Seconds',lambda r:num(r,'aggregate_seconds')),
+        ('Aggregate','Accumulated worker-seconds',lambda r:num(r,'aggregate_seconds')),
         ('','Records processed/sec',lambda r:rate(r,'rows_retained','aggregate_seconds')),
         ('','Input entity/group/date groups produced',lambda r:count(r,'groups')),
-        ('Compute/link','Seconds',lambda r:num(r,'compute_seconds')),
+        ('Compute/link','Accumulated worker-seconds',lambda r:num(r,'compute_seconds')),
         ('','Daily effect components computed',lambda r:count(r,'effect_values')),
         ('','Daily effect components/sec',lambda r:rate(r,'effect_values','compute_seconds')),
         ('','Logical output effect components/sec',lambda r:f"{3*value(r,'report_rows')/value(r,'compute_seconds'):,.2f}"),
         ('','Logical report rows',lambda r:count(r,'report_rows')),
-        ('Write CSV','Seconds',lambda r:num(r,'write_seconds')),
+        ('Write CSV','Accumulated worker-seconds',lambda r:num(r,'write_seconds')),
         ('','Rows/sec',lambda r:rate(r,'output_rows','write_seconds')),
         ('','Output MiB/sec',lambda r:f"{value(r,'output_bytes')/value(r,'write_seconds')/1024**2:.3f}" if value(r,'write_seconds') else 'N/A'),
         ('','Attribution rows written',lambda r:count(r,'output_rows')),
@@ -43,7 +43,7 @@ def metrics_table(rows,scenario):
         ('','Median CPU seconds',lambda r:num(r,'cpu_seconds')),
         ('','Median average cores',lambda r:f"{value(r,'average_cores'):.3f}"),
     ]
-    lines=['| Stage | Metric | Rust | Go |','|---|---|---:|---:|']
+    lines=['**Timing units:** stage values accumulate across concurrent readers/workers; overall wall time measures end-to-end elapsed time. Stage throughput is per accumulated stage-second.', '', '| Stage | Metric | Rust | Go |','|---|---|---:|---:|']
     lines += [f'| {stage} | {label} | {cells(rows,scenario,fn)} |' for stage,label,fn in metrics]
     return lines
 
@@ -74,6 +74,14 @@ def main():
               f"Machine: {env['platform']}, {env['logical_cpus']} logical CPUs. Rust uses {env['rust_threads']} native portfolio workers; Go uses GOMAXPROCS={env['go_GOMAXPROCS']} with concurrent portfolio goroutines. Each uses its own optimized parser/buffers/formatter. Language order alternates between repetitions; filesystem cache is OS-managed and first runs are retained. These are workload-specific observations, not controlled cold-cache or universal language claims.",'',
               '**Stage seconds are accumulated worker elapsed time, include scheduling pauses and overlap across threads. They are not stage CPU time and cannot be added to obtain wall time.** Read includes decoding, numeric parsing, lookup and validation. Filter includes selection and denominator scan; only subset applies an instrument predicate. Aggregate includes normalization, dense slot construction and weighted contributions. Compute includes daily effects, linking, reconciliation, report planning, residual reduction and checksums. Write includes only attribution file creation/header, numeric/CSV formatting, buffering, flush and fsync. Metrics-file writing, setup, channel waits and publication contribute to external overall time, not the attribution write stage.','',
               'Per-stage rates divide work by the corresponding median stage duration. Groups are input entity/group/date combinations, not output row counts. Logical output effect components count three components per report row. Daily effect components count the daily engine’s values before linking/reduction. Average cores is process CPU time divided by process wall time; it is descriptive, not a metric where larger is automatically better.','',
+              '### Why a stage can show 30 seconds while the program finishes in 15 seconds', '',
+              '**Overall wall time is the elapsed time you wait, from process start to completion. Stage timings sum elapsed durations inside that stage across concurrent readers/workers.** For example, one index reader taking 12 seconds and four portfolio readers taking 3 seconds each contribute 24 accumulated reader-seconds. Because they run concurrently, the complete program can still finish in about 15 wall seconds. This is an illustration, not a measured timing breakdown.', '',
+              '| Timing label | Interpretation |', '|---|---|',
+              '| Accumulated reader-seconds | Sum of read/parse elapsed durations across the index and portfolio readers |',
+              '| Accumulated worker-seconds | Sum of elapsed durations inside a stage across its executing workers |',
+              '| Median wall seconds | Median end-to-end process duration across the two repetitions |',
+              '| CPU seconds | OS-measured CPU time across process threads; excludes time waiting for I/O |', '',
+              '**Do not add stage times or compare one accumulated stage duration directly with wall time.** Scheduling pauses can also contribute to accumulated stage durations. Stage throughput uses accumulated stage time as its denominator: rows/sec and MiB/sec are per accumulated reader/worker-second, not end-to-end program throughput.', '',
               '## Five scenarios','']
     for i,(scenario,title) in enumerate(SCENARIOS,1):
         lines += [f'### {i}. {title}','',SCENARIO_FLOWS[scenario],'','**Scope:** all 1,095 dates, all four portfolios, both return types; complete read, calculation and CSV-writing executions.','']

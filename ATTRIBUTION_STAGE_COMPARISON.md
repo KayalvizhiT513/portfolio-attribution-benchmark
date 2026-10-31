@@ -42,6 +42,19 @@ Machine: macOS-27.0.1-arm64-arm-64bit-Mach-O, 12 logical CPUs. Rust uses 4 nativ
 
 Per-stage rates divide work by the corresponding median stage duration. Groups are input entity/group/date combinations, not output row counts. Logical output effect components count three components per report row. Daily effect components count the daily engineâ€™s values before linking/reduction. Average cores is process CPU time divided by process wall time; it is descriptive, not a metric where larger is automatically better.
 
+### Why a stage can show 30 seconds while the program finishes in 15 seconds
+
+**Overall wall time is the elapsed time you wait, from process start to completion. Stage timings sum elapsed durations inside that stage across concurrent readers/workers.** For example, one index reader taking 12 seconds and four portfolio readers taking 3 seconds each contribute 24 accumulated reader-seconds. Because they run concurrently, the complete program can still finish in about 15 wall seconds. This is an illustration, not a measured timing breakdown.
+
+| Timing label | Interpretation |
+|---|---|
+| Accumulated reader-seconds | Sum of read/parse elapsed durations across the index and portfolio readers |
+| Accumulated worker-seconds | Sum of elapsed durations inside a stage across its executing workers |
+| Median wall seconds | Median end-to-end process duration across the two repetitions |
+| CPU seconds | OS-measured CPU time across process threads; excludes time waiting for I/O |
+
+**Do not add stage times or compare one accumulated stage duration directly with wall time.** Scheduling pauses can also contribute to accumulated stage durations. Stage throughput uses accumulated stage time as its denominator: rows/sec and MiB/sec are per accumulated reader/worker-second, not end-to-end program throughput.
+
 ## Five scenarios
 
 ### 1. Security
@@ -52,23 +65,25 @@ Compute on the full portfolio/index union, tracking whether each ID was ever hel
 
 **Scope:** all 1,095 dates, all four portfolios, both return types; complete read, calculation and CSV-writing executions.
 
+**Timing units:** stage values accumulate across concurrent readers/workers; overall wall time measures end-to-end elapsed time. Stage throughput is per accumulated stage-second.
+
 | Stage | Metric | Rust | Go |
 |---|---|---:|---:|
-| Read/parse | Seconds | 25.194951 | 37.398302 |
+| Read/parse | Accumulated reader-seconds | 25.194951 | 37.398302 |
 |  | Million rows/sec | 6.954 | 4.685 |
 |  | Input MiB/sec | 419.451 | 282.581 |
-| Filter | Seconds | 0.095541 | 0.307224 |
+| Filter | Accumulated worker-seconds | 0.095541 | 0.307224 |
 |  | Rows examined | 175,200,000 | 175,200,000 |
 |  | Rows retained | 175,200,000 | 175,200,000 |
-| Aggregate | Seconds | 0.854045 | 1.008709 |
+| Aggregate | Accumulated worker-seconds | 0.854045 | 1.008709 |
 |  | Records processed/sec | 205,141,402.53 | 173,687,287.50 |
 |  | Input entity/group/date groups produced | 175,200,000 | 175,200,000 |
-| Compute/link | Seconds | 3.982126 | 9.562240 |
+| Compute/link | Accumulated worker-seconds | 3.982126 | 9.562240 |
 |  | Daily effect components computed | 2,628,000,000 | 2,628,000,000 |
 |  | Daily effect components/sec | 659,948,915.32 | 274,830,990.43 |
 |  | Logical output effect components/sec | 90,409.99 | 37,650.59 |
 |  | Logical report rows | 120,008 | 120,008 |
-| Write CSV | Seconds | 0.107084 | 0.117280 |
+| Write CSV | Accumulated worker-seconds | 0.107084 | 0.117280 |
 |  | Rows/sec | 1,120,694.48 | 1,023,264.27 |
 |  | Output MiB/sec | 282.177 | 255.071 |
 |  | Attribution rows written | 120,008 | 120,008 |
@@ -87,23 +102,25 @@ Predicate: `InstrumentId IN selected_ids`. The 400-ID set comprises the inclusiv
 
 **Scope:** all 1,095 dates, all four portfolios, both return types; complete read, calculation and CSV-writing executions.
 
+**Timing units:** stage values accumulate across concurrent readers/workers; overall wall time measures end-to-end elapsed time. Stage throughput is per accumulated stage-second.
+
 | Stage | Metric | Rust | Go |
 |---|---|---:|---:|
-| Read/parse | Seconds | 23.925582 | 35.502112 |
+| Read/parse | Accumulated reader-seconds | 23.925582 | 35.502112 |
 |  | Million rows/sec | 7.323 | 4.935 |
 |  | Input MiB/sec | 441.705 | 297.674 |
-| Filter | Seconds | 0.070383 | 0.165726 |
+| Filter | Accumulated worker-seconds | 0.070383 | 0.165726 |
 |  | Rows examined | 175,200,000 | 175,200,000 |
 |  | Rows retained | 876,000 | 876,000 |
-| Aggregate | Seconds | 0.007270 | 0.010179 |
+| Aggregate | Accumulated worker-seconds | 0.007270 | 0.010179 |
 |  | Records processed/sec | 120,493,702.31 | 86,057,885.72 |
 |  | Input entity/group/date groups produced | 876,000 | 876,000 |
-| Compute/link | Seconds | 0.010824 | 0.026857 |
+| Compute/link | Accumulated worker-seconds | 0.010824 | 0.026857 |
 |  | Daily effect components computed | 10,512,000 | 10,512,000 |
 |  | Daily effect components/sec | 971,216,396.34 | 391,399,385.73 |
 |  | Logical output effect components/sec | 223,956.29 | 90,254.20 |
 |  | Logical report rows | 808 | 808 |
-| Write CSV | Seconds | 0.036136 | 0.037216 |
+| Write CSV | Accumulated worker-seconds | 0.036136 | 0.037216 |
 |  | Rows/sec | 22,360.18 | 21,711.15 |
 |  | Output MiB/sec | 5.344 | 5.188 |
 |  | Attribution rows written | 808 | 808 |
@@ -122,23 +139,25 @@ No country filter applies. Resolve InstrumentId to Country, aggregate each sideâ
 
 **Scope:** all 1,095 dates, all four portfolios, both return types; complete read, calculation and CSV-writing executions.
 
+**Timing units:** stage values accumulate across concurrent readers/workers; overall wall time measures end-to-end elapsed time. Stage throughput is per accumulated stage-second.
+
 | Stage | Metric | Rust | Go |
 |---|---|---:|---:|
-| Read/parse | Seconds | 22.928799 | 34.916485 |
+| Read/parse | Accumulated reader-seconds | 22.928799 | 34.916485 |
 |  | Million rows/sec | 7.641 | 5.018 |
 |  | Input MiB/sec | 460.907 | 302.667 |
-| Filter | Seconds | 0.096108 | 0.312492 |
+| Filter | Accumulated worker-seconds | 0.096108 | 0.312492 |
 |  | Rows examined | 175,200,000 | 175,200,000 |
 |  | Rows retained | 175,200,000 | 175,200,000 |
-| Aggregate | Seconds | 0.213288 | 0.335391 |
+| Aggregate | Accumulated worker-seconds | 0.213288 | 0.335391 |
 |  | Records processed/sec | 821,426,412.87 | 522,374,836.34 |
 |  | Input entity/group/date groups produced | 5,475 | 5,475 |
-| Compute/link | Seconds | 0.001039 | 0.000635 |
+| Compute/link | Accumulated worker-seconds | 0.001039 | 0.000635 |
 |  | Daily effect components computed | 26,280 | 26,280 |
 |  | Daily effect components/sec | 25,286,688.31 | 41,371,428.21 |
 |  | Logical output effect components/sec | 23,092.87 | 37,782.13 |
 |  | Logical report rows | 8 | 8 |
-| Write CSV | Seconds | 0.033001 | 0.034793 |
+| Write CSV | Accumulated worker-seconds | 0.033001 | 0.034793 |
 |  | Rows/sec | 242.42 | 229.93 |
 |  | Output MiB/sec | 0.075 | 0.071 |
 |  | Attribution rows written | 8 | 8 |
@@ -157,23 +176,25 @@ Calculate daily security effects, reduce them to three portfolio-level component
 
 **Scope:** all 1,095 dates, all four portfolios, both return types; complete read, calculation and CSV-writing executions.
 
+**Timing units:** stage values accumulate across concurrent readers/workers; overall wall time measures end-to-end elapsed time. Stage throughput is per accumulated stage-second.
+
 | Stage | Metric | Rust | Go |
 |---|---|---:|---:|
-| Read/parse | Seconds | 25.907244 | 38.680824 |
+| Read/parse | Accumulated reader-seconds | 25.907244 | 38.680824 |
 |  | Million rows/sec | 6.763 | 4.529 |
 |  | Input MiB/sec | 407.919 | 273.212 |
-| Filter | Seconds | 0.097007 | 0.329595 |
+| Filter | Accumulated worker-seconds | 0.097007 | 0.329595 |
 |  | Rows examined | 175,200,000 | 175,200,000 |
 |  | Rows retained | 175,200,000 | 175,200,000 |
-| Aggregate | Seconds | 0.870800 | 1.688835 |
+| Aggregate | Accumulated worker-seconds | 0.870800 | 1.688835 |
 |  | Records processed/sec | 201,194,317.37 | 103,740,144.31 |
 |  | Input entity/group/date groups produced | 175,200,000 | 175,200,000 |
-| Compute/link | Seconds | 3.778659 | 6.886732 |
+| Compute/link | Accumulated worker-seconds | 3.778659 | 6.886732 |
 |  | Daily effect components computed | 2,628,000,000 | 2,628,000,000 |
 |  | Daily effect components/sec | 695,484,762.52 | 381,603,361.52 |
 |  | Logical output effect components/sec | 1,003.53 | 550.62 |
 |  | Logical report rows | 1,264 | 1,264 |
-| Write CSV | Seconds | 0.041283 | 0.049564 |
+| Write CSV | Accumulated worker-seconds | 0.041283 | 0.049564 |
 |  | Rows/sec | 30,618.25 | 25,502.35 |
 |  | Output MiB/sec | 6.348 | 5.172 |
 |  | Attribution rows written | 1,264 | 1,264 |
@@ -192,23 +213,25 @@ Use the same portfolio-level reduction and linking engine with calendar-month ke
 
 **Scope:** all 1,095 dates, all four portfolios, both return types; complete read, calculation and CSV-writing executions.
 
+**Timing units:** stage values accumulate across concurrent readers/workers; overall wall time measures end-to-end elapsed time. Stage throughput is per accumulated stage-second.
+
 | Stage | Metric | Rust | Go |
 |---|---|---:|---:|
-| Read/parse | Seconds | 25.609576 | 38.072932 |
+| Read/parse | Accumulated reader-seconds | 25.609576 | 38.072932 |
 |  | Million rows/sec | 6.841 | 4.602 |
 |  | Input MiB/sec | 412.660 | 277.574 |
-| Filter | Seconds | 0.096679 | 0.318752 |
+| Filter | Accumulated worker-seconds | 0.096679 | 0.318752 |
 |  | Rows examined | 175,200,000 | 175,200,000 |
 |  | Rows retained | 175,200,000 | 175,200,000 |
-| Aggregate | Seconds | 0.867075 | 1.672868 |
+| Aggregate | Accumulated worker-seconds | 0.867075 | 1.672868 |
 |  | Records processed/sec | 202,058,613.52 | 104,730,316.74 |
 |  | Input entity/group/date groups produced | 175,200,000 | 175,200,000 |
-| Compute/link | Seconds | 3.767712 | 6.802985 |
+| Compute/link | Accumulated worker-seconds | 3.767712 | 6.802985 |
 |  | Daily effect components computed | 2,628,000,000 | 2,628,000,000 |
 |  | Daily effect components/sec | 697,505,611.80 | 386,301,018.36 |
 |  | Logical output effect components/sec | 229.32 | 127.00 |
 |  | Logical report rows | 288 | 288 |
-| Write CSV | Seconds | 0.040021 | 0.043221 |
+| Write CSV | Accumulated worker-seconds | 0.040021 | 0.043221 |
 |  | Rows/sec | 7,196.20 | 6,663.45 |
 |  | Output MiB/sec | 1.506 | 1.367 |
 |  | Attribution rows written | 288 | 288 |
