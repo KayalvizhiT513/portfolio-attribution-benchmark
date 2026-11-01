@@ -1,0 +1,114 @@
+[
+  {
+    "mode": "csv",
+    "repetition": 1,
+    "comparison": "fresh csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "csv",
+    "repetition": 1,
+    "comparison": "fresh parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "parquet",
+    "repetition": 1,
+    "comparison": "fresh csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "parquet",
+    "repetition": 1,
+    "comparison": "fresh parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "parquet",
+    "repetition": 2,
+    "comparison": "fresh csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "parquet",
+    "repetition": 2,
+    "comparison": "fresh parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "csv",
+    "repetition": 2,
+    "comparison": "fresh csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "csv",
+    "repetition": 2,
+    "comparison": "fresh parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "csv",
+    "repetition": 3,
+    "comparison": "fresh csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "csv",
+    "repetition": 3,
+    "comparison": "fresh parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "parquet",
+    "repetition": 3,
+    "comparison": "fresh csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "parquet",
+    "repetition": 3,
+    "comparison": "fresh parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "parquet-cache-off",
+    "repetition": 1,
+    "comparison": "fresh csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "mode": "parquet-cache-off",
+    "repetition": 1,
+    "comparison": "fresh parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  }
+]

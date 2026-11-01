@@ -16,10 +16,11 @@ REPORT = ROOT / 'CSV_PARQUET_REPORT.md'
 SCENARIOS = [('security', 318000), ('country', 2190), ('weekly', 316), ('monthly', 72), ('subset', 602)]
 
 
-def save(runs, checks, environment):
-    for name, value in [('runs', runs), ('checks', checks), ('environment', environment)]:
-        (OUT / f'{name}.json').write_text(json.dumps(value, indent=2) + '\n')
-    if runs:
+def save(runs, checks, environment, persist=True):
+    if persist:
+        for name, value in [('runs', runs), ('checks', checks), ('environment', environment)]:
+            (OUT / f'{name}.json').write_text(json.dumps(value, indent=2) + '\n')
+    if runs and persist:
         with (OUT / 'runs.csv').open('w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=list(runs[0]))
             writer.writeheader(); writer.writerows(runs)
@@ -35,6 +36,7 @@ def save(runs, checks, environment):
              '## Total runtime (seconds)', '',
              '| Scenario | Output rows | CSV Rust | CSV Go | Parquet Rust | Parquet Go |',
              '|---|---:|---:|---:|---:|---:|']
+    followup = ROOT / 'RUST_DATE_READ_REPORT.md'
     if done == {'csv': 10, 'parquet': 10}:
         lines[2] = 'Complete: 10 CSV runs, followed by 10 Parquet runs.'
         ratios = {lang: sum(r['process_wall_seconds'] for r in runs if r['format'] == 'parquet' and r['language'] == lang)
@@ -60,6 +62,10 @@ def save(runs, checks, environment):
               'CSV ran first, then Parquet. The starting language alternates by scenario. We used the normal filesystem cache and measured each configuration once. Total runtime includes setup, reading, calculation and saving the finished output.', '',
               '[Raw runs and stage metrics](results/csv-parquet-native-output/runs.csv) · [Validation](results/csv-parquet-native-output/checks.json) · [Environment](results/csv-parquet-native-output/environment.json)', '']
     REPORT.write_text('\n'.join(lines))
+    if followup.exists():
+        report_text = REPORT.read_text()
+        report_text = report_text.replace('# CSV vs Parquet: Go and Rust\n', '# CSV vs Parquet: Go and Rust\n\n**Baseline measurements.** See the [Rust date-format fix and fresh comparison](RUST_DATE_READ_REPORT.md) for the follow-up.', 1)
+        REPORT.write_text(report_text)
 
 
 def main():

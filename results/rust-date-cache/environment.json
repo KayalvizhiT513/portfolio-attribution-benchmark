@@ -1,0 +1,14 @@
+{
+  "change": "cache date32 text until the integer day changes",
+  "threads": 4,
+  "input": "unchanged attribution_data and attribution_data_parquet",
+  "repetitions": {
+    "country": 3,
+    "other_scenarios": 1
+  },
+  "cache": "OS-managed; paired format order alternates",
+  "slowdown_trigger_ratio": 1.1,
+  "binary_sha256": "eb60e2fa970ceefded973b8ac2237572b18920c55c71069ca71ce25d61742961",
+  "profiling_binary_sha256": "58c5794141774739b158930372c2ccf106e94be6f54f6516d3a3e3243deb91e8",
+  "profiling_env": "ATTRIBUTION_PROFILE_READ=1"
+}

@@ -1,5 +1,30 @@
 # CSV and Parquet input adapters
 
+Rust now caches formatted date32 text until the integer date changes, including
+across batches. It no longer allocates a date string for every return record.
+See the [follow-up measurements](../RUST_DATE_READ_REPORT.md).
+
+Go now uses the same date cache. [Go measurements](../GO_DATE_READ_REPORT.md)
+separate normal timing runs from optional CPU/allocation/GC diagnostics.
+`ATTRIBUTION_CPU_PROFILE=FILE` enables CPU sampling,
+`ATTRIBUTION_ALLOC_PROFILE=FILE` writes sampled allocation stacks, and
+`ATTRIBUTION_RUNTIME_STATS=FILE` writes process-wide allocation/GC statistics;
+the GC CPU values are Go-runtime estimates and may overestimate CPU use.
+`ATTRIBUTION_PROFILE_READ=1` also adds Go batch read/decode and daily-buffer
+timings, with the same counter names as Rust. No per-row clocks are introduced.
+For a controlled comparison only, `ATTRIBUTION_DISABLE_DATE_CACHE=1` restores
+the old Go date-formatting path; the cache is enabled by default.
+
+For optional Rust read profiling, set `ATTRIBUTION_PROFILE_READ=1`. Metrics then
+append `parquet_batch_read_decode_seconds`, `parquet_to_daily_buffer_seconds`
+and `parquet_batches`. The first timer wraps batch fetches (file I/O,
+decompression, decoding and Arrow materialization). The second is the remainder
+of the read stage: typed access, date caching, ID lookup, validation and daily
+buffer construction. These are combined reader elapsed times, not CPU times;
+their sum matches `read_parse_seconds` for pure Parquet runs. Clocks are sampled
+per batch/date, never per input row. Normal metrics remain unchanged when the
+environment variable is unset.
+
 Both native attribution CLIs now implement Phase 2 of the supplied migration
 plan: replaceable storage readers feeding the existing daily dense arrays. Rust
 uses `parquet::arrow::ParquetRecordBatchReaderBuilder`; Go uses Apache Arrow Go's

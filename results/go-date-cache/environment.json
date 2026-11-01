@@ -1,0 +1,14 @@
+{
+  "binary_sha256": "4a7c882032eb9f970fb5652d7864f49239b2db1141b9ec0341b317f6b3bd8539",
+  "threads": 4,
+  "normal_repetitions": {
+    "country": 3,
+    "other_scenarios": 1
+  },
+  "normal_order": "CSV/Parquet pairs alternate; OS-managed caches",
+  "diagnostics": "three country pairs plus one cache-off control; CPU samples and whole-process runtime counters",
+  "allocation_profile_sample_rate_bytes": 524288,
+  "pprof_tool": "/private/tmp/attribution-pprof",
+  "go_version": "go1.27.3 darwin/arm64",
+  "cpu_postprocessing": "mutually exclusive sampled stacks; file I/O separated from decoding; runtime/heap support shown separately"
+}

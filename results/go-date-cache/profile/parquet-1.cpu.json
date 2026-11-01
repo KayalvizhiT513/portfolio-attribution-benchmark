@@ -1,0 +1,26 @@
+{
+  "sampled_cpu_seconds": 30.88,
+  "exclusive_cpu_seconds": {
+    "allocation": 0.65,
+    "decode": 2.86,
+    "file_read": 7.48,
+    "gc": 2.85,
+    "heap_maintenance": 1.8,
+    "other": 0.23,
+    "output": 0.02,
+    "row_handling": 4.64,
+    "runtime_support": 10.34,
+    "setup": 0.01
+  },
+  "phase_cpu_including_allocation_and_gc_assist": {
+    "decode": 11.04,
+    "other": 15.17,
+    "output": 0.02,
+    "row_handling": 4.64,
+    "setup": 0.01
+  },
+  "allocation_cpu_by_calling_phase": {
+    "decode": 0.65
+  },
+  "method": "10ms CPU samples; GC first, allocation second, file reads third, then heap/runtime support or caller phase; each sample counted once. These are CPU estimates, not elapsed stage durations."
+}

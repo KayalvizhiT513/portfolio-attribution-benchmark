@@ -206,10 +206,16 @@ struct Metrics {
     parsed: u64,
     report_rows: u64,
     checksum: [f64; 3],
+    batch_decode: f64,
+    to_daily_buffer: f64,
+    parquet_batches: u64,
 }
 impl Metrics {
     fn add(&mut self, b: &Self) {
         self.read += b.read;
+        self.batch_decode += b.batch_decode;
+        self.to_daily_buffer += b.to_daily_buffer;
+        self.parquet_batches += b.parquet_batches;
         self.filter += b.filter;
         self.aggregate += b.aggregate;
         self.compute += b.compute;
@@ -254,6 +260,7 @@ impl Stream {
     fn next(&mut self, m: &Master, c: &Config, metrics: &mut Metrics) -> Result<Option<Day>> {
         let start = Instant::now();
         let offset = self.r.parsed_bytes();
+        let profile_before = self.r.read_profile();
         self.raw.clear();
         self.seen.resize(m.names.len(), false);
         self.seen.fill(false);
@@ -320,7 +327,14 @@ impl Stream {
             ));
             total += w;
         }
-        metrics.read += start.elapsed().as_secs_f64();
+        let read_elapsed = start.elapsed().as_secs_f64();
+        metrics.read += read_elapsed;
+        if let (Some(before), Some(after)) = (profile_before, self.r.read_profile()) {
+            let decoding = after.0 - before.0;
+            metrics.batch_decode += decoding;
+            metrics.to_daily_buffer += (read_elapsed - decoding).max(0.0);
+            metrics.parquet_batches += after.1 - before.1;
+        }
         metrics.rows += raw.len() as u64;
         metrics.parsed += self.r.parsed_bytes() - offset;
         if date.is_empty() {
@@ -847,7 +861,7 @@ fn run() -> Result<()> {
         fs::create_dir_all(p)?;
     }
     let mut w = csv::Writer::from_path(&c.metrics)?;
-    w.write_record([
+    let mut header = vec![
         "language",
         "scenario",
         "period",
@@ -871,8 +885,8 @@ fn run() -> Result<()> {
         "checksum_allocation",
         "checksum_selection",
         "checksum_interaction",
-    ])?;
-    w.write_record(vec![
+    ];
+    let mut values = vec![
         "rust".into(),
         c.scenario,
         c.period,
@@ -896,7 +910,21 @@ fn run() -> Result<()> {
         metrics.checksum[0].to_string(),
         metrics.checksum[1].to_string(),
         metrics.checksum[2].to_string(),
-    ])?;
+    ];
+    if input::read_profile_enabled() {
+        header.extend([
+            "parquet_batch_read_decode_seconds",
+            "parquet_to_daily_buffer_seconds",
+            "parquet_batches",
+        ]);
+        values.extend([
+            metrics.batch_decode.to_string(),
+            metrics.to_daily_buffer.to_string(),
+            metrics.parquet_batches.to_string(),
+        ]);
+    }
+    w.write_record(header)?;
+    w.write_record(values)?;
     w.flush()?;
     println!(
         "{} rows written; metrics {}",

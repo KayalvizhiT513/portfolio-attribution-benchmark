@@ -41,10 +41,15 @@ type metrics struct {
 	rows, retained, groups, effects, written, bytes, parsed uint64
 	reportRows                                              uint64
 	checksum                                                [3]float64
+	batchDecode, toDailyBuffer                              float64
+	parquetBatches                                          uint64
 }
 
 func (m *metrics) add(b metrics) {
 	m.read += b.read
+	m.batchDecode += b.batchDecode
+	m.toDailyBuffer += b.toDailyBuffer
+	m.parquetBatches += b.parquetBatches
 	m.filter += b.filter
 	m.aggregate += b.aggregate
 	m.compute += b.compute
@@ -185,6 +190,11 @@ type raw struct {
 func (s *stream) next(m *master, c config, mt *metrics) (*day, error) {
 	start := time.Now()
 	offset := s.r.parsedBytes()
+	var profileBefore inputReadProfile
+	profiler, profileAvailable := s.r.(profiledInput)
+	if profileAvailable {
+		profileBefore = profiler.readProfile()
+	}
 	rows := s.rowsBuf[:0]
 	if len(s.seen) != len(m.names) {
 		s.seen = make([]bool, len(m.names))
@@ -255,7 +265,15 @@ func (s *stream) next(m *master, c config, mt *metrics) (*day, error) {
 		total += w
 	}
 	s.rowsBuf = rows[:0]
-	mt.read += seconds(start)
+	readElapsed := seconds(start)
+	mt.read += readElapsed
+	if profileBefore.enabled {
+		after := profiler.readProfile()
+		decoding := after.seconds - profileBefore.seconds
+		mt.batchDecode += decoding
+		mt.toDailyBuffer += math.Max(0, readElapsed-decoding)
+		mt.parquetBatches += after.batches - profileBefore.batches
+	}
 	mt.parsed += uint64(s.r.parsedBytes() - offset)
 	mt.rows += uint64(len(rows))
 	if date == "" {
@@ -828,16 +846,29 @@ func run() error {
 	}
 	defer f.Close()
 	w := csv.NewWriter(f)
-	w.Write([]string{"language", "scenario", "period", "threads", "days", "input_file_bytes", "rows_read", "rows_retained", "groups", "effect_values", "output_rows", "output_bytes", "parsed_input_bytes", "read_parse_seconds", "filter_seconds", "aggregate_seconds", "compute_seconds", "write_seconds", "wall_seconds", "report_rows", "checksum_allocation", "checksum_selection", "checksum_interaction"})
+	header := []string{"language", "scenario", "period", "threads", "days", "input_file_bytes", "rows_read", "rows_retained", "groups", "effect_values", "output_rows", "output_bytes", "parsed_input_bytes", "read_parse_seconds", "filter_seconds", "aggregate_seconds", "compute_seconds", "write_seconds", "wall_seconds", "report_rows", "checksum_allocation", "checksum_selection", "checksum_interaction"}
 	u := func(v uint64) string { return strconv.FormatUint(v, 10) }
-	w.Write([]string{"go", c.scenario, c.period, strconv.Itoa(c.threads), strconv.Itoa(days), u(inputBytes), u(mt.rows), u(mt.retained), u(mt.groups), u(mt.effects), u(mt.written), u(mt.bytes), u(mt.parsed), number(mt.read), number(mt.filter), number(mt.aggregate), number(mt.compute), number(mt.write), number(seconds(wall)), u(mt.reportRows), number(mt.checksum[0]), number(mt.checksum[1]), number(mt.checksum[2])})
+	values := []string{"go", c.scenario, c.period, strconv.Itoa(c.threads), strconv.Itoa(days), u(inputBytes), u(mt.rows), u(mt.retained), u(mt.groups), u(mt.effects), u(mt.written), u(mt.bytes), u(mt.parsed), number(mt.read), number(mt.filter), number(mt.aggregate), number(mt.compute), number(mt.write), number(seconds(wall)), u(mt.reportRows), number(mt.checksum[0]), number(mt.checksum[1]), number(mt.checksum[2])}
+	if os.Getenv("ATTRIBUTION_PROFILE_READ") == "1" {
+		header = append(header, "parquet_batch_read_decode_seconds", "parquet_to_daily_buffer_seconds", "parquet_batches")
+		values = append(values, number(mt.batchDecode), number(mt.toDailyBuffer), u(mt.parquetBatches))
+	}
+	w.Write(header)
+	w.Write(values)
 	w.Flush()
 	fmt.Printf("%d rows written; metrics %s\n", mt.written, c.metrics)
 	return w.Error()
 }
 func main() {
-	if e := run(); e != nil {
-		fmt.Fprintln(os.Stderr, "error:", e)
+	finish, err := startDiagnostics()
+	if err == nil {
+		err = run()
+		if stopErr := finish(); err == nil {
+			err = stopErr
+		}
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }

@@ -13,6 +13,7 @@ use std::{
     collections::BTreeMap,
     fs::{self, File},
     path::{Path, PathBuf},
+    time::Instant,
 };
 
 pub fn resolve(dir: &Path, stem: &str) -> Result<PathBuf> {
@@ -61,7 +62,68 @@ pub enum Input {
         batch: Option<RecordBatch>,
         row: usize,
         columns: Vec<usize>,
+        date_cache: Option<DateCache>,
+        profile: ReadProfile,
     },
+}
+
+pub fn read_profile_enabled() -> bool {
+    std::env::var("ATTRIBUTION_PROFILE_READ").is_ok_and(|v| v == "1")
+}
+
+pub struct ReadProfile {
+    enabled: bool,
+    batch_seconds: f64,
+    batches: u64,
+}
+impl ReadProfile {
+    fn new() -> Self {
+        Self {
+            enabled: read_profile_enabled(),
+            batch_seconds: 0.0,
+            batches: 0,
+        }
+    }
+}
+
+// Date32 values repeat throughout a date and across batch boundaries. Keep the
+// formatted text until the integer day changes instead of allocating per row.
+pub struct DateCache {
+    column: usize,
+    day: Option<i32>,
+    text: String,
+    #[cfg(test)]
+    formats: usize,
+}
+impl DateCache {
+    fn new(column: usize) -> Self {
+        Self {
+            column,
+            day: None,
+            text: String::new(),
+            #[cfg(test)]
+            formats: 0,
+        }
+    }
+    fn refresh(&mut self, batch: &RecordBatch, row: usize) -> Result<()> {
+        let day = batch
+            .column(self.column)
+            .as_any()
+            .downcast_ref::<Date32Array>()
+            .unwrap()
+            .value(row);
+        if self.day != Some(day) {
+            let date = arrow_array::temporal_conversions::date32_to_datetime(day)
+                .ok_or("date32 out of range")?;
+            self.text = date.format("%Y-%m-%d").to_string();
+            self.day = Some(day);
+            #[cfg(test)]
+            {
+                self.formats += 1;
+            }
+        }
+        Ok(())
+    }
 }
 
 fn is_string(t: &DataType) -> bool {
@@ -118,11 +180,19 @@ impl Input {
                     .iter()
                     .map(|name| reader.schema().index_of(name))
                     .collect::<std::result::Result<Vec<_>, _>>()?;
+                let date_cache = reader
+                    .schema()
+                    .index_of("EffectiveDate")
+                    .ok()
+                    .filter(|&i| reader.schema().field(i).data_type() == &DataType::Date32)
+                    .map(DateCache::new);
                 Ok(Self::Parquet {
                     reader,
                     batch: None,
                     row: 0,
                     columns,
+                    date_cache,
+                    profile: ReadProfile::new(),
                 })
             }
             _ => Err(format!("unsupported input format: {}", path.display()).into()),
@@ -133,16 +203,32 @@ impl Input {
         match self {
             Self::Csv { reader, row } => Ok(reader.read_record(row)?),
             Self::Parquet {
-                reader, batch, row, ..
+                reader,
+                batch,
+                row,
+                date_cache,
+                profile,
+                ..
             } => {
                 if let Some(b) = batch {
                     *row += 1;
                     if *row < b.num_rows() {
+                        if let Some(cache) = date_cache {
+                            cache.refresh(b, *row)?;
+                        }
                         return Ok(true);
                     }
                 }
                 loop {
-                    let Some(next) = reader.next() else {
+                    let started = profile.enabled.then(Instant::now);
+                    let next = reader.next();
+                    if let Some(started) = started {
+                        profile.batch_seconds += started.elapsed().as_secs_f64();
+                        if next.is_some() {
+                            profile.batches += 1;
+                        }
+                    }
+                    let Some(next) = next else {
                         *batch = None;
                         return Ok(false);
                     };
@@ -152,6 +238,9 @@ impl Input {
                     }
                     if next.columns().iter().any(|a| a.null_count() != 0) {
                         return Err("null Parquet input field".into());
+                    }
+                    if let Some(cache) = date_cache {
+                        cache.refresh(&next, 0)?;
                     }
                     *batch = Some(next);
                     *row = 0;
@@ -168,8 +257,14 @@ impl Input {
                 batch,
                 row,
                 columns,
+                date_cache,
                 ..
             } => {
+                if let Some(cache) = date_cache {
+                    if columns[col] == cache.column {
+                        return Ok(Cow::Borrowed(&cache.text));
+                    }
+                }
                 let a = batch.as_ref().unwrap().column(columns[col]);
                 if let Some(a) = a.as_any().downcast_ref::<StringArray>() {
                     return Ok(Cow::Borrowed(a.value(*row)));
@@ -179,11 +274,6 @@ impl Input {
                 }
                 if let Some(a) = a.as_any().downcast_ref::<StringViewArray>() {
                     return Ok(Cow::Borrowed(a.value(*row)));
-                }
-                if let Some(a) = a.as_any().downcast_ref::<Date32Array>() {
-                    let date = arrow_array::temporal_conversions::date32_to_datetime(a.value(*row))
-                        .ok_or("date32 out of range")?;
-                    return Ok(Cow::Owned(date.format("%Y-%m-%d").to_string()));
                 }
                 Err("expected string or date32".into())
             }
@@ -216,5 +306,56 @@ impl Input {
             Self::Csv { reader, .. } => reader.position().byte(),
             Self::Parquet { .. } => 0,
         }
+    }
+
+    pub fn read_profile(&self) -> Option<(f64, u64)> {
+        match self {
+            Self::Parquet { profile, .. } if profile.enabled => {
+                Some((profile.batch_seconds, profile.batches))
+            }
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow_schema::{Field, Schema};
+    use std::sync::Arc;
+
+    fn dates(values: Vec<i32>) -> RecordBatch {
+        RecordBatch::try_new(
+            Arc::new(Schema::new(vec![Field::new(
+                "EffectiveDate",
+                DataType::Date32,
+                false,
+            )])),
+            vec![Arc::new(Date32Array::from(values))],
+        )
+        .unwrap()
+    }
+    #[test]
+    fn date_text_is_formatted_only_when_the_day_changes() {
+        let mut cache = DateCache::new(0);
+        let a = dates(vec![19358, 19358]);
+        cache.refresh(&a, 0).unwrap();
+        assert_eq!(cache.text, "2023-01-01");
+        let address = cache.text.as_ptr();
+        cache.refresh(&a, 1).unwrap();
+        let b = dates(vec![19358, 19359, 19359]);
+        cache.refresh(&b, 0).unwrap();
+        assert_eq!(cache.formats, 1);
+        assert_eq!(cache.text.as_ptr(), address);
+        cache.refresh(&b, 1).unwrap();
+        cache.refresh(&b, 2).unwrap();
+        assert_eq!(cache.text, "2023-01-02");
+        assert_eq!(cache.formats, 2);
+    }
+    #[test]
+    fn invalid_date32_still_fails() {
+        assert!(DateCache::new(0)
+            .refresh(&dates(vec![i32::MAX]), 0)
+            .is_err());
     }
 }

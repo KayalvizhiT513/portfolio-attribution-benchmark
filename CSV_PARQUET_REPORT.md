@@ -1,37 +1,100 @@
 # CSV vs Parquet: Go and Rust
 
-Complete: 10 CSV runs, followed by 10 Parquet runs.
+Both engines use their date-cache follow-up measurements: Country is the median of three CSV/Parquet pairs per engine; each other scenario uses one pair. Rust and Go were measured in separate sessions.
+Updated with date caches in both Rust and Go.
 
-Parquet/CSV total wall-time ratio across the five scenarios: Rust **1.52×**, Go **0.97×** (below 1 means Parquet was faster in this single pass).
+Parquet/CSV total wall-time ratio across the five scenarios: Rust **1.15×**, Go **0.73×** (below 1 means Parquet was faster for the displayed results).
 
-One full-history run per cell; 1,095 dates, one 60,000-security portfolio, a 100,000-security index, and 1,000 shared DE IDs. Four threads configured for both engines. BF effects and contribution columns included. CSV input writes CSV; Parquet input writes typed Zstandard Parquet.
+Country cells are three-run medians for both engines; other cells are single runs; 1,095 dates, one 60,000-security portfolio, a 100,000-security index, and 1,000 shared DE IDs. Four threads configured for both engines. BF effects and contribution columns included. CSV input writes CSV; Parquet input writes typed Zstandard Parquet.
 
 ## Total runtime (seconds)
 
 | Scenario | Output rows | CSV Rust | CSV Go | Parquet Rust | Parquet Go |
 |---|---:|---:|---:|---:|---:|
-| Security | 318,000 | 14.58 | 23.50 | 24.76 | 23.78 |
-| Country | 2,190 | 13.88 | 23.88 | 21.17 | 22.69 |
-| Weekly | 316 | 14.09 | 23.48 | 21.62 | 23.31 |
-| Monthly | 72 | 15.82 | 25.30 | 22.02 | 23.63 |
-| Subset | 602 | 14.58 | 23.61 | 21.48 | 23.02 |
+| Security | 318,000 | 14.22 | 23.91 | 16.77 | 17.47 |
+| Country | 2,190 | 13.07 | 23.22 | 14.78 | 16.77 |
+| Weekly | 316 | 14.45 | 24.16 | 16.74 | 17.42 |
+| Monthly | 72 | 14.10 | 23.75 | 16.37 | 17.46 |
+| Subset | 602 | 13.88 | 23.06 | 15.62 | 16.79 |
 
 ## Resources across all five scenarios
 
 | Engine | CSV CPU s¹ | Parquet CPU s¹ | CSV max memory MiB² | Parquet max memory MiB² |
 |---|---:|---:|---:|---:|
-| Rust | 125.21 | 178.65 | 70.75 | 141.91 |
-| Go | 218.16 | 233.81 | 135.22 | 253.34 |
+| Rust | 120.04 | 118.47 | 70.81 | 146.95 |
+| Go | 215.30 | 180.15 | 163.36 | 261.39 |
 
-¹ Total CPU time across the five scenarios. ² Highest memory use seen in any scenario.
+¹ Sum of the displayed scenario CPU values; Country uses three-run medians for both engines. ² Highest memory use observed, including repeats.
 
-Validation: 15/15 file comparisons passed (5 CSV Go/Rust, 5 Parquet Go/Rust, 5 CSV/Parquet). Every output field is compared; engines also enforce BF and contribution reconciliation.
+Checks: the updated Rust and Go outputs each passed 35 comparisons against the original results and fresh CSV/Parquet outputs. Rust has 14 passed profiling checks; Go has 14 passed diagnostic/control checks. Each engine checks BF and contribution totals.
 
 Subset: 400 IDs—200 portfolio-only US, 100 index-only US, 100 shared DE; 300 held IDs × 2 + 2 residual rows = 602. Country: US-filtered, separately normalized daily attribution.
 
-CSV ran first, then Parquet. The starting language alternates by scenario. We used the normal filesystem cache and measured each configuration once. Total runtime includes setup, reading, calculation and saving the finished output.
+Latest Rust Country pairs alternate CSV/Parquet order over three pairs; other Rust scenarios have one fresh pair. Go also uses three alternating country pairs and one fresh pair per other scenario. All used normal filesystem caching. Total runtime includes setup, reading, calculation and saving the finished output.
 
 [Raw runs and stage metrics](results/csv-parquet-native-output/runs.csv) · [Validation](results/csv-parquet-native-output/checks.json) · [Environment](results/csv-parquet-native-output/environment.json)
+
+Latest measurements: [Rust](results/rust-date-cache/runs.csv) · [Go](results/go-date-cache/runs.csv). Detailed diagnostics: [Go read report](GO_DATE_READ_REPORT.md).
+## Rust Parquet: where read time goes
+
+These separate profiling runs split the read step. Times combine both readers, so they can exceed total runtime. Country uses the run with the middle read time out of three; other scenarios use one.
+
+| Scenario | Read + decompress/decode seconds | Prepare daily buffers seconds | Total read seconds |
+|---|---:|---:|---:|
+| Security | 7.077 | 16.147 | 23.224 |
+| Country | 6.859 | 14.973 | 21.832 |
+| Weekly | 7.014 | 15.710 | 22.724 |
+| Monthly | 7.064 | 15.414 | 22.478 |
+| Subset | 7.008 | 14.641 | 21.649 |
+
+The first part includes file I/O, decompression, decoding and Arrow batch creation. The second includes row handling, date caching, ID lookup, validation and building daily buffers. It is the remaining read time after subtracting batch time.
+
+[Full date-cache comparison and profiling evidence](RUST_DATE_READ_REPORT.md)
+
+## Go Parquet: where read time goes
+
+These separate profiling runs split the read step. Times combine both readers, so they can exceed total runtime. Country uses the run with the middle read time out of three; other scenarios use one.
+
+| Scenario | Read + decompress/decode seconds | Prepare daily buffers seconds | Total read seconds |
+|---|---:|---:|---:|
+| Country | 16.004 | 11.307 | 27.311 |
+
+The first part includes file I/O, decompression, decoding and Arrow batch creation. The second includes row handling, date caching, ID lookup, validation and building daily buffers. It is the remaining read time after subtracting batch time.
+
+[Full date-cache comparison and profiling evidence](GO_DATE_READ_REPORT.md)
+
+<details>
+<summary>Go: decoding, row handling, allocations and garbage collection</summary>
+
+Country diagnostic runs only: three runs per format, separate from the normal timing runs above. These measure the whole process, including setup and output.
+
+| Memory / garbage collection | CSV | Parquet with cached dates |
+|---|---:|---:|
+| Total allocated GiB | 11.577 | 80.389 |
+| Allocated objects (millions) | 175.698 | 4.243 |
+| Garbage collections | 467.000 | 1173.000 |
+| Estimated garbage-collection CPU seconds | 1.273 | 6.969 |
+| Pause seconds | 0.026 | 0.110 |
+
+Values above are medians. Allocated GiB is the total allocated over the run, **not peak memory**. Garbage-collection CPU is a Go-runtime estimate that may overestimate CPU use and is not directly comparable with OS CPU time. It overlaps the stage measurements; do not add it to runtime.
+
+| Work sampled on CPU | CSV CPU seconds | Parquet CPU seconds |
+|---|---:|---:|
+| File reads | 17.267 | 7.683 |
+| Text parsing / Parquet decoding | 10.380 | 2.707 |
+| Row handling and ID lookup | 2.850 | 4.460 |
+| Allocate / resize memory | 0.543 | 0.733 |
+| Garbage collection | 0.780 | 2.903 |
+| Release unused heap memory | 0.037 | 1.800 |
+| Go runtime / profiling support | 4.513 | 10.207 |
+
+CPU rows are means from 10 ms samples, not elapsed stage times. Each sample is counted once; parsing/decoding and row handling exclude samples assigned to file reads, allocation or garbage collection. Runtime support includes scheduling, waits and profiling support. Remaining calculation, output and setup samples are in the full Go report.
+
+CSV spends most sampled CPU on file reads and text parsing. Parquet allocates large Arrow and dictionary-decoding buffers. A separate single-run control with the date cache disabled creates about 175.2 million more objects than cached Parquet; the cache removes repeated date-string allocations.
+
+[Full Go analysis](GO_DATE_READ_REPORT.md) · [Diagnostic measurements](results/go-date-cache/profile/runs.json) · [Diagnostic checks](results/go-date-cache/profile/checks.json)
+
+</details>
 
 <details>
 <summary>How the CSV and Parquet runs work</summary>
@@ -60,7 +123,7 @@ Each scenario has the same layout: a timing table, its supporting numbers, then 
 
 **Why stage times can exceed the whole run:** the index and portfolio workers can run at the same time. Stage figures add their time together; “Whole run” is how long you actually wait. Do not add the stage rows to estimate runtime.
 
-One measurement per configuration. Small timing differences need repeat runs to confirm.
+Both engines use their date-cache follow-up measurements: Country is the median of three CSV/Parquet pairs per engine; each other scenario uses one pair. Rust and Go were measured in separate sessions.
 
 ### Security
 
@@ -68,12 +131,12 @@ One measurement per configuration. Small timing differences need repeat runs to 
 
 | Step | Work done | Rust seconds | Go seconds |
 |---|---|---:|---:|
-| Read | Read and check CSV records. | 24.480 | 38.789 |
-| Filter | Keep all holdings; total the weights on each side. | 0.092 | 0.294 |
-| Prepare / group | Scale each side’s weights to 100%; line up matching security IDs. | 0.316 | 0.481 |
-| Calculate | Calculate BF effects and contributions for every security over the full period. | 0.978 | 2.677 |
-| Write | Save the CSV report to disk. | 0.108 | 0.133 |
-| **Whole run** | Elapsed time from start to finish. | 14.577 | 23.502 |
+| Read | Read and check CSV records. | 23.462 | 39.380 |
+| Filter | Keep all holdings; total the weights on each side. | 0.095 | 0.300 |
+| Prepare / group | Scale each side’s weights to 100%; line up matching security IDs. | 0.326 | 0.514 |
+| Calculate | Calculate BF effects and contributions for every security over the full period. | 1.009 | 2.625 |
+| Write | Save the CSV report to disk. | 0.114 | 0.134 |
+| **Whole run** | Elapsed time from start to finish. | 14.222 | 23.915 |
 
 <details>
 <summary>Counts, throughput, and memory — Security, CSV</summary>
@@ -82,27 +145,27 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
-| Read | Million rows read per second | 7.157 | 4.517 |
-| Read | CSV bytes parsed per second (MiB) | 491.707 | 310.323 |
-| Read | Stored file size / read time (MiB/sec) | 491.838 | 310.406 |
+| Read | Million rows read per second | 7.467 | 4.449 |
+| Read | CSV bytes parsed per second (MiB) | 513.048 | 305.665 |
+| Read | Stored file size / read time (MiB/sec) | 513.184 | 305.747 |
 | Filter | Rows checked | 175,200,000 | 175,200,000 |
 | Filter | Rows kept | 175,200,000 | 175,200,000 |
-| Prepare / group | Rows prepared per second | 555,045,359.466 | 364,124,490.730 |
+| Prepare / group | Rows prepared per second | 537,188,744.310 | 340,956,545.649 |
 | Prepare / group | Groups prepared across dates, counting portfolio and index separately | 175,200,000 | 175,200,000 |
 | Calculate | Daily BF effect values calculated | 1,044,630,000 | 1,044,630,000 |
-| Calculate | Daily BF effect values per second | 1,068,095,072.504 | 390,169,902.684 |
-| Calculate | Final BF effect values / calculation time | 975,429.290 | 356,319.546 |
+| Calculate | Daily BF effect values per second | 1,035,704,459.502 | 397,879,816.254 |
+| Calculate | Final BF effect values / calculation time | 945,848.821 | 363,360.563 |
 | Calculate | Report rows | 318,000 | 318,000 |
-| Write | Report rows written per second | 2,957,160.646 | 2,394,868.475 |
-| Write | Output written per second (MiB) | 738.826 | 583.220 |
+| Write | Report rows written per second | 2,799,156.310 | 2,380,015.343 |
+| Write | Output written per second (MiB) | 699.350 | 579.603 |
 | Write | Report rows written | 318,000 | 318,000 |
 | Write | Output file size (MB) | 83.309447 | 81.204076 |
 | Whole run | Runtime range across repeat runs | N/A (one run) | N/A (one run) |
-| Whole run | Highest memory use (MiB) | 70.750 | 135.219 |
-| Whole run | Total CPU time (seconds) | 25.874797 | 43.835052 |
-| Whole run | Average CPU cores used | 1.775 | 1.865 |
+| Whole run | Highest memory use (MiB) | 70.812 | 163.359 |
+| Whole run | Total CPU time (seconds) | 24.898769 | 44.279602 |
+| Whole run | Average CPU cores used | 1.751 | 1.852 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude the additional contribution columns. A runtime range is unavailable because there was one run.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -110,12 +173,12 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 | Step | Work done | Rust seconds | Go seconds |
 |---|---|---:|---:|
-| Read | Read and decode Parquet batches. | 39.191 | 37.312 |
-| Filter | Keep all holdings; total the weights on each side. | 0.096 | 0.302 |
-| Prepare / group | Scale each side’s weights to 100%; line up matching security IDs. | 0.329 | 0.531 |
-| Calculate | Calculate BF effects and contributions for every security over the full period. | 1.018 | 2.711 |
-| Write | Save the PARQUET report to disk. | 0.099 | 0.289 |
-| **Whole run** | Elapsed time from start to finish. | 24.761 | 23.783 |
+| Read | Read and decode Parquet batches. | 26.388 | 26.725 |
+| Filter | Keep all holdings; total the weights on each side. | 0.095 | 0.303 |
+| Prepare / group | Scale each side’s weights to 100%; line up matching security IDs. | 0.337 | 0.573 |
+| Calculate | Calculate BF effects and contributions for every security over the full period. | 1.036 | 2.650 |
+| Write | Save the PARQUET report to disk. | 0.101 | 0.281 |
+| **Whole run** | Elapsed time from start to finish. | 16.773 | 17.468 |
 
 <details>
 <summary>Counts, throughput, and memory — Security, PARQUET</summary>
@@ -124,27 +187,27 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
-| Read | Million rows read per second | 4.470 | 4.696 |
+| Read | Million rows read per second | 6.639 | 6.556 |
 | Read | CSV bytes parsed per second (MiB) | N/A (no parsed-byte counter) | N/A (no parsed-byte counter) |
-| Read | Stored file size / read time (MiB/sec) | 129.320 | 135.833 |
+| Read | Stored file size / read time (MiB/sec) | 192.065 | 189.643 |
 | Filter | Rows checked | 175,200,000 | 175,200,000 |
 | Filter | Rows kept | 175,200,000 | 175,200,000 |
-| Prepare / group | Rows prepared per second | 532,145,156.065 | 329,932,655.434 |
+| Prepare / group | Rows prepared per second | 520,539,816.309 | 305,938,148.935 |
 | Prepare / group | Groups prepared across dates, counting portfolio and index separately | 175,200,000 | 175,200,000 |
 | Calculate | Daily BF effect values calculated | 1,044,630,000 | 1,044,630,000 |
-| Calculate | Daily BF effect values per second | 1,025,933,029.192 | 385,361,284.931 |
-| Calculate | Final BF effect values / calculation time | 936,925.141 | 351,928.114 |
+| Calculate | Daily BF effect values per second | 1,008,749,772.288 | 394,202,305.563 |
+| Calculate | Final BF effect values / calculation time | 921,232.669 | 360,002.106 |
 | Calculate | Report rows | 318,000 | 318,000 |
-| Write | Report rows written per second | 3,196,537.671 | 1,100,223.215 |
-| Write | Output written per second (MiB) | 139.904 | 50.269 |
+| Write | Report rows written per second | 3,161,336.701 | 1,130,814.764 |
+| Write | Output written per second (MiB) | 138.363 | 51.666 |
 | Write | Report rows written | 318,000 | 318,000 |
 | Write | Output file size (MB) | 14.594064 | 15.235043 |
 | Whole run | Runtime range across repeat runs | N/A (one run) | N/A (one run) |
-| Whole run | Highest memory use (MiB) | 141.906 | 253.344 |
-| Whole run | Total CPU time (seconds) | 38.095214 | 47.847328 |
-| Whole run | Average CPU cores used | 1.539 | 2.012 |
+| Whole run | Highest memory use (MiB) | 146.953 | 261.391 |
+| Whole run | Total CPU time (seconds) | 24.825229 | 36.671846 |
+| Whole run | Average CPU cores used | 1.480 | 2.099 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude the additional contribution columns. A runtime range is unavailable because there was one run.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -161,12 +224,12 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 | Step | Work done | Rust seconds | Go seconds |
 |---|---|---:|---:|
-| Read | Read and check CSV records. | 22.965 | 39.955 |
-| Filter | Keep US holdings in the portfolio and index. | 0.230 | 0.357 |
-| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | 0.174 | 0.314 |
-| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000743 | 0.000974 |
-| Write | Save the CSV report to disk. | 0.011 | 0.011 |
-| **Whole run** | Elapsed time from start to finish. | 13.878 | 23.884 |
+| Read | Read and check CSV records. | 21.739 | 38.821 |
+| Filter | Keep US holdings in the portfolio and index. | 0.220 | 0.347 |
+| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | 0.169 | 0.309 |
+| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000932 | 0.000819 |
+| Write | Save the CSV report to disk. | 0.011 | 0.009 |
+| **Whole run** | Elapsed time from start to finish. | 13.067 | 23.218 |
 
 <details>
 <summary>Counts, throughput, and memory — Country, CSV</summary>
@@ -175,27 +238,27 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
-| Read | Million rows read per second | 7.629 | 4.385 |
-| Read | CSV bytes parsed per second (MiB) | 524.150 | 301.269 |
-| Read | Stored file size / read time (MiB/sec) | 524.290 | 301.349 |
+| Read | Million rows read per second | 8.059 | 4.513 |
+| Read | CSV bytes parsed per second (MiB) | 553.706 | 310.065 |
+| Read | Stored file size / read time (MiB/sec) | 553.854 | 310.148 |
 | Filter | Rows checked | 175,200,000 | 175,200,000 |
 | Filter | Rows kept | 173,010,000 | 173,010,000 |
-| Prepare / group | Rows prepared per second | 996,094,510.387 | 550,982,288.268 |
+| Prepare / group | Rows prepared per second | 1,026,188,197.043 | 559,628,419.409 |
 | Prepare / group | Groups prepared across dates, counting portfolio and index separately | 2,190 | 2,190 |
 | Calculate | Daily BF effect values calculated | 6,570 | 6,570 |
-| Calculate | Daily BF effect values per second | 8,848,318.012 | 6,747,146.327 |
-| Calculate | Final BF effect values / calculation time | 8,848,318.012 | 6,747,146.327 |
+| Calculate | Daily BF effect values per second | 7,049,325.969 | 8,023,741.482 |
+| Calculate | Final BF effect values / calculation time | 7,049,325.969 | 8,023,741.482 |
 | Calculate | Report rows | 2,190 | 2,190 |
-| Write | Report rows written per second | 197,508.364 | 203,144.548 |
-| Write | Output written per second (MiB) | 61.053 | 62.358 |
+| Write | Report rows written per second | 195,566.306 | 242,016.628 |
+| Write | Output written per second (MiB) | 60.453 | 74.291 |
 | Write | Report rows written | 2,190 | 2,190 |
 | Write | Output file size (MB) | 0.709851 | 0.704911 |
-| Whole run | Runtime range across repeat runs | N/A (one run) | N/A (one run) |
-| Whole run | Highest memory use (MiB) | 36.406 | 74.594 |
-| Whole run | Total CPU time (seconds) | 23.226444 | 42.037703 |
-| Whole run | Average CPU cores used | 1.674 | 1.760 |
+| Whole run | Runtime range across repeat runs | 12.982–13.283 | 22.114–23.246 |
+| Whole run | Highest memory use (MiB) | 40.250 | 76.344 |
+| Whole run | Total CPU time (seconds) | 22.089002 | 40.954650 |
+| Whole run | Average CPU cores used | 1.677 | 1.770 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude the additional contribution columns. A runtime range is unavailable because there was one run.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -203,12 +266,12 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 | Step | Work done | Rust seconds | Go seconds |
 |---|---|---:|---:|
-| Read | Read and decode Parquet batches. | 33.689 | 36.605 |
-| Filter | Keep US holdings in the portfolio and index. | 0.230 | 0.355 |
-| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | 0.164 | 0.316 |
-| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000861 | 0.000881 |
-| Write | Save the PARQUET report to disk. | 0.007 | 0.012 |
-| **Whole run** | Elapsed time from start to finish. | 21.170 | 22.694 |
+| Read | Read and decode Parquet batches. | 23.481 | 26.925 |
+| Filter | Keep US holdings in the portfolio and index. | 0.218 | 0.346 |
+| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | 0.161 | 0.313 |
+| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000804 | 0.000812 |
+| Write | Save the PARQUET report to disk. | 0.007 | 0.011 |
+| **Whole run** | Elapsed time from start to finish. | 14.776 | 16.772 |
 
 <details>
 <summary>Counts, throughput, and memory — Country, PARQUET</summary>
@@ -217,27 +280,27 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
-| Read | Million rows read per second | 5.200 | 4.786 |
+| Read | Million rows read per second | 7.461 | 6.507 |
 | Read | CSV bytes parsed per second (MiB) | N/A (no parsed-byte counter) | N/A (no parsed-byte counter) |
-| Read | Stored file size / read time (MiB/sec) | 150.440 | 138.456 |
+| Read | Stored file size / read time (MiB/sec) | 215.844 | 188.235 |
 | Filter | Rows checked | 175,200,000 | 175,200,000 |
 | Filter | Rows kept | 173,010,000 | 173,010,000 |
-| Prepare / group | Rows prepared per second | 1,055,502,102.582 | 547,900,248.067 |
+| Prepare / group | Rows prepared per second | 1,073,595,961.924 | 552,975,327.200 |
 | Prepare / group | Groups prepared across dates, counting portfolio and index separately | 2,190 | 2,190 |
 | Calculate | Daily BF effect values calculated | 6,570 | 6,570 |
-| Calculate | Daily BF effect values per second | 7,626,436.922 | 7,459,839.494 |
-| Calculate | Final BF effect values / calculation time | 7,626,436.922 | 7,459,839.494 |
+| Calculate | Daily BF effect values per second | 8,170,656.028 | 8,093,186.202 |
+| Calculate | Final BF effect values / calculation time | 8,170,656.028 | 8,093,186.202 |
 | Calculate | Report rows | 2,190 | 2,190 |
-| Write | Report rows written per second | 322,011.090 | 186,604.919 |
-| Write | Output written per second (MiB) | 29.098 | 17.229 |
+| Write | Report rows written per second | 293,929.589 | 191,744.867 |
+| Write | Output written per second (MiB) | 26.560 | 17.704 |
 | Write | Report rows written | 2,190 | 2,190 |
 | Write | Output file size (MB) | 0.207507 | 0.212026 |
-| Whole run | Runtime range across repeat runs | N/A (one run) | N/A (one run) |
-| Whole run | Highest memory use (MiB) | 101.688 | 195.312 |
-| Whole run | Total CPU time (seconds) | 34.082801 | 44.616701 |
-| Whole run | Average CPU cores used | 1.610 | 1.966 |
+| Whole run | Runtime range across repeat runs | 12.868–15.090 | 16.637–17.046 |
+| Whole run | Highest memory use (MiB) | 110.000 | 206.281 |
+| Whole run | Total CPU time (seconds) | 21.285223 | 34.304759 |
+| Whole run | Average CPU cores used | 1.447 | 2.043 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude the additional contribution columns. A runtime range is unavailable because there was one run.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -254,12 +317,12 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 | Step | Work done | Rust seconds | Go seconds |
 |---|---|---:|---:|
-| Read | Read and check CSV records. | 23.203 | 39.099 |
+| Read | Read and check CSV records. | 24.113 | 40.214 |
 | Filter | Keep all holdings; total the weights on each side. | 0.095 | 0.305 |
-| Prepare / group | Prepare weights and matching security IDs for each day. | 0.349 | 0.548 |
-| Calculate | Add security results to portfolio totals, then combine them by week. | 0.928 | 1.733 |
-| Write | Save the CSV report to disk. | 0.006 | 0.007 |
-| **Whole run** | Elapsed time from start to finish. | 14.090 | 23.477 |
+| Prepare / group | Prepare weights and matching security IDs for each day. | 0.350 | 0.573 |
+| Calculate | Add security results to portfolio totals, then combine them by week. | 0.920 | 1.653 |
+| Write | Save the CSV report to disk. | 0.006 | 0.006 |
+| **Whole run** | Elapsed time from start to finish. | 14.446 | 24.163 |
 
 <details>
 <summary>Counts, throughput, and memory — Weekly, CSV</summary>
@@ -268,27 +331,27 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
-| Read | Million rows read per second | 7.551 | 4.481 |
-| Read | CSV bytes parsed per second (MiB) | 518.776 | 307.860 |
-| Read | Stored file size / read time (MiB/sec) | 518.914 | 307.942 |
+| Read | Million rows read per second | 7.266 | 4.357 |
+| Read | CSV bytes parsed per second (MiB) | 499.192 | 299.325 |
+| Read | Stored file size / read time (MiB/sec) | 499.325 | 299.405 |
 | Filter | Rows checked | 175,200,000 | 175,200,000 |
 | Filter | Rows kept | 175,200,000 | 175,200,000 |
-| Prepare / group | Rows prepared per second | 501,569,421.312 | 319,600,562.925 |
+| Prepare / group | Rows prepared per second | 501,169,158.708 | 306,017,267.307 |
 | Prepare / group | Groups prepared across dates, counting portfolio and index separately | 175,200,000 | 175,200,000 |
 | Calculate | Daily BF effect values calculated | 1,044,630,000 | 1,044,630,000 |
-| Calculate | Daily BF effect values per second | 1,126,249,222.597 | 602,916,840.372 |
-| Calculate | Final BF effect values / calculation time | 1,022.069 | 547.146 |
+| Calculate | Daily BF effect values per second | 1,135,468,646.491 | 632,094,889.678 |
+| Calculate | Final BF effect values / calculation time | 1,030.436 | 573.625 |
 | Calculate | Report rows | 316 | 316 |
-| Write | Report rows written per second | 53,306.370 | 48,057.489 |
-| Write | Output written per second (MiB) | 14.911 | 13.185 |
+| Write | Report rows written per second | 53,987.793 | 49,377.785 |
+| Write | Output written per second (MiB) | 15.102 | 13.548 |
 | Write | Report rows written | 316 | 316 |
 | Write | Output file size (MB) | 0.092687 | 0.090911 |
 | Whole run | Runtime range across repeat runs | N/A (one run) | N/A (one run) |
-| Whole run | Highest memory use (MiB) | 48.891 | 98.344 |
-| Whole run | Total CPU time (seconds) | 24.415678 | 43.787871 |
-| Whole run | Average CPU cores used | 1.733 | 1.865 |
+| Whole run | Highest memory use (MiB) | 50.453 | 98.109 |
+| Whole run | Total CPU time (seconds) | 25.424049 | 45.031998 |
+| Whole run | Average CPU cores used | 1.760 | 1.864 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude the additional contribution columns. A runtime range is unavailable because there was one run.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -296,12 +359,12 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 | Step | Work done | Rust seconds | Go seconds |
 |---|---|---:|---:|
-| Read | Read and decode Parquet batches. | 34.302 | 37.284 |
-| Filter | Keep all holdings; total the weights on each side. | 0.096 | 0.306 |
-| Prepare / group | Prepare weights and matching security IDs for each day. | 0.351 | 0.563 |
-| Calculate | Add security results to portfolio totals, then combine them by week. | 0.933 | 1.738 |
-| Write | Save the PARQUET report to disk. | 0.005 | 0.007 |
-| **Whole run** | Elapsed time from start to finish. | 21.625 | 23.306 |
+| Read | Read and decode Parquet batches. | 26.495 | 27.657 |
+| Filter | Keep all holdings; total the weights on each side. | 0.094 | 0.304 |
+| Prepare / group | Prepare weights and matching security IDs for each day. | 0.350 | 0.576 |
+| Calculate | Add security results to portfolio totals, then combine them by week. | 0.917 | 1.664 |
+| Write | Save the PARQUET report to disk. | 0.007 | 0.006 |
+| **Whole run** | Elapsed time from start to finish. | 16.744 | 17.420 |
 
 <details>
 <summary>Counts, throughput, and memory — Weekly, PARQUET</summary>
@@ -310,27 +373,27 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
-| Read | Million rows read per second | 5.108 | 4.699 |
+| Read | Million rows read per second | 6.613 | 6.335 |
 | Read | CSV bytes parsed per second (MiB) | N/A (no parsed-byte counter) | N/A (no parsed-byte counter) |
-| Read | Stored file size / read time (MiB/sec) | 147.752 | 135.936 |
+| Read | Stored file size / read time (MiB/sec) | 191.290 | 183.255 |
 | Filter | Rows checked | 175,200,000 | 175,200,000 |
 | Filter | Rows kept | 175,200,000 | 175,200,000 |
-| Prepare / group | Rows prepared per second | 499,839,345.301 | 311,292,393.287 |
+| Prepare / group | Rows prepared per second | 500,822,762.898 | 304,107,812.302 |
 | Prepare / group | Groups prepared across dates, counting portfolio and index separately | 175,200,000 | 175,200,000 |
 | Calculate | Daily BF effect values calculated | 1,044,630,000 | 1,044,630,000 |
-| Calculate | Daily BF effect values per second | 1,120,073,217.017 | 601,123,425.986 |
-| Calculate | Final BF effect values / calculation time | 1,016.465 | 545.519 |
+| Calculate | Daily BF effect values per second | 1,139,463,684.899 | 627,686,733.846 |
+| Calculate | Final BF effect values / calculation time | 1,034.061 | 569.625 |
 | Calculate | Report rows | 316 | 316 |
-| Write | Report rows written per second | 60,570.257 | 47,681.941 |
-| Write | Output written per second (MiB) | 6.467 | 5.132 |
+| Write | Report rows written per second | 46,470.568 | 50,299.441 |
+| Write | Output written per second (MiB) | 4.962 | 5.413 |
 | Write | Report rows written | 316 | 316 |
 | Write | Output file size (MB) | 0.035379 | 0.035660 |
 | Whole run | Runtime range across repeat runs | N/A (one run) | N/A (one run) |
-| Whole run | Highest memory use (MiB) | 113.672 | 214.406 |
-| Whole run | Total CPU time (seconds) | 35.679190 | 47.770195 |
-| Whole run | Average CPU cores used | 1.650 | 2.050 |
+| Whole run | Highest memory use (MiB) | 126.500 | 223.547 |
+| Whole run | Total CPU time (seconds) | 25.186351 | 37.510574 |
+| Whole run | Average CPU cores used | 1.504 | 2.153 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude the additional contribution columns. A runtime range is unavailable because there was one run.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -347,12 +410,12 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 | Step | Work done | Rust seconds | Go seconds |
 |---|---|---:|---:|
-| Read | Read and check CSV records. | 26.281 | 42.099 |
-| Filter | Keep all holdings; total the weights on each side. | 0.096 | 0.312 |
-| Prepare / group | Prepare weights and matching security IDs for each day. | 0.353 | 0.563 |
-| Calculate | Add security results to portfolio totals, then combine them by month. | 0.925 | 1.739 |
-| Write | Save the CSV report to disk. | 0.006 | 0.009 |
-| **Whole run** | Elapsed time from start to finish. | 15.822 | 25.298 |
+| Read | Read and check CSV records. | 23.173 | 39.542 |
+| Filter | Keep all holdings; total the weights on each side. | 0.096 | 0.310 |
+| Prepare / group | Prepare weights and matching security IDs for each day. | 0.353 | 0.620 |
+| Calculate | Add security results to portfolio totals, then combine them by month. | 0.925 | 1.649 |
+| Write | Save the CSV report to disk. | 0.006 | 0.005 |
+| **Whole run** | Elapsed time from start to finish. | 14.096 | 23.751 |
 
 <details>
 <summary>Counts, throughput, and memory — Monthly, CSV</summary>
@@ -361,27 +424,27 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
-| Read | Million rows read per second | 6.667 | 4.162 |
-| Read | CSV bytes parsed per second (MiB) | 458.024 | 285.924 |
-| Read | Stored file size / read time (MiB/sec) | 458.146 | 286.000 |
+| Read | Million rows read per second | 7.560 | 4.431 |
+| Read | CSV bytes parsed per second (MiB) | 519.437 | 304.411 |
+| Read | Stored file size / read time (MiB/sec) | 519.576 | 304.492 |
 | Filter | Rows checked | 175,200,000 | 175,200,000 |
 | Filter | Rows kept | 175,200,000 | 175,200,000 |
-| Prepare / group | Rows prepared per second | 496,773,012.697 | 311,143,011.557 |
+| Prepare / group | Rows prepared per second | 496,642,168.847 | 282,691,820.103 |
 | Prepare / group | Groups prepared across dates, counting portfolio and index separately | 175,200,000 | 175,200,000 |
 | Calculate | Daily BF effect values calculated | 1,044,630,000 | 1,044,630,000 |
-| Calculate | Daily BF effect values per second | 1,129,550,969.078 | 600,562,191.129 |
-| Calculate | Final BF effect values / calculation time | 233.559 | 124.179 |
+| Calculate | Daily BF effect values per second | 1,129,402,962.660 | 633,611,287.375 |
+| Calculate | Final BF effect values / calculation time | 233.529 | 131.013 |
 | Calculate | Report rows | 72 | 72 |
-| Write | Report rows written per second | 11,899.023 | 8,130.921 |
-| Write | Output written per second (MiB) | 3.355 | 2.250 |
+| Write | Report rows written per second | 11,765.592 | 13,264.855 |
+| Write | Output written per second (MiB) | 3.318 | 3.671 |
 | Write | Report rows written | 72 | 72 |
 | Write | Output file size (MB) | 0.021288 | 0.020895 |
 | Whole run | Runtime range across repeat runs | N/A (one run) | N/A (one run) |
-| Whole run | Highest memory use (MiB) | 48.703 | 102.516 |
-| Whole run | Total CPU time (seconds) | 27.420683 | 46.953158 |
-| Whole run | Average CPU cores used | 1.733 | 1.856 |
+| Whole run | Highest memory use (MiB) | 48.203 | 102.938 |
+| Whole run | Total CPU time (seconds) | 24.406038 | 44.377285 |
+| Whole run | Average CPU cores used | 1.731 | 1.868 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude the additional contribution columns. A runtime range is unavailable because there was one run.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -389,12 +452,12 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 | Step | Work done | Rust seconds | Go seconds |
 |---|---|---:|---:|
-| Read | Read and decode Parquet batches. | 34.962 | 37.785 |
-| Filter | Keep all holdings; total the weights on each side. | 0.096 | 0.310 |
-| Prepare / group | Prepare weights and matching security IDs for each day. | 0.351 | 0.588 |
-| Calculate | Add security results to portfolio totals, then combine them by month. | 0.933 | 1.741 |
-| Write | Save the PARQUET report to disk. | 0.007 | 0.007 |
-| **Whole run** | Elapsed time from start to finish. | 22.023 | 23.627 |
+| Read | Read and decode Parquet batches. | 25.895 | 27.751 |
+| Filter | Keep all holdings; total the weights on each side. | 0.094 | 0.311 |
+| Prepare / group | Prepare weights and matching security IDs for each day. | 0.349 | 0.608 |
+| Calculate | Add security results to portfolio totals, then combine them by month. | 0.923 | 1.663 |
+| Write | Save the PARQUET report to disk. | 0.005 | 0.008 |
+| **Whole run** | Elapsed time from start to finish. | 16.366 | 17.464 |
 
 <details>
 <summary>Counts, throughput, and memory — Monthly, PARQUET</summary>
@@ -403,27 +466,27 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
-| Read | Million rows read per second | 5.011 | 4.637 |
+| Read | Million rows read per second | 6.766 | 6.313 |
 | Read | CSV bytes parsed per second (MiB) | N/A (no parsed-byte counter) | N/A (no parsed-byte counter) |
-| Read | Stored file size / read time (MiB/sec) | 144.966 | 134.133 |
+| Read | Stored file size / read time (MiB/sec) | 195.724 | 182.634 |
 | Filter | Rows checked | 175,200,000 | 175,200,000 |
 | Filter | Rows kept | 175,200,000 | 175,200,000 |
-| Prepare / group | Rows prepared per second | 499,185,974.980 | 298,085,100.295 |
+| Prepare / group | Rows prepared per second | 501,889,950.831 | 288,340,258.094 |
 | Prepare / group | Groups prepared across dates, counting portfolio and index separately | 175,200,000 | 175,200,000 |
 | Calculate | Daily BF effect values calculated | 1,044,630,000 | 1,044,630,000 |
-| Calculate | Daily BF effect values per second | 1,120,043,133.653 | 600,093,793.586 |
-| Calculate | Final BF effect values / calculation time | 231.593 | 124.082 |
+| Calculate | Daily BF effect values per second | 1,131,359,257.367 | 628,063,529.980 |
+| Calculate | Final BF effect values / calculation time | 233.933 | 129.866 |
 | Calculate | Report rows | 72 | 72 |
-| Write | Report rows written per second | 10,580.065 | 11,044.984 |
-| Write | Output written per second (MiB) | 1.804 | 1.875 |
+| Write | Report rows written per second | 13,494.409 | 8,615.401 |
+| Write | Output written per second (MiB) | 2.301 | 1.463 |
 | Write | Report rows written | 72 | 72 |
 | Write | Output file size (MB) | 0.012874 | 0.012819 |
 | Whole run | Runtime range across repeat runs | N/A (one run) | N/A (one run) |
-| Whole run | Highest memory use (MiB) | 110.531 | 216.812 |
-| Whole run | Total CPU time (seconds) | 36.313088 | 48.398475 |
-| Whole run | Average CPU cores used | 1.649 | 2.048 |
+| Whole run | Highest memory use (MiB) | 126.656 | 223.703 |
+| Whole run | Total CPU time (seconds) | 24.672630 | 37.537981 |
+| Whole run | Average CPU cores used | 1.508 | 2.149 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude the additional contribution columns. A runtime range is unavailable because there was one run.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -440,12 +503,12 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 | Step | Work done | Rust seconds | Go seconds |
 |---|---|---:|---:|
-| Read | Read and check CSV records. | 24.373 | 39.979 |
-| Filter | Keep the 400 selected IDs on both sides. | 0.080 | 0.205 |
+| Read | Read and check CSV records. | 23.221 | 38.959 |
+| Filter | Keep the 400 selected IDs on both sides. | 0.080 | 0.223 |
 | Prepare / group | Scale selected weights to 100% on each side; line up selected IDs. | 0.004 | 0.004 |
 | Calculate | Calculate selected-security results; combine index-only results into one summary. | 0.003 | 0.008 |
-| Write | Save the CSV report to disk. | 0.012 | 0.004 |
-| **Whole run** | Elapsed time from start to finish. | 14.584 | 23.609 |
+| Write | Save the CSV report to disk. | 0.007 | 0.004 |
+| **Whole run** | Elapsed time from start to finish. | 13.883 | 23.058 |
 
 <details>
 <summary>Counts, throughput, and memory — Subset, CSV</summary>
@@ -454,27 +517,27 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
-| Read | Million rows read per second | 7.188 | 4.382 |
-| Read | CSV bytes parsed per second (MiB) | 493.868 | 301.087 |
-| Read | Stored file size / read time (MiB/sec) | 493.999 | 301.167 |
+| Read | Million rows read per second | 7.545 | 4.497 |
+| Read | CSV bytes parsed per second (MiB) | 518.381 | 308.972 |
+| Read | Stored file size / read time (MiB/sec) | 518.519 | 309.054 |
 | Filter | Rows checked | 175,200,000 | 175,200,000 |
 | Filter | Rows kept | 547,500 | 547,500 |
-| Prepare / group | Rows prepared per second | 136,594,912.133 | 128,909,307.181 |
+| Prepare / group | Rows prepared per second | 140,441,115.926 | 153,096,491.895 |
 | Prepare / group | Groups prepared across dates, counting portfolio and index separately | 547,500 | 547,500 |
 | Calculate | Daily BF effect values calculated | 2,628,000 | 2,628,000 |
-| Calculate | Daily BF effect values per second | 824,093,121.268 | 338,270,259.917 |
-| Calculate | Final BF effect values / calculation time | 566,328.834 | 232,464.265 |
+| Calculate | Daily BF effect values per second | 888,726,263.856 | 341,044,645.184 |
+| Calculate | Final BF effect values / calculation time | 610,745.674 | 234,370.863 |
 | Calculate | Report rows | 602 | 602 |
-| Write | Report rows written per second | 51,172.888 | 134,547.569 |
-| Write | Output written per second (MiB) | 13.556 | 34.929 |
+| Write | Report rows written per second | 88,109.518 | 169,973.575 |
+| Write | Output written per second (MiB) | 23.342 | 44.126 |
 | Write | Report rows written | 602 | 602 |
 | Write | Output file size (MB) | 0.167226 | 0.163874 |
 | Whole run | Runtime range across repeat runs | N/A (one run) | N/A (one run) |
-| Whole run | Highest memory use (MiB) | 36.984 | 76.641 |
-| Whole run | Total CPU time (seconds) | 24.268410 | 41.544603 |
-| Whole run | Average CPU cores used | 1.664 | 1.760 |
+| Whole run | Highest memory use (MiB) | 40.359 | 76.344 |
+| Whole run | Total CPU time (seconds) | 23.218193 | 40.652325 |
+| Whole run | Average CPU cores used | 1.672 | 1.763 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude the additional contribution columns. A runtime range is unavailable because there was one run.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -482,12 +545,12 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 | Step | Work done | Rust seconds | Go seconds |
 |---|---|---:|---:|
-| Read | Read and decode Parquet batches. | 34.452 | 37.644 |
-| Filter | Keep the 400 selected IDs on both sides. | 0.084 | 0.195 |
+| Read | Read and decode Parquet batches. | 25.091 | 27.290 |
+| Filter | Keep the 400 selected IDs on both sides. | 0.084 | 0.225 |
 | Prepare / group | Scale selected weights to 100% on each side; line up selected IDs. | 0.003 | 0.005 |
 | Calculate | Calculate selected-security results; combine index-only results into one summary. | 0.003 | 0.008 |
-| Write | Save the PARQUET report to disk. | 0.007 | 0.007 |
-| **Whole run** | Elapsed time from start to finish. | 21.483 | 23.023 |
+| Write | Save the PARQUET report to disk. | 0.006 | 0.006 |
+| **Whole run** | Elapsed time from start to finish. | 15.618 | 16.787 |
 
 <details>
 <summary>Counts, throughput, and memory — Subset, PARQUET</summary>
@@ -496,27 +559,27 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
-| Read | Million rows read per second | 5.085 | 4.654 |
+| Read | Million rows read per second | 6.982 | 6.420 |
 | Read | CSV bytes parsed per second (MiB) | N/A (no parsed-byte counter) | N/A (no parsed-byte counter) |
-| Read | Stored file size / read time (MiB/sec) | 147.108 | 134.635 |
+| Read | Stored file size / read time (MiB/sec) | 201.990 | 185.719 |
 | Filter | Rows checked | 175,200,000 | 175,200,000 |
 | Filter | Rows kept | 547,500 | 547,500 |
-| Prepare / group | Rows prepared per second | 171,420,037.327 | 118,175,984.438 |
+| Prepare / group | Rows prepared per second | 192,415,964.304 | 112,471,612.473 |
 | Prepare / group | Groups prepared across dates, counting portfolio and index separately | 547,500 | 547,500 |
 | Calculate | Daily BF effect values calculated | 2,628,000 | 2,628,000 |
-| Calculate | Daily BF effect values per second | 868,446,828.451 | 314,167,483.068 |
-| Calculate | Final BF effect values / calculation time | 596,809.350 | 215,900.485 |
+| Calculate | Daily BF effect values per second | 864,373,314.546 | 335,855,401.214 |
+| Calculate | Final BF effect values / calculation time | 594,009.972 | 230,804.739 |
 | Calculate | Report rows | 602 | 602 |
-| Write | Report rows written per second | 85,756.049 | 86,474.647 |
-| Write | Output written per second (MiB) | 5.202 | 5.340 |
+| Write | Report rows written per second | 94,059.399 | 101,032.020 |
+| Write | Output written per second (MiB) | 5.706 | 6.239 |
 | Write | Report rows written | 602 | 602 |
 | Write | Output file size (MB) | 0.038292 | 0.038980 |
 | Whole run | Runtime range across repeat runs | N/A (one run) | N/A (one run) |
-| Whole run | Highest memory use (MiB) | 98.797 | 200.969 |
-| Whole run | Total CPU time (seconds) | 34.481872 | 45.175742 |
-| Whole run | Average CPU cores used | 1.605 | 1.962 |
+| Whole run | Highest memory use (MiB) | 112.031 | 202.453 |
+| Whole run | Total CPU time (seconds) | 22.498215 | 34.127748 |
+| Whole run | Average CPU cores used | 1.441 | 2.033 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude the additional contribution columns. A runtime range is unavailable because there was one run.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
 
 </details>
 

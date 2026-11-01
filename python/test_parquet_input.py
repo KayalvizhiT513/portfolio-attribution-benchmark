@@ -4,6 +4,7 @@ Run after building both native binaries: .venv/bin/python python/test_parquet_in
 """
 import argparse
 import csv
+import math
 from datetime import date
 from pathlib import Path
 import shutil
@@ -63,6 +64,12 @@ def compare_outputs(a, b):
         x, y = next(csv.DictReader(f)), next(csv.DictReader(g))
         for field in ['days', 'rows_read', 'rows_retained', 'groups', 'effect_values', 'output_rows', 'report_rows']:
             assert x[field] == y[field], (field, x[field], y[field])
+        for folder, row in [(a, x), (b, y)]:
+            if 'parquet_batch_read_decode_seconds' in row and folder.name.endswith('parquet'):
+                decode = float(row['parquet_batch_read_decode_seconds'])
+                adapter = float(row['parquet_to_daily_buffer_seconds'])
+                assert decode > 0 and adapter > 0 and int(row['parquet_batches']) > 0
+                assert math.isclose(decode + adapter, float(row['read_parse_seconds']), rel_tol=1e-9, abs_tol=1e-6)
 
 
 def main():

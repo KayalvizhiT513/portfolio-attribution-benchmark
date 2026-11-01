@@ -1,5 +1,6 @@
 """Add measured detailed stage tables and five consolidated scenario flow SVGs to the report."""
 import json
+import statistics
 from pathlib import Path
 
 import benchmark_csv_parquet as benchmark
@@ -15,6 +16,102 @@ STAGES = [('read_parse_seconds', 'Read/decode'), ('filter_seconds', 'Filter'),
 def seconds(value):
     value = float(value)
     return f'{value:.6f}' if abs(value) < 0.001 else f'{value:.3f}'
+
+
+def latest_datasets():
+    ready = {}
+    for language in ['rust', 'go']:
+        path = ROOT / f'results/{language}-date-cache/runs.json'
+        if path.exists():
+            data = json.loads(path.read_text())
+            if len(data) == 14: ready[language] = data
+    return ready
+
+
+GO_UPDATED = 'go' in latest_datasets()
+LATEST_NOTE = ('Both engines use their date-cache follow-up measurements: Country is the median of three CSV/Parquet pairs per engine; each other scenario uses one pair. Rust and Go were measured in separate sessions.' if GO_UPDATED else
+              'Rust uses the latest date-cache measurements: the median of three runs for Country and one run for each other scenario. Go uses its earlier single-run baseline; Go was not rerun for this change.')
+
+
+def latest_rust_rows(runs):
+    # Keep the established helper name for the country renderer, but merge the
+    # newest complete experiment for either engine without changing raw files.
+    datasets = latest_datasets()
+    if not datasets: return runs, False
+    merged = []
+    for original in runs:
+        row = dict(original)
+        latest = datasets.get(row['language'], [])
+        samples = [r for r in latest if r['scenario'] == row['scenario'] and r['format'] == row['format']]
+        if samples:
+            for key in row:
+                try: row[key] = statistics.median(float(r[key]) for r in samples)
+                except (ValueError, TypeError, KeyError): pass
+            row['measurement_runs'] = len(samples)
+            row['process_wall_seconds_min'] = min(float(r['process_wall_seconds']) for r in samples)
+            row['process_wall_seconds_max'] = max(float(r['process_wall_seconds']) for r in samples)
+            row['peak_rss_mib'] = max(float(r['peak_rss_mib']) for r in samples)
+        merged.append(row)
+    return merged, True
+
+
+def read_breakdown(scenario=None, language='rust'):
+    path = ROOT / f'results/{language}-date-cache/profile/runs.json'
+    if not path.exists(): return []
+    profiles = [r for r in json.loads(path.read_text()) if r.get('mode', 'parquet') == 'parquet']
+    if not profiles: return []
+    lines = [f'## {language.capitalize()} Parquet: where read time goes', '',
+             'These separate profiling runs split the read step. Times combine both readers, so they can exceed total runtime. Country uses the run with the middle read time out of three; other scenarios use one.', '',
+             '| Scenario | Read + decompress/decode seconds | Prepare daily buffers seconds | Total read seconds |',
+             '|---|---:|---:|---:|']
+    for name, _ in benchmark.SCENARIOS:
+        if scenario and name != scenario: continue
+        samples = sorted([r for r in profiles if r['scenario'] == name], key=lambda r: float(r['read_parse_seconds']))
+        if not samples: continue
+        r = samples[len(samples)//2]
+        lines.append(f"| {name.capitalize()} | {float(r['parquet_batch_read_decode_seconds']):.3f} | {float(r['parquet_to_daily_buffer_seconds']):.3f} | {float(r['read_parse_seconds']):.3f} |")
+    lines += ['', 'The first part includes file I/O, decompression, decoding and Arrow batch creation. The second includes row handling, date caching, ID lookup, validation and building daily buffers. It is the remaining read time after subtracting batch time.', '',
+              f'[Full date-cache comparison and profiling evidence]({language.upper()}_DATE_READ_REPORT.md)', '']
+    return lines
+
+
+def go_diagnostics_section():
+    path = ROOT / 'results/go-date-cache/profile/runs.json'
+    if not path.exists(): return []
+    profiles = json.loads(path.read_text())
+    groups = {mode: [p for p in profiles if p['mode'] == mode]
+              for mode in ('csv', 'parquet')}
+    if any(len(samples) != 3 for samples in groups.values()): return []
+    lines = ['<details>', '<summary>Go: decoding, row handling, allocations and garbage collection</summary>', '',
+             'Country diagnostic runs only: three runs per format, separate from the normal timing runs above. These measure the whole process, including setup and output.', '',
+             '| Memory / garbage collection | CSV | Parquet with cached dates |',
+             '|---|---:|---:|']
+    metrics = [('Total allocated GiB', 'allocated_bytes', 1024**3),
+               ('Allocated objects (millions)', 'allocated_objects', 1e6),
+               ('Garbage collections', 'gc_cycles', 1),
+               ('Estimated garbage-collection CPU seconds', 'gc_cpu_seconds', 1),
+               ('Pause seconds', 'gc_pause_wall_seconds', 1)]
+    for label, key, scale in metrics:
+        values = [statistics.median(p['runtime'][key] for p in samples) / scale
+                  for samples in groups.values()]
+        lines.append(f'| {label} | {values[0]:.3f} | {values[1]:.3f} |')
+    lines += ['', 'Values above are medians. Allocated GiB is the total allocated over the run, **not peak memory**. Garbage-collection CPU is a Go-runtime estimate that may overestimate CPU use and is not directly comparable with OS CPU time. It overlaps the stage measurements; do not add it to runtime.', '',
+              '| Work sampled on CPU | CSV CPU seconds | Parquet CPU seconds |',
+              '|---|---:|---:|']
+    labels = [('file_read', 'File reads'), ('decode', 'Text parsing / Parquet decoding'),
+              ('row_handling', 'Row handling and ID lookup'), ('allocation', 'Allocate / resize memory'),
+              ('gc', 'Garbage collection'), ('heap_maintenance', 'Release unused heap memory'),
+              ('runtime_support', 'Go runtime / profiling support')]
+    for key, label in labels:
+        values = [statistics.mean(p['cpu']['exclusive_cpu_seconds'].get(key, 0)
+                                  for p in samples) for samples in groups.values()]
+        lines.append(f'| {label} | {values[0]:.3f} | {values[1]:.3f} |')
+    lines += ['', 'CPU rows are means from 10 ms samples, not elapsed stage times. Each sample is counted once; parsing/decoding and row handling exclude samples assigned to file reads, allocation or garbage collection. Runtime support includes scheduling, waits and profiling support. Remaining calculation, output and setup samples are in the full Go report.', '',
+              'CSV spends most sampled CPU on file reads and text parsing. Parquet allocates large Arrow and dictionary-decoding buffers. A separate single-run control with the date cache disabled creates about 175.2 million more objects than cached Parquet; the cache removes repeated date-string allocations.', '',
+              '[Full Go analysis](GO_DATE_READ_REPORT.md) · [Diagnostic measurements](results/go-date-cache/profile/runs.json) · [Diagnostic checks](results/go-date-cache/profile/checks.json)', '',
+              '</details>', '']
+    return lines
+
 
 CONTENT = {
     'security': {
@@ -157,7 +254,7 @@ def metrics_table(rows, fmt, scenario):
         ('', 'Attribution rows written', lambda r: count(r, 'output_rows')),
         ('', 'Attribution output MB', lambda r: f"{value(r, 'output_bytes') / 1e6:.6f}"),
         ('Overall', 'Wall seconds (single run)', lambda r: number(r, 'process_wall_seconds')),
-        ('', 'Wall min–max seconds', lambda r: 'N/A (one run)'),
+        ('', 'Wall min–max seconds', lambda r: f"{float(r['process_wall_seconds_min']):.3f}–{float(r['process_wall_seconds_max']):.3f}" if r.get('measurement_runs', 1) > 1 else 'N/A (one run)'),
         ('', 'Peak RSS MiB', lambda r: f"{value(r, 'peak_rss_mib'):.3f}"),
         ('', 'CPU seconds', lambda r: number(r, 'cpu_seconds')),
         ('', 'Average cores', lambda r: f"{value(r, 'average_cores'):.3f}"),
@@ -232,7 +329,7 @@ def draw(scenario, rows):
         'Typed string/date32/float64 arrays; ≤65,536 rows.'])
     c.edge('M1065 765 V805')
     c.box(765, 805, 600, 160, 'read', '1c · ARROW → DAILY ADAPTER', [
-        'Typed numeric access; date32 → ISO date.',
+        'Both cache date text; numeric values stay typed.' if GO_UPDATED else 'Rust caches date text; Go formats date32.',
         'ID lookup/validation; assemble complete dates',
         'across batches into reusable raw buffers.', pair('parquet', 'read_parse_seconds')])
     c.edge('M375 815 V1010 H720 V1050'); c.edge('M1065 965 V1010 H720')
@@ -272,10 +369,28 @@ def main():
     checks = json.loads((benchmark.OUT / 'checks.json').read_text())
     env = json.loads((benchmark.OUT / 'environment.json').read_text())
     assert len(runs) == 20 and len(checks) == 15
-    rows = {(r['format'], r['scenario'], r['language']): r for r in runs}
+    display_runs, updated = latest_rust_rows(runs)
+    rows = {(r['format'], r['scenario'], r['language']): r for r in display_runs}
     DEST.mkdir(parents=True, exist_ok=True)
     flow.DEST = DEST
-    benchmark.save(runs, checks, env)
+    benchmark.save(display_runs, checks, env, persist=False)
+    if updated:
+        text = benchmark.REPORT.read_text()
+        text = text.replace('**Baseline measurements.** See the [Rust date-format fix and fresh comparison](RUST_DATE_READ_REPORT.md) for the follow-up.', LATEST_NOTE)
+        text = text.replace('Complete: 10 CSV runs, followed by 10 Parquet runs.', 'Updated with the Rust date-format fix and follow-up measurements.')
+        text = text.replace('One full-history run per cell;', 'Rust Country cells are three-run medians; other cells are single runs;')
+        text = text.replace('in this single pass', 'for the displayed results')
+        text = text.replace('¹ Total CPU time across the five scenarios. ² Highest memory use seen in any scenario.', '¹ Sum of the displayed scenario CPU values; Rust Country uses its three-run median. ² Highest memory use observed, including repeats.')
+        text = text.replace('CSV ran first, then Parquet. The starting language alternates by scenario. We used the normal filesystem cache and measured each configuration once.', 'Latest Rust Country pairs alternate CSV/Parquet order over three pairs; other Rust scenarios have one fresh pair. Go retains the earlier CSV-first measurements. All used normal filesystem caching.')
+        text = text.replace('Validation: 15/15 file comparisons passed (5 CSV Go/Rust, 5 Parquet Go/Rust, 5 CSV/Parquet). Every output field is compared; engines also enforce BF and contribution reconciliation.', 'Checks: the updated Rust outputs passed 35 comparisons against the earlier Rust/Go results and fresh CSV/Parquet outputs. All 14 profiling comparisons passed. The original Go baseline also retains its 15 passed comparisons. Each engine checks BF and contribution totals.')
+        if GO_UPDATED:
+            text = text.replace('Updated with the Rust date-format fix and follow-up measurements.', 'Updated with date caches in both Rust and Go.')
+            text = text.replace('Rust Country cells are three-run medians; other cells are single runs;', 'Country cells are three-run medians for both engines; other cells are single runs;')
+            text = text.replace('Go retains the earlier CSV-first measurements.', 'Go also uses three alternating country pairs and one fresh pair per other scenario.')
+            text = text.replace('the updated Rust outputs passed 35 comparisons against the earlier Rust/Go results and fresh CSV/Parquet outputs. All 14 profiling comparisons passed. The original Go baseline also retains its 15 passed comparisons.', 'the updated Rust and Go outputs each passed 35 comparisons against the original results and fresh CSV/Parquet outputs. Rust has 14 passed profiling checks; Go has 14 passed diagnostic/control checks.')
+            text = text.replace('Rust Country uses its three-run median.', 'Country uses three-run medians for both engines.')
+            text += '\nLatest measurements: [Rust](results/rust-date-cache/runs.csv) · [Go](results/go-date-cache/runs.csv). Detailed diagnostics: [Go read report](GO_DATE_READ_REPORT.md).\n'
+        benchmark.REPORT.write_text(text + '\n'.join(read_breakdown() + read_breakdown(language='go') + go_diagnostics_section()))
     sections = ['', '<details>', '<summary>How the CSV and Parquet runs work</summary>', '',
                 '| Layer | CSV | Parquet / Arrow |', '|---|---|---|',
                 '| Storage / decode | Buffered text records; parse numeric strings | Project Parquet columns; decompress/decode into typed Arrow RecordBatches |',
@@ -291,7 +406,7 @@ def main():
                 '## Time by stage', '',
                 'Each scenario has the same layout: a timing table, its supporting numbers, then the next input format. Read down to follow the steps; compare Rust and Go across the row.', '',
                 '**Why stage times can exceed the whole run:** the index and portfolio workers can run at the same time. Stage figures add their time together; “Whole run” is how long you actually wait. Do not add the stage rows to estimate runtime.', '',
-                'One measurement per configuration. Small timing differences need repeat runs to confirm.', '']
+                LATEST_NOTE if updated else 'One measurement per configuration. Small timing differences need repeat runs to confirm.', '']
     for scenario, _ in benchmark.SCENARIOS:
         draw(scenario, rows)
         path = f'docs/flows/csv-parquet/{scenario}.svg'
@@ -302,7 +417,7 @@ def main():
                          f'<summary>Counts, throughput, and memory — {scenario.capitalize()}, {fmt.upper()}</summary>', '',
                          'Steps appear in the same order as the timing table. Rates use the time spent in that step.', '']
             sections += metrics_table(rows, fmt, scenario)
-            sections += ['', 'MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude the additional contribution columns. A runtime range is unavailable because there was one run.', '', '</details>', '']
+            sections += ['', 'MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.', '', '</details>', '']
         sections += ['<details>', f'<summary>View the {scenario} flow diagram</summary>', '',
                      f'[![{scenario.capitalize()} — CSV/Parquet and Rust/Go flow]({path})]({path})', '', '</details>', '']
     benchmark.REPORT.write_text(benchmark.REPORT.read_text() + '\n'.join(sections))

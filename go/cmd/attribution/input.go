@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
@@ -100,21 +101,71 @@ func (r *csvInput) parsedBytes() int64            { return r.r.InputOffset() }
 func (r *csvInput) Close() error                  { return r.f.Close() }
 
 type parquetInput struct {
-	f       *file.Reader
-	r       pqarrow.RecordReader
-	batch   arrow.RecordBatch
-	row     int
-	columns []int
+	f            *file.Reader
+	r            pqarrow.RecordReader
+	batch        arrow.RecordBatch
+	row          int
+	columns      []int
+	dateCache    *date32Cache
+	profileRead  bool
+	batchSeconds float64
+	batches      uint64
+}
+
+type date32Cache struct {
+	column  int
+	day     arrow.Date32
+	valid   bool
+	text    string
+	formats uint64
+}
+
+func (c *date32Cache) refresh(batch arrow.RecordBatch, row int) {
+	day := batch.Column(c.column).(*array.Date32).Value(row)
+	if !c.valid || day != c.day {
+		c.text = day.FormattedString()
+		c.day = day
+		c.valid = true
+		c.formats++
+	}
+}
+
+type inputReadProfile struct {
+	seconds float64
+	batches uint64
+	enabled bool
+}
+type profiledInput interface{ readProfile() inputReadProfile }
+
+func (r *parquetInput) readProfile() inputReadProfile {
+	return inputReadProfile{r.batchSeconds, r.batches, r.profileRead}
 }
 
 func (r *parquetInput) next() (bool, error) {
 	if r.batch != nil {
 		r.row++
 		if int64(r.row) < r.batch.NumRows() {
+			if r.dateCache != nil {
+				r.dateCache.refresh(r.batch, r.row)
+			}
 			return true, nil
 		}
 	}
-	for r.r.Next() {
+	for {
+		var started time.Time
+		if r.profileRead {
+			started = time.Now()
+		}
+		next := r.r.Next()
+		if r.profileRead {
+			r.batchSeconds += time.Since(started).Seconds()
+			if next {
+				r.batches++
+			}
+		}
+		if !next {
+			break
+		}
 		r.batch = r.r.RecordBatch()
 		r.row = 0
 		if r.batch.NumRows() == 0 {
@@ -125,12 +176,18 @@ func (r *parquetInput) next() (bool, error) {
 				return false, fmt.Errorf("null Parquet input field")
 			}
 		}
+		if r.dateCache != nil {
+			r.dateCache.refresh(r.batch, 0)
+		}
 		return true, nil
 	}
 	r.batch = nil
 	return false, r.r.Err()
 }
 func (r *parquetInput) text(i int) string {
+	if r.dateCache != nil && r.columns[i] == r.dateCache.column {
+		return r.dateCache.text
+	}
 	switch a := r.batch.Column(r.columns[i]).(type) {
 	case *array.String:
 		return a.Value(r.row)
@@ -215,5 +272,12 @@ func openInput(path string, header []string) (inputReader, error) {
 	for i, name := range header {
 		columns[i] = rr.Schema().FieldIndices(name)[0]
 	}
-	return &parquetInput{f: f, r: rr, columns: columns}, nil
+	var cache *date32Cache
+	if os.Getenv("ATTRIBUTION_DISABLE_DATE_CACHE") != "1" {
+		indices := rr.Schema().FieldIndices("EffectiveDate")
+		if len(indices) == 1 && rr.Schema().Field(indices[0]).Type.ID() == arrow.DATE32 {
+			cache = &date32Cache{column: indices[0]}
+		}
+	}
+	return &parquetInput{f: f, r: rr, columns: columns, dateCache: cache, profileRead: os.Getenv("ATTRIBUTION_PROFILE_READ") == "1"}, nil
 }

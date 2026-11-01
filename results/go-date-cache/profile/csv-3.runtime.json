@@ -1,0 +1,11 @@
+{
+  "allocated_bytes": 12430414544,
+  "allocated_objects": 175698119,
+  "freed_objects": 175418083,
+  "gc_assist_cpu_seconds": 0.0194234,
+  "gc_cpu_seconds": 1.23391291,
+  "gc_cycles": 467,
+  "gc_pause_wall_seconds": 0.025912963,
+  "heap_live_bytes_at_end": 37821440,
+  "scope": "whole process, including setup/output and diagnostic overhead; GC counters overlap phase elapsed times"
+}

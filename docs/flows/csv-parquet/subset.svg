@@ -69,7 +69,7 @@
 <tspan x="375.0" dy="0">Rust Stream::next / Go stream.next group dates.</tspan>
 <tspan x="375.0" dy="25">Lookahead preserves the next date boundary.</tspan>
 <tspan x="375.0" dy="25">Reusable raw records with integer IDs.</tspan>
-<tspan x="375.0" dy="25">CSV: Rust 24.373s · Go 39.979s</tspan>
+<tspan x="375.0" dy="25">CSV: Rust 23.221s · Go 38.959s</tspan>
 </text>
 <rect x="765" y="630" width="600" height="135" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
 <text x="1065.0" y="660" class="head" text-anchor="middle">
@@ -86,10 +86,10 @@
 <tspan x="1065.0" dy="0">1c · ARROW → DAILY ADAPTER</tspan>
 </text>
 <text x="1065.0" y="866" class="body" text-anchor="middle">
-<tspan x="1065.0" dy="0">Typed numeric access; date32 → ISO date.</tspan>
+<tspan x="1065.0" dy="0">Both cache date text; numeric values stay typed.</tspan>
 <tspan x="1065.0" dy="25">ID lookup/validation; assemble complete dates</tspan>
 <tspan x="1065.0" dy="25">across batches into reusable raw buffers.</tspan>
-<tspan x="1065.0" dy="25">PARQUET: Rust 34.452s · Go 37.644s</tspan>
+<tspan x="1065.0" dy="25">PARQUET: Rust 25.091s · Go 27.290s</tspan>
 </text>
 <path d="M375 815 V1010 H720 V1050" class="edge"/>
 <path d="M1065 965 V1010 H720" class="edge"/>
@@ -100,8 +100,8 @@
 <text x="720.0" y="1111" class="body" text-anchor="middle">
 <tspan x="720.0" dy="0">Membership mask: retain 400 selected IDs; excluded rows were still read and validated.</tspan>
 <tspan x="720.0" dy="25">Selection = 200 portfolio-only US + 100 index-only US + 100 shared DE IDs.</tspan>
-<tspan x="720.0" dy="25">CSV: Rust 0.080s · Go 0.205s</tspan>
-<tspan x="720.0" dy="25">PARQUET: Rust 0.084s · Go 0.195s</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 0.080s · Go 0.223s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 0.084s · Go 0.225s</tspan>
 </text>
 <path d="M720 1210 V1250" class="edge"/>
 <rect x="160" y="1250" width="1120" height="185" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
@@ -140,7 +140,7 @@
 <tspan x="375.0" dy="0">602 rows · 20 columns · numeric text formatting.</tspan>
 <tspan x="375.0" dy="25">Rust: csv Writer + Ryū; Go: escaped byte buffer.</tspan>
 <tspan x="375.0" dy="25">Buffer → flush → fsync → publish final .csv.</tspan>
-<tspan x="375.0" dy="25">CSV: Rust 0.012s · Go 0.004s</tspan>
+<tspan x="375.0" dy="25">CSV: Rust 0.007s · Go 0.004s</tspan>
 </text>
 <rect x="765" y="1740" width="600" height="185" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
 <text x="1065.0" y="1770" class="head" text-anchor="middle">
@@ -150,7 +150,7 @@
 <tspan x="1065.0" dy="0">602 rows · 20 typed columns · Arrow builders.</tspan>
 <tspan x="1065.0" dy="25">Rust: ArrowWriter; Go: pqarrow.FileWriter.</tspan>
 <tspan x="1065.0" dy="25">≤65,536 rows → Zstd → footer → fsync → .parquet.</tspan>
-<tspan x="1065.0" dy="25">PARQUET: Rust 0.007s · Go 0.007s</tspan>
+<tspan x="1065.0" dy="25">PARQUET: Rust 0.006s · Go 0.006s</tspan>
 </text>
 <path d="M160 1540 H35 V435 H375 V455" class="edge"/>
 <path d="M1280 1540 H1400 V435 H1065 V455" class="edge"/>

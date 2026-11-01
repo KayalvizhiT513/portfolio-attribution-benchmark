@@ -1,0 +1,310 @@
+[
+  {
+    "scenario": "country",
+    "repetition": 1,
+    "format": "csv",
+    "comparison": "original rust",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 1,
+    "format": "csv",
+    "comparison": "original go",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 1,
+    "format": "parquet",
+    "comparison": "original rust",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 1,
+    "format": "parquet",
+    "comparison": "original go",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 1,
+    "comparison": "fresh CSV/Parquet",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 2,
+    "format": "parquet",
+    "comparison": "original rust",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 2,
+    "format": "parquet",
+    "comparison": "original go",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 2,
+    "format": "csv",
+    "comparison": "original rust",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 2,
+    "format": "csv",
+    "comparison": "original go",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 2,
+    "comparison": "fresh CSV/Parquet",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 3,
+    "format": "csv",
+    "comparison": "original rust",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 3,
+    "format": "csv",
+    "comparison": "original go",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 3,
+    "format": "parquet",
+    "comparison": "original rust",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 3,
+    "format": "parquet",
+    "comparison": "original go",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 3,
+    "comparison": "fresh CSV/Parquet",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "security",
+    "repetition": 1,
+    "format": "csv",
+    "comparison": "original rust",
+    "rows": 318000,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "security",
+    "repetition": 1,
+    "format": "csv",
+    "comparison": "original go",
+    "rows": 318000,
+    "maximum_absolute_difference": 6.2341624917916505e-19,
+    "status": "PASS"
+  },
+  {
+    "scenario": "security",
+    "repetition": 1,
+    "format": "parquet",
+    "comparison": "original rust",
+    "rows": 318000,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "security",
+    "repetition": 1,
+    "format": "parquet",
+    "comparison": "original go",
+    "rows": 318000,
+    "maximum_absolute_difference": 6.2341624917916505e-19,
+    "status": "PASS"
+  },
+  {
+    "scenario": "security",
+    "repetition": 1,
+    "comparison": "fresh CSV/Parquet",
+    "rows": 318000,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "weekly",
+    "repetition": 1,
+    "format": "csv",
+    "comparison": "original rust",
+    "rows": 316,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "weekly",
+    "repetition": 1,
+    "format": "csv",
+    "comparison": "original go",
+    "rows": 316,
+    "maximum_absolute_difference": 1.734723475976807e-18,
+    "status": "PASS"
+  },
+  {
+    "scenario": "weekly",
+    "repetition": 1,
+    "format": "parquet",
+    "comparison": "original rust",
+    "rows": 316,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "weekly",
+    "repetition": 1,
+    "format": "parquet",
+    "comparison": "original go",
+    "rows": 316,
+    "maximum_absolute_difference": 1.734723475976807e-18,
+    "status": "PASS"
+  },
+  {
+    "scenario": "weekly",
+    "repetition": 1,
+    "comparison": "fresh CSV/Parquet",
+    "rows": 316,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "monthly",
+    "repetition": 1,
+    "format": "csv",
+    "comparison": "original rust",
+    "rows": 72,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "monthly",
+    "repetition": 1,
+    "format": "csv",
+    "comparison": "original go",
+    "rows": 72,
+    "maximum_absolute_difference": 6.938893903907228e-18,
+    "status": "PASS"
+  },
+  {
+    "scenario": "monthly",
+    "repetition": 1,
+    "format": "parquet",
+    "comparison": "original rust",
+    "rows": 72,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "monthly",
+    "repetition": 1,
+    "format": "parquet",
+    "comparison": "original go",
+    "rows": 72,
+    "maximum_absolute_difference": 6.938893903907228e-18,
+    "status": "PASS"
+  },
+  {
+    "scenario": "monthly",
+    "repetition": 1,
+    "comparison": "fresh CSV/Parquet",
+    "rows": 72,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "subset",
+    "repetition": 1,
+    "format": "csv",
+    "comparison": "original rust",
+    "rows": 602,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "subset",
+    "repetition": 1,
+    "format": "csv",
+    "comparison": "original go",
+    "rows": 602,
+    "maximum_absolute_difference": 1.5959455978986625e-16,
+    "status": "PASS"
+  },
+  {
+    "scenario": "subset",
+    "repetition": 1,
+    "format": "parquet",
+    "comparison": "original rust",
+    "rows": 602,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "subset",
+    "repetition": 1,
+    "format": "parquet",
+    "comparison": "original go",
+    "rows": 602,
+    "maximum_absolute_difference": 1.5959455978986625e-16,
+    "status": "PASS"
+  },
+  {
+    "scenario": "subset",
+    "repetition": 1,
+    "comparison": "fresh CSV/Parquet",
+    "rows": 602,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  }
+]

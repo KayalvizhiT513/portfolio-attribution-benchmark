@@ -69,7 +69,7 @@
 <tspan x="375.0" dy="0">Rust Stream::next / Go stream.next group dates.</tspan>
 <tspan x="375.0" dy="25">Lookahead preserves the next date boundary.</tspan>
 <tspan x="375.0" dy="25">Reusable raw records with integer IDs.</tspan>
-<tspan x="375.0" dy="25">CSV: Rust 26.281s · Go 42.099s</tspan>
+<tspan x="375.0" dy="25">CSV: Rust 23.173s · Go 39.542s</tspan>
 </text>
 <rect x="765" y="630" width="600" height="135" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
 <text x="1065.0" y="660" class="head" text-anchor="middle">
@@ -86,10 +86,10 @@
 <tspan x="1065.0" dy="0">1c · ARROW → DAILY ADAPTER</tspan>
 </text>
 <text x="1065.0" y="866" class="body" text-anchor="middle">
-<tspan x="1065.0" dy="0">Typed numeric access; date32 → ISO date.</tspan>
+<tspan x="1065.0" dy="0">Both cache date text; numeric values stay typed.</tspan>
 <tspan x="1065.0" dy="25">ID lookup/validation; assemble complete dates</tspan>
 <tspan x="1065.0" dy="25">across batches into reusable raw buffers.</tspan>
-<tspan x="1065.0" dy="25">PARQUET: Rust 34.962s · Go 37.785s</tspan>
+<tspan x="1065.0" dy="25">PARQUET: Rust 25.895s · Go 27.751s</tspan>
 </text>
 <path d="M375 815 V1010 H720 V1050" class="edge"/>
 <path d="M1065 965 V1010 H720" class="edge"/>
@@ -100,8 +100,8 @@
 <text x="720.0" y="1111" class="body" text-anchor="middle">
 <tspan x="720.0" dy="0">No instrument predicate; validate all daily records and scan weight totals.</tspan>
 <tspan x="720.0" dy="25">Retain all portfolio and index holdings.</tspan>
-<tspan x="720.0" dy="25">CSV: Rust 0.096s · Go 0.312s</tspan>
-<tspan x="720.0" dy="25">PARQUET: Rust 0.096s · Go 0.310s</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 0.096s · Go 0.310s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 0.094s · Go 0.311s</tspan>
 </text>
 <path d="M720 1210 V1250" class="edge"/>
 <rect x="160" y="1250" width="1120" height="185" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
@@ -112,8 +112,8 @@
 <tspan x="720.0" dy="0">Normalize both sides; align the 159,000-ID full security union each date.</tspan>
 <tspan x="720.0" dy="25">59,000 portfolio-only US + 1,000 shared DE + 99,000 index-only US IDs.</tspan>
 <tspan x="720.0" dy="25">Missing-side weights and contributions are zero.</tspan>
-<tspan x="720.0" dy="25">CSV: Rust 0.353s · Go 0.563s</tspan>
-<tspan x="720.0" dy="25">PARQUET: Rust 0.351s · Go 0.588s</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 0.353s · Go 0.620s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 0.349s · Go 0.608s</tspan>
 </text>
 <path d="M720 1435 V1475" class="edge"/>
 <rect x="160" y="1475" width="1120" height="185" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
@@ -124,8 +124,8 @@
 <tspan x="720.0" dy="0">Calculate daily per-security BF effects and weighted-return contributions.</tspan>
 <tspan x="720.0" dy="25">Sum security effects/contributions to portfolio level before period linking.</tspan>
 <tspan x="720.0" dy="25">One portfolio accumulator; close calendar-month buckets and reset period growth.</tspan>
-<tspan x="720.0" dy="25">CSV: Rust 0.925s · Go 1.739s</tspan>
-<tspan x="720.0" dy="25">PARQUET: Rust 0.933s · Go 1.741s</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 0.925s · Go 1.649s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 0.923s · Go 1.663s</tspan>
 </text>
 <path d="M720 1660 V1705 H375 V1740" class="edge"/>
 <text x="970" y="1690" class="label" text-anchor="middle">
@@ -140,7 +140,7 @@
 <tspan x="375.0" dy="0">72 rows · 20 columns · numeric text formatting.</tspan>
 <tspan x="375.0" dy="25">Rust: csv Writer + Ryū; Go: escaped byte buffer.</tspan>
 <tspan x="375.0" dy="25">Buffer → flush → fsync → publish final .csv.</tspan>
-<tspan x="375.0" dy="25">CSV: Rust 0.006s · Go 0.009s</tspan>
+<tspan x="375.0" dy="25">CSV: Rust 0.006s · Go 0.005s</tspan>
 </text>
 <rect x="765" y="1740" width="600" height="185" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
 <text x="1065.0" y="1770" class="head" text-anchor="middle">
@@ -150,7 +150,7 @@
 <tspan x="1065.0" dy="0">72 rows · 20 typed columns · Arrow builders.</tspan>
 <tspan x="1065.0" dy="25">Rust: ArrowWriter; Go: pqarrow.FileWriter.</tspan>
 <tspan x="1065.0" dy="25">≤65,536 rows → Zstd → footer → fsync → .parquet.</tspan>
-<tspan x="1065.0" dy="25">PARQUET: Rust 0.007s · Go 0.007s</tspan>
+<tspan x="1065.0" dy="25">PARQUET: Rust 0.005s · Go 0.008s</tspan>
 </text>
 <path d="M160 1540 H35 V435 H375 V455" class="edge"/>
 <path d="M1280 1540 H1400 V435 H1065 V455" class="edge"/>

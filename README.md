@@ -8,6 +8,10 @@ country attribution and contribution columns. Updated as the measurements finish
 
 [Country-only report](COUNTRY_REPORT.md) — daily US results, stage times, supporting metrics and flow diagram.
 
+[Rust date-format follow-up](RUST_DATE_READ_REPORT.md) — cached dates, repeated CSV/Parquet country measurements and separate decode/buffer timings.
+
+[Go date-format and memory follow-up](GO_DATE_READ_REPORT.md) — cached dates, repeated comparisons, CPU sampling and allocation/garbage-collection measurements.
+
 Historical benchmark counts below describe the original four-portfolio fixture.
 Current CSV and Parquet inputs both use the merged portfolio described below.
 See [current scenario row counts](docs/OUTPUT_ROW_COUNTS.md), including daily

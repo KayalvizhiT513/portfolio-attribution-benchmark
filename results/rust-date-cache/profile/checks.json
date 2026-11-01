@@ -1,0 +1,114 @@
+[
+  {
+    "scenario": "country",
+    "repetition": 1,
+    "comparison": "cache-only csv",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 1,
+    "comparison": "cache-only parquet",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 2,
+    "comparison": "cache-only csv",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 2,
+    "comparison": "cache-only parquet",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 3,
+    "comparison": "cache-only csv",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "country",
+    "repetition": 3,
+    "comparison": "cache-only parquet",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "security",
+    "repetition": 1,
+    "comparison": "cache-only csv",
+    "rows": 318000,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "security",
+    "repetition": 1,
+    "comparison": "cache-only parquet",
+    "rows": 318000,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "weekly",
+    "repetition": 1,
+    "comparison": "cache-only csv",
+    "rows": 316,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "weekly",
+    "repetition": 1,
+    "comparison": "cache-only parquet",
+    "rows": 316,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "monthly",
+    "repetition": 1,
+    "comparison": "cache-only csv",
+    "rows": 72,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "monthly",
+    "repetition": 1,
+    "comparison": "cache-only parquet",
+    "rows": 72,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "subset",
+    "repetition": 1,
+    "comparison": "cache-only csv",
+    "rows": 602,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "scenario": "subset",
+    "repetition": 1,
+    "comparison": "cache-only parquet",
+    "rows": 602,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  }
+]

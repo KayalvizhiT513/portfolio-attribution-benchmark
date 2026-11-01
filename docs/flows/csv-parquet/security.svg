@@ -69,7 +69,7 @@
 <tspan x="375.0" dy="0">Rust Stream::next / Go stream.next group dates.</tspan>
 <tspan x="375.0" dy="25">Lookahead preserves the next date boundary.</tspan>
 <tspan x="375.0" dy="25">Reusable raw records with integer IDs.</tspan>
-<tspan x="375.0" dy="25">CSV: Rust 24.480s · Go 38.789s</tspan>
+<tspan x="375.0" dy="25">CSV: Rust 23.462s · Go 39.380s</tspan>
 </text>
 <rect x="765" y="630" width="600" height="135" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
 <text x="1065.0" y="660" class="head" text-anchor="middle">
@@ -86,10 +86,10 @@
 <tspan x="1065.0" dy="0">1c · ARROW → DAILY ADAPTER</tspan>
 </text>
 <text x="1065.0" y="866" class="body" text-anchor="middle">
-<tspan x="1065.0" dy="0">Typed numeric access; date32 → ISO date.</tspan>
+<tspan x="1065.0" dy="0">Both cache date text; numeric values stay typed.</tspan>
 <tspan x="1065.0" dy="25">ID lookup/validation; assemble complete dates</tspan>
 <tspan x="1065.0" dy="25">across batches into reusable raw buffers.</tspan>
-<tspan x="1065.0" dy="25">PARQUET: Rust 39.191s · Go 37.312s</tspan>
+<tspan x="1065.0" dy="25">PARQUET: Rust 26.388s · Go 26.725s</tspan>
 </text>
 <path d="M375 815 V1010 H720 V1050" class="edge"/>
 <path d="M1065 965 V1010 H720" class="edge"/>
@@ -100,8 +100,8 @@
 <text x="720.0" y="1111" class="body" text-anchor="middle">
 <tspan x="720.0" dy="0">No instrument predicate; validate every record and scan weight totals.</tspan>
 <tspan x="720.0" dy="25">Retain all 60,000 portfolio and 100,000 index holdings per date.</tspan>
-<tspan x="720.0" dy="25">CSV: Rust 0.092s · Go 0.294s</tspan>
-<tspan x="720.0" dy="25">PARQUET: Rust 0.096s · Go 0.302s</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 0.095s · Go 0.300s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 0.095s · Go 0.303s</tspan>
 </text>
 <path d="M720 1210 V1250" class="edge"/>
 <rect x="160" y="1250" width="1120" height="185" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
@@ -112,8 +112,8 @@
 <tspan x="720.0" dy="0">Normalize each side; build aligned instrument slots using the master lookup.</tspan>
 <tspan x="720.0" dy="25">Full outer-join semantics: 59,000 portfolio-only + 1,000 shared + 99,000 index-only IDs.</tspan>
 <tspan x="720.0" dy="25">Missing-side weight and contribution are zero; 159,000 IDs participate per date.</tspan>
-<tspan x="720.0" dy="25">CSV: Rust 0.316s · Go 0.481s</tspan>
-<tspan x="720.0" dy="25">PARQUET: Rust 0.329s · Go 0.531s</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 0.326s · Go 0.514s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 0.337s · Go 0.573s</tspan>
 </text>
 <path d="M720 1435 V1475" class="edge"/>
 <rect x="160" y="1475" width="1120" height="185" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
@@ -124,8 +124,8 @@
 <tspan x="720.0" dy="0">Daily Brinson-Fachler allocation, selection and interaction for each union ID.</tspan>
 <tspan x="720.0" dy="25">Also accumulate portfolio, benchmark and active contributions; reconcile totals.</tspan>
 <tspan x="720.0" dy="25">Link each ID across all 1,095 dates; maintain full-history per-ID accumulators.</tspan>
-<tspan x="720.0" dy="25">CSV: Rust 0.978s · Go 2.677s</tspan>
-<tspan x="720.0" dy="25">PARQUET: Rust 1.018s · Go 2.711s</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 1.009s · Go 2.625s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 1.036s · Go 2.650s</tspan>
 </text>
 <path d="M720 1660 V1705 H375 V1740" class="edge"/>
 <text x="970" y="1690" class="label" text-anchor="middle">
@@ -140,7 +140,7 @@
 <tspan x="375.0" dy="0">318,000 rows · 20 columns · numeric text formatting.</tspan>
 <tspan x="375.0" dy="25">Rust: csv Writer + Ryū; Go: escaped byte buffer.</tspan>
 <tspan x="375.0" dy="25">Buffer → flush → fsync → publish final .csv.</tspan>
-<tspan x="375.0" dy="25">CSV: Rust 0.108s · Go 0.133s</tspan>
+<tspan x="375.0" dy="25">CSV: Rust 0.114s · Go 0.134s</tspan>
 </text>
 <rect x="765" y="1740" width="600" height="185" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
 <text x="1065.0" y="1770" class="head" text-anchor="middle">
@@ -150,7 +150,7 @@
 <tspan x="1065.0" dy="0">318,000 rows · 20 typed columns · Arrow builders.</tspan>
 <tspan x="1065.0" dy="25">Rust: ArrowWriter; Go: pqarrow.FileWriter.</tspan>
 <tspan x="1065.0" dy="25">≤65,536 rows → Zstd → footer → fsync → .parquet.</tspan>
-<tspan x="1065.0" dy="25">PARQUET: Rust 0.099s · Go 0.289s</tspan>
+<tspan x="1065.0" dy="25">PARQUET: Rust 0.101s · Go 0.281s</tspan>
 </text>
 <path d="M160 1540 H35 V435 H375 V455" class="edge"/>
 <path d="M1280 1540 H1400 V435 H1065 V455" class="edge"/>
