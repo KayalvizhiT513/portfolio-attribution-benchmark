@@ -249,11 +249,11 @@ def timing_table(rows, fmt, scenario):
         ('Write', f'Save the {fmt.upper()} report to disk.', 'write_seconds'),
         ('**Whole run**', 'Elapsed time from start to finish.', 'process_wall_seconds'),
     ]
-    lines = ['| Step | Work done | Rust seconds | Go seconds |', '|---|---|---:|---:|']
+    lines = ['| Step | Work done | Rust elapsed seconds | Go elapsed seconds |', '|---|---|---:|---:|']
     for stage, work, field in definitions:
-        values = [seconds(rows[fmt, scenario, lang][field]) for lang in ['rust', 'go']]
+        values = [seconds(rows[fmt, scenario, lang][field]) for lang in ['rust', 'go']] if field == 'process_wall_seconds' else ['—', '—']
         lines.append(f'| {stage} | {work} | ' + ' | '.join(values) + ' |')
-    return lines
+    return lines + ['', '— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.']
 
 
 def metrics_table(rows, fmt, scenario):
@@ -433,9 +433,9 @@ def main():
                 'The index producer and portfolio worker execute concurrently. With this merged single-portfolio fixture, there is one portfolio worker; a capacity-1 channel provides bounded index prefetch. Within that worker, portfolio reading, filtering, aggregation, BF/contribution calculation and output writing execute sequentially. There are no separate application-level stage workers or writer queue.', '',
                 'Go `pqarrow` uses `Parallel=false` only for decoding columns within each individual reader. It does not disable the concurrent index producer and portfolio goroutine. `GOMAXPROCS=4` permits four logical CPUs but does not create four portfolio workers or parallelize the security loop. Enabling per-column decoding would be a separate configuration experiment requiring new measurements.', '',
                 '</details>', '',
-                '## Time by stage', '',
+                '## Elapsed time and processing steps', '',
                 'Each scenario has the same layout: a timing table, its supporting numbers, then the next input format. Read down to follow the steps; compare Rust and Go across the row.', '',
-                '**Why stage times can exceed the whole run:** the index and portfolio workers can run at the same time. Stage figures add their time together; “Whole run” is how long you actually wait. Do not add the stage rows to estimate runtime.', '',
+                'All visible timing columns use elapsed clock seconds. Only whole-run elapsed time was recorded; stage rows describe the work without showing accumulated worker times.', '',
                 LATEST_NOTE if updated else 'One measurement per configuration. Small timing differences need repeat runs to confirm.', '']
     for scenario, _ in benchmark.SCENARIOS:
         draw(scenario, rows)
@@ -444,7 +444,7 @@ def main():
         for fmt in ['csv', 'parquet']:
             sections += [f'#### {fmt.upper()} input → {fmt.upper()} output', '']
             sections += timing_table(rows, fmt, scenario) + ['', '<details>',
-                         f'<summary>Counts, throughput, and memory — {scenario.capitalize()}, {fmt.upper()}</summary>', '',
+                         f'<summary>Worker times, counts, throughput, and memory — {scenario.capitalize()}, {fmt.upper()}</summary>', '',
                          'Steps appear in the same order as the timing table. Rates use the time spent in that step.', '']
             sections += metrics_table(rows, fmt, scenario)
             sections += ['', 'MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.', '', '</details>', '']

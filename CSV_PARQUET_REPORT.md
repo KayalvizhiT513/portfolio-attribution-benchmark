@@ -133,11 +133,11 @@ Go `pqarrow` uses `Parallel=false` only for decoding columns within each individ
 
 </details>
 
-## Time by stage
+## Elapsed time and processing steps
 
 Each scenario has the same layout: a timing table, its supporting numbers, then the next input format. Read down to follow the steps; compare Rust and Go across the row.
 
-**Why stage times can exceed the whole run:** the index and portfolio workers can run at the same time. Stage figures add their time together; “Whole run” is how long you actually wait. Do not add the stage rows to estimate runtime.
+All visible timing columns use elapsed clock seconds. Only whole-run elapsed time was recorded; stage rows describe the work without showing accumulated worker times.
 
 Both engines use their date-cache follow-up measurements: Country is the median of three CSV/Parquet pairs per engine; each other scenario uses one pair. Rust and Go were measured in separate sessions.
 
@@ -145,17 +145,19 @@ Both engines use their date-cache follow-up measurements: Country is the median 
 
 #### CSV input → CSV output
 
-| Step | Work done | Rust seconds | Go seconds |
+| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
 |---|---|---:|---:|
-| Read | Read and check CSV records. | 23.462 | 39.380 |
-| Filter | Keep all holdings; total the weights on each side. | 0.095 | 0.300 |
-| Prepare / group | Scale each side’s weights to 100%; line up matching security IDs. | 0.326 | 0.514 |
-| Calculate | Calculate BF effects and contributions for every security over the full period. | 1.009 | 2.625 |
-| Write | Save the CSV report to disk. | 0.114 | 0.134 |
+| Read | Read and check CSV records. | — | — |
+| Filter | Keep all holdings; total the weights on each side. | — | — |
+| Prepare / group | Scale each side’s weights to 100%; line up matching security IDs. | — | — |
+| Calculate | Calculate BF effects and contributions for every security over the full period. | — | — |
+| Write | Save the CSV report to disk. | — | — |
 | **Whole run** | Elapsed time from start to finish. | 14.222 | 23.915 |
 
+— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+
 <details>
-<summary>Counts, throughput, and memory — Security, CSV</summary>
+<summary>Worker times, counts, throughput, and memory — Security, CSV</summary>
 
 Steps appear in the same order as the timing table. Rates use the time spent in that step.
 
@@ -187,17 +189,19 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### PARQUET input → PARQUET output
 
-| Step | Work done | Rust seconds | Go seconds |
+| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
 |---|---|---:|---:|
-| Read | Read and decode Parquet batches. | 26.388 | 26.725 |
-| Filter | Keep all holdings; total the weights on each side. | 0.095 | 0.303 |
-| Prepare / group | Scale each side’s weights to 100%; line up matching security IDs. | 0.337 | 0.573 |
-| Calculate | Calculate BF effects and contributions for every security over the full period. | 1.036 | 2.650 |
-| Write | Save the PARQUET report to disk. | 0.101 | 0.281 |
+| Read | Read and decode Parquet batches. | — | — |
+| Filter | Keep all holdings; total the weights on each side. | — | — |
+| Prepare / group | Scale each side’s weights to 100%; line up matching security IDs. | — | — |
+| Calculate | Calculate BF effects and contributions for every security over the full period. | — | — |
+| Write | Save the PARQUET report to disk. | — | — |
 | **Whole run** | Elapsed time from start to finish. | 16.773 | 17.468 |
 
+— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+
 <details>
-<summary>Counts, throughput, and memory — Security, PARQUET</summary>
+<summary>Worker times, counts, throughput, and memory — Security, PARQUET</summary>
 
 Steps appear in the same order as the timing table. Rates use the time spent in that step.
 
@@ -238,17 +242,19 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### CSV input → CSV output
 
-| Step | Work done | Rust seconds | Go seconds |
+| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
 |---|---|---:|---:|
-| Read | Read and check CSV records. | 21.739 | 38.821 |
-| Filter | Keep US holdings in the portfolio and index. | 0.220 | 0.347 |
-| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | 0.169 | 0.309 |
-| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000932 | 0.000819 |
-| Write | Save the CSV report to disk. | 0.011 | 0.009 |
+| Read | Read and check CSV records. | — | — |
+| Filter | Keep US holdings in the portfolio and index. | — | — |
+| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | — | — |
+| Calculate | Calculate the US group’s BF effects and contributions for each date. | — | — |
+| Write | Save the CSV report to disk. | — | — |
 | **Whole run** | Elapsed time from start to finish. | 13.067 | 23.218 |
 
+— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+
 <details>
-<summary>Counts, throughput, and memory — Country, CSV</summary>
+<summary>Worker times, counts, throughput, and memory — Country, CSV</summary>
 
 Steps appear in the same order as the timing table. Rates use the time spent in that step.
 
@@ -280,17 +286,19 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### PARQUET input → PARQUET output
 
-| Step | Work done | Rust seconds | Go seconds |
+| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
 |---|---|---:|---:|
-| Read | Read and decode Parquet batches. | 23.481 | 26.925 |
-| Filter | Keep US holdings in the portfolio and index. | 0.218 | 0.346 |
-| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | 0.161 | 0.313 |
-| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000804 | 0.000812 |
-| Write | Save the PARQUET report to disk. | 0.007 | 0.011 |
+| Read | Read and decode Parquet batches. | — | — |
+| Filter | Keep US holdings in the portfolio and index. | — | — |
+| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | — | — |
+| Calculate | Calculate the US group’s BF effects and contributions for each date. | — | — |
+| Write | Save the PARQUET report to disk. | — | — |
 | **Whole run** | Elapsed time from start to finish. | 14.776 | 16.772 |
 
+— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+
 <details>
-<summary>Counts, throughput, and memory — Country, PARQUET</summary>
+<summary>Worker times, counts, throughput, and memory — Country, PARQUET</summary>
 
 Steps appear in the same order as the timing table. Rates use the time spent in that step.
 
@@ -331,17 +339,19 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### CSV input → CSV output
 
-| Step | Work done | Rust seconds | Go seconds |
+| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
 |---|---|---:|---:|
-| Read | Read and check CSV records. | 24.113 | 40.214 |
-| Filter | Keep all holdings; total the weights on each side. | 0.095 | 0.305 |
-| Prepare / group | Prepare weights and matching security IDs for each day. | 0.350 | 0.573 |
-| Calculate | Add security results to portfolio totals, then combine them by week. | 0.920 | 1.653 |
-| Write | Save the CSV report to disk. | 0.006 | 0.006 |
+| Read | Read and check CSV records. | — | — |
+| Filter | Keep all holdings; total the weights on each side. | — | — |
+| Prepare / group | Prepare weights and matching security IDs for each day. | — | — |
+| Calculate | Add security results to portfolio totals, then combine them by week. | — | — |
+| Write | Save the CSV report to disk. | — | — |
 | **Whole run** | Elapsed time from start to finish. | 14.446 | 24.163 |
 
+— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+
 <details>
-<summary>Counts, throughput, and memory — Weekly, CSV</summary>
+<summary>Worker times, counts, throughput, and memory — Weekly, CSV</summary>
 
 Steps appear in the same order as the timing table. Rates use the time spent in that step.
 
@@ -373,17 +383,19 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### PARQUET input → PARQUET output
 
-| Step | Work done | Rust seconds | Go seconds |
+| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
 |---|---|---:|---:|
-| Read | Read and decode Parquet batches. | 26.495 | 27.657 |
-| Filter | Keep all holdings; total the weights on each side. | 0.094 | 0.304 |
-| Prepare / group | Prepare weights and matching security IDs for each day. | 0.350 | 0.576 |
-| Calculate | Add security results to portfolio totals, then combine them by week. | 0.917 | 1.664 |
-| Write | Save the PARQUET report to disk. | 0.007 | 0.006 |
+| Read | Read and decode Parquet batches. | — | — |
+| Filter | Keep all holdings; total the weights on each side. | — | — |
+| Prepare / group | Prepare weights and matching security IDs for each day. | — | — |
+| Calculate | Add security results to portfolio totals, then combine them by week. | — | — |
+| Write | Save the PARQUET report to disk. | — | — |
 | **Whole run** | Elapsed time from start to finish. | 16.744 | 17.420 |
 
+— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+
 <details>
-<summary>Counts, throughput, and memory — Weekly, PARQUET</summary>
+<summary>Worker times, counts, throughput, and memory — Weekly, PARQUET</summary>
 
 Steps appear in the same order as the timing table. Rates use the time spent in that step.
 
@@ -424,17 +436,19 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### CSV input → CSV output
 
-| Step | Work done | Rust seconds | Go seconds |
+| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
 |---|---|---:|---:|
-| Read | Read and check CSV records. | 23.173 | 39.542 |
-| Filter | Keep all holdings; total the weights on each side. | 0.096 | 0.310 |
-| Prepare / group | Prepare weights and matching security IDs for each day. | 0.353 | 0.620 |
-| Calculate | Add security results to portfolio totals, then combine them by month. | 0.925 | 1.649 |
-| Write | Save the CSV report to disk. | 0.006 | 0.005 |
+| Read | Read and check CSV records. | — | — |
+| Filter | Keep all holdings; total the weights on each side. | — | — |
+| Prepare / group | Prepare weights and matching security IDs for each day. | — | — |
+| Calculate | Add security results to portfolio totals, then combine them by month. | — | — |
+| Write | Save the CSV report to disk. | — | — |
 | **Whole run** | Elapsed time from start to finish. | 14.096 | 23.751 |
 
+— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+
 <details>
-<summary>Counts, throughput, and memory — Monthly, CSV</summary>
+<summary>Worker times, counts, throughput, and memory — Monthly, CSV</summary>
 
 Steps appear in the same order as the timing table. Rates use the time spent in that step.
 
@@ -466,17 +480,19 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### PARQUET input → PARQUET output
 
-| Step | Work done | Rust seconds | Go seconds |
+| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
 |---|---|---:|---:|
-| Read | Read and decode Parquet batches. | 25.895 | 27.751 |
-| Filter | Keep all holdings; total the weights on each side. | 0.094 | 0.311 |
-| Prepare / group | Prepare weights and matching security IDs for each day. | 0.349 | 0.608 |
-| Calculate | Add security results to portfolio totals, then combine them by month. | 0.923 | 1.663 |
-| Write | Save the PARQUET report to disk. | 0.005 | 0.008 |
+| Read | Read and decode Parquet batches. | — | — |
+| Filter | Keep all holdings; total the weights on each side. | — | — |
+| Prepare / group | Prepare weights and matching security IDs for each day. | — | — |
+| Calculate | Add security results to portfolio totals, then combine them by month. | — | — |
+| Write | Save the PARQUET report to disk. | — | — |
 | **Whole run** | Elapsed time from start to finish. | 16.366 | 17.464 |
 
+— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+
 <details>
-<summary>Counts, throughput, and memory — Monthly, PARQUET</summary>
+<summary>Worker times, counts, throughput, and memory — Monthly, PARQUET</summary>
 
 Steps appear in the same order as the timing table. Rates use the time spent in that step.
 
@@ -517,17 +533,19 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### CSV input → CSV output
 
-| Step | Work done | Rust seconds | Go seconds |
+| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
 |---|---|---:|---:|
-| Read | Read and check CSV records. | 23.221 | 38.959 |
-| Filter | Keep the 400 selected IDs on both sides. | 0.080 | 0.223 |
-| Prepare / group | Scale selected weights to 100% on each side; line up selected IDs. | 0.004 | 0.004 |
-| Calculate | Calculate selected-security results; combine index-only results into one summary. | 0.003 | 0.008 |
-| Write | Save the CSV report to disk. | 0.007 | 0.004 |
+| Read | Read and check CSV records. | — | — |
+| Filter | Keep the 400 selected IDs on both sides. | — | — |
+| Prepare / group | Scale selected weights to 100% on each side; line up selected IDs. | — | — |
+| Calculate | Calculate selected-security results; combine index-only results into one summary. | — | — |
+| Write | Save the CSV report to disk. | — | — |
 | **Whole run** | Elapsed time from start to finish. | 13.883 | 23.058 |
 
+— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+
 <details>
-<summary>Counts, throughput, and memory — Subset, CSV</summary>
+<summary>Worker times, counts, throughput, and memory — Subset, CSV</summary>
 
 Steps appear in the same order as the timing table. Rates use the time spent in that step.
 
@@ -559,17 +577,19 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### PARQUET input → PARQUET output
 
-| Step | Work done | Rust seconds | Go seconds |
+| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
 |---|---|---:|---:|
-| Read | Read and decode Parquet batches. | 25.091 | 27.290 |
-| Filter | Keep the 400 selected IDs on both sides. | 0.084 | 0.225 |
-| Prepare / group | Scale selected weights to 100% on each side; line up selected IDs. | 0.003 | 0.005 |
-| Calculate | Calculate selected-security results; combine index-only results into one summary. | 0.003 | 0.008 |
-| Write | Save the PARQUET report to disk. | 0.006 | 0.006 |
+| Read | Read and decode Parquet batches. | — | — |
+| Filter | Keep the 400 selected IDs on both sides. | — | — |
+| Prepare / group | Scale selected weights to 100% on each side; line up selected IDs. | — | — |
+| Calculate | Calculate selected-security results; combine index-only results into one summary. | — | — |
+| Write | Save the PARQUET report to disk. | — | — |
 | **Whole run** | Elapsed time from start to finish. | 15.618 | 16.787 |
 
+— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+
 <details>
-<summary>Counts, throughput, and memory — Subset, PARQUET</summary>
+<summary>Worker times, counts, throughput, and memory — Subset, PARQUET</summary>
 
 Steps appear in the same order as the timing table. Rates use the time spent in that step.
 

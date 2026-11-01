@@ -32,12 +32,12 @@ def main():
     if updated:
         lines[2:2] = [LATEST_NOTE, '']
         lines += [''] + country_read_split() + go_diagnostics_section()
-    lines += ['', '## Time by stage', '',
-              'The index and portfolio workers can run at the same time. Stage figures add their time together; **Whole run** is how long you actually wait. Do not add the stage rows to estimate runtime.', '']
+    lines += ['', '## Elapsed time and processing steps', '',
+              'All timing columns below use elapsed clock seconds. Only whole-run elapsed time was recorded; accumulated worker times are kept in the expandable details.', '']
     for fmt in ['csv', 'parquet']:
         lines += [f'### {fmt.upper()} input → {fmt.upper()} output', '']
         lines += timing_table(rows, fmt, 'country')
-        lines += ['', '<details>', f'<summary>Counts, throughput, and memory — {fmt.upper()}</summary>', '',
+        lines += ['', '<details>', f'<summary>Worker times, counts, throughput, and memory — {fmt.upper()}</summary>', '',
                   'Steps follow the timing table. Rates use the time spent in that step.', '']
         lines += metrics_table(rows, fmt, 'country')
         lines += ['', 'MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. Both engines use three-run country medians.' if updated else 'One measurement per configuration.', '', '</details>', '']
