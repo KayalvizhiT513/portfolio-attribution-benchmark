@@ -2,7 +2,7 @@
 import json
 
 import benchmark_csv_parquet as benchmark
-from render_csv_parquet_report import metrics_table, timing_table, latest_rust_rows, read_breakdown, LATEST_NOTE, GO_UPDATED, go_diagnostics_section
+from render_csv_parquet_report import metrics_table, timing_table, latest_rust_rows, read_breakdown, LATEST_NOTE, GO_UPDATED, go_diagnostics_section, country_read_split
 
 REPORT = benchmark.ROOT / 'COUNTRY_REPORT.md'
 
@@ -31,7 +31,7 @@ def main():
         lines.append(f"| {fmt.upper()} → {fmt.upper()} | {a['process_wall_seconds']:.3f} | {b['process_wall_seconds']:.3f} | 2,190 |")
     if updated:
         lines[2:2] = [LATEST_NOTE, '']
-        lines += [''] + read_breakdown('country') + read_breakdown('country', language='go') + go_diagnostics_section()
+        lines += [''] + country_read_split() + go_diagnostics_section()
     lines += ['', '## Time by stage', '',
               'The index and portfolio workers can run at the same time. Stage figures add their time together; **Whole run** is how long you actually wait. Do not add the stage rows to estimate runtime.', '']
     for fmt in ['csv', 'parquet']:

@@ -62,7 +62,7 @@ def read_breakdown(scenario=None, language='rust'):
     if not profiles: return []
     lines = [f'## {language.capitalize()} Parquet: where read time goes', '',
              'These separate profiling runs split the read step. Times combine both readers, so they can exceed total runtime. Country uses the run with the middle read time out of three; other scenarios use one.', '',
-             '| Scenario | Read + decompress/decode seconds | Prepare daily buffers seconds | Total read seconds |',
+             '| Scenario | Read + decompress/decode seconds | Read decoded rows + prepare calculation data seconds | Total read seconds |',
              '|---|---:|---:|---:|']
     for name, _ in benchmark.SCENARIOS:
         if scenario and name != scenario: continue
@@ -72,6 +72,36 @@ def read_breakdown(scenario=None, language='rust'):
         lines.append(f"| {name.capitalize()} | {float(r['parquet_batch_read_decode_seconds']):.3f} | {float(r['parquet_to_daily_buffer_seconds']):.3f} | {float(r['read_parse_seconds']):.3f} |")
     lines += ['', 'The first part includes file I/O, decompression, decoding and Arrow batch creation. The second includes row handling, date caching, ID lookup, validation and building daily buffers. It is the remaining read time after subtracting batch time.', '',
               f'[Full date-cache comparison and profiling evidence]({language.upper()}_DATE_READ_REPORT.md)', '']
+    return lines
+
+
+def country_read_split():
+    selected = {}
+    for language in ('rust', 'go'):
+        path = ROOT / f'results/{language}-date-cache/profile/runs.json'
+        if not path.exists(): return []
+        samples = sorted([r for r in json.loads(path.read_text())
+                          if r['scenario'] == 'country' and r.get('mode', 'parquet') == 'parquet'],
+                         key=lambda r: float(r['read_parse_seconds']))
+        assert len(samples) == 3
+        selected[language] = samples[1]
+    lines = ['## Country Parquet: read-time split', '',
+             '| Part of reading | What is actually measured | Rust seconds | Go seconds |',
+             '|---|---|---:|---:|']
+    parts = [('Fetch decoded Arrow batches',
+              'File reading + decompression + decoding + Arrow array creation; timed around each batch fetch.',
+              'parquet_batch_read_decode_seconds'),
+             ('Read decoded rows and prepare daily calculation data',
+              'Read typed Arrow values, reuse cached date text, look up security positions, validate rows, assemble each date and fill reusable calculation arrays. Calculated as total read time minus batch-fetch time.',
+              'parquet_to_daily_buffer_seconds'),
+             ('Total read', 'Both parts above; excludes filtering, grouping, Brinson calculations and output writing.',
+              'read_parse_seconds')]
+    for label, work, key in parts:
+        lines.append(f"| {label} | {work} | {float(selected['rust'][key]):.3f} | {float(selected['go'][key]):.3f} |")
+    lines += ['', '**Decompression is included, not measured separately from file reading and decoding. No decompression optimization was made.** The implemented optimization caches date strings instead of formatting a date for every row. Preparing calculation data still handles rows individually; it is more than copying an Arrow buffer.', '',
+              'These are separate profiling runs, not the normal runtime runs. For each engine, all three country runs cover all 1,095 dates; the table uses the run with the middle total read time and takes both parts from that same run. Times add the concurrent index and portfolio readers, so they can exceed whole-run runtime. Rust and Go were measured in separate sessions; Go diagnostics also enabled CPU/allocation profiling.', '',
+              'Both engines passed all six country Parquet profiling-output comparisons against their CSV and Parquet reference outputs. This checks decoded results; it does not isolate decompression performance.', '',
+              '[Rust profiling measurements](results/rust-date-cache/profile/runs.json) · [Go profiling measurements](results/go-date-cache/profile/runs.json)', '']
     return lines
 
 
@@ -390,7 +420,7 @@ def main():
             text = text.replace('the updated Rust outputs passed 35 comparisons against the earlier Rust/Go results and fresh CSV/Parquet outputs. All 14 profiling comparisons passed. The original Go baseline also retains its 15 passed comparisons.', 'the updated Rust and Go outputs each passed 35 comparisons against the original results and fresh CSV/Parquet outputs. Rust has 14 passed profiling checks; Go has 14 passed diagnostic/control checks.')
             text = text.replace('Rust Country uses its three-run median.', 'Country uses three-run medians for both engines.')
             text += '\nLatest measurements: [Rust](results/rust-date-cache/runs.csv) · [Go](results/go-date-cache/runs.csv). Detailed diagnostics: [Go read report](GO_DATE_READ_REPORT.md).\n'
-        benchmark.REPORT.write_text(text + '\n'.join(read_breakdown() + read_breakdown(language='go') + go_diagnostics_section()))
+        benchmark.REPORT.write_text(text + '\n'.join(country_read_split() + read_breakdown() + read_breakdown(language='go') + go_diagnostics_section()))
     sections = ['', '<details>', '<summary>How the CSV and Parquet runs work</summary>', '',
                 '| Layer | CSV | Parquet / Arrow |', '|---|---|---|',
                 '| Storage / decode | Buffered text records; parse numeric strings | Project Parquet columns; decompress/decode into typed Arrow RecordBatches |',

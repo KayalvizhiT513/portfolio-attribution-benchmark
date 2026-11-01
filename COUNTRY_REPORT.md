@@ -15,29 +15,21 @@ Keep US holdings in the portfolio and index. Scale each side’s US weights to 1
 | CSV → CSV | 13.067 | 23.218 | 2,190 |
 | PARQUET → PARQUET | 14.776 | 16.772 | 2,190 |
 
-## Rust Parquet: where read time goes
+## Country Parquet: read-time split
 
-These separate profiling runs split the read step. Times combine both readers, so they can exceed total runtime. Country uses the run with the middle read time out of three; other scenarios use one.
+| Part of reading | What is actually measured | Rust seconds | Go seconds |
+|---|---|---:|---:|
+| Fetch decoded Arrow batches | File reading + decompression + decoding + Arrow array creation; timed around each batch fetch. | 6.859 | 16.004 |
+| Read decoded rows and prepare daily calculation data | Read typed Arrow values, reuse cached date text, look up security positions, validate rows, assemble each date and fill reusable calculation arrays. Calculated as total read time minus batch-fetch time. | 14.973 | 11.307 |
+| Total read | Both parts above; excludes filtering, grouping, Brinson calculations and output writing. | 21.832 | 27.311 |
 
-| Scenario | Read + decompress/decode seconds | Prepare daily buffers seconds | Total read seconds |
-|---|---:|---:|---:|
-| Country | 6.859 | 14.973 | 21.832 |
+**Decompression is included, not measured separately from file reading and decoding. No decompression optimization was made.** The implemented optimization caches date strings instead of formatting a date for every row. Preparing calculation data still handles rows individually; it is more than copying an Arrow buffer.
 
-The first part includes file I/O, decompression, decoding and Arrow batch creation. The second includes row handling, date caching, ID lookup, validation and building daily buffers. It is the remaining read time after subtracting batch time.
+These are separate profiling runs, not the normal runtime runs. For each engine, all three country runs cover all 1,095 dates; the table uses the run with the middle total read time and takes both parts from that same run. Times add the concurrent index and portfolio readers, so they can exceed whole-run runtime. Rust and Go were measured in separate sessions; Go diagnostics also enabled CPU/allocation profiling.
 
-[Full date-cache comparison and profiling evidence](RUST_DATE_READ_REPORT.md)
+Both engines passed all six country Parquet profiling-output comparisons against their CSV and Parquet reference outputs. This checks decoded results; it does not isolate decompression performance.
 
-## Go Parquet: where read time goes
-
-These separate profiling runs split the read step. Times combine both readers, so they can exceed total runtime. Country uses the run with the middle read time out of three; other scenarios use one.
-
-| Scenario | Read + decompress/decode seconds | Prepare daily buffers seconds | Total read seconds |
-|---|---:|---:|---:|
-| Country | 16.004 | 11.307 | 27.311 |
-
-The first part includes file I/O, decompression, decoding and Arrow batch creation. The second includes row handling, date caching, ID lookup, validation and building daily buffers. It is the remaining read time after subtracting batch time.
-
-[Full date-cache comparison and profiling evidence](GO_DATE_READ_REPORT.md)
+[Rust profiling measurements](results/rust-date-cache/profile/runs.json) · [Go profiling measurements](results/go-date-cache/profile/runs.json)
 
 <details>
 <summary>Go: decoding, row handling, allocations and garbage collection</summary>
