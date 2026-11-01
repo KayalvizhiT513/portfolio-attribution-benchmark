@@ -1,0 +1,405 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="3460" viewBox="0 0 1900 3460" role="img" aria-labelledby="title desc">
+<title id="title">Daily country attribution: parallel CSV and Parquet inputs through ordered Brinson-Fachler output</title>
+<desc id="desc">Both Go and Rust load an effective-dated master, partition whole dates, read one logical date at a time per worker, validate all holdings, retain US country records, normalize selected weights independently for portfolio and benchmark, aggregate weighted returns, collect results in original date order, and calculate allocation, selection, interaction and contributions. Total benchmark return is computed after US filtering and is used only as allocation reference, while selection uses benchmark group return. With one normalized US group, allocation and interaction are approximately zero. Reports are buffered, finalized, synced and published after success.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#62748a"/></marker><marker id="reference-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#b77908"/></marker></defs>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#17324d}.title{font-size:34px;font-weight:700}.subtitle{font-size:19px;fill:#51657b}.body{font-size:18px}.node-title{font-size:21px;font-weight:700}.section{font-size:22px;font-weight:700;letter-spacing:.5px}.section-number{font-size:18px;fill:white;font-weight:700}.caption{font-size:17px;fill:#51657b}.formula{font-family:Menlo,Consolas,monospace;font-size:18px;font-weight:600}.small{font-size:16px;fill:#51657b}.reference-label{font-size:16px;fill:#8b5b00;font-weight:700}</style>
+<rect width="1900" height="3460" fill="#ffffff"/>
+<text x="50" y="55" class="title" text-anchor="start">
+<tspan x="50" dy="0">Country attribution: complete read → filter → group → compute → write flow</tspan>
+</text>
+<text x="50" y="92" class="subtitle" text-anchor="start">
+<tspan x="50" dy="0">Implemented daily US-only scenario • shared logic in Go and Rust • parallel CSV / Parquet • observed dataset shown</tspan>
+</text>
+<rect x="50" y="115" width="18" height="18" rx="4" fill="#edf6ff" stroke="#2563eb"/>
+<text x="78" y="130" class="small" text-anchor="start">
+<tspan x="78" dy="0">Read</tspan>
+</text>
+<rect x="275" y="115" width="18" height="18" rx="4" fill="#fff7df" stroke="#b77908"/>
+<text x="303" y="130" class="small" text-anchor="start">
+<tspan x="303" dy="0">Filter</tspan>
+</text>
+<rect x="500" y="115" width="18" height="18" rx="4" fill="#f3eeff" stroke="#7951b0"/>
+<text x="528" y="130" class="small" text-anchor="start">
+<tspan x="528" dy="0">Aggregate</tspan>
+</text>
+<rect x="725" y="115" width="18" height="18" rx="4" fill="#eaf8f0" stroke="#17815b"/>
+<text x="753" y="130" class="small" text-anchor="start">
+<tspan x="753" dy="0">Compute</tspan>
+</text>
+<rect x="950" y="115" width="18" height="18" rx="4" fill="#fff0f3" stroke="#c13e62"/>
+<text x="978" y="130" class="small" text-anchor="start">
+<tspan x="978" dy="0">Write</tspan>
+</text>
+<rect x="1175" y="115" width="18" height="18" rx="4" fill="#f2f5f9" stroke="#64748b"/>
+<text x="1203" y="130" class="small" text-anchor="start">
+<tspan x="1203" dy="0">Plan / merge</tspan>
+</text>
+<rect x="40" y="158" width="36" height="32" rx="9" fill="#17324d"/>
+<text x="58" y="182" class="section-number" text-anchor="middle">
+<tspan x="58" dy="0">01</tspan>
+</text>
+<text x="90" y="182" class="section" text-anchor="start">
+<tspan x="90" dy="0">LOAD ONCE AND PLAN COMPLETE DATES</tspan>
+</text>
+<text x="90" y="211" class="caption" text-anchor="start">
+<tspan x="90" dy="0">Read units differ by format; the calculation universe and formulas do not.</tspan>
+</text>
+<rect x="65" y="232" width="500" height="230" rx="16" fill="#edf6ff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="87" y="265" class="node-title" text-anchor="start">
+<tspan x="87" dy="0">Effective-dated security master</tspan>
+</text>
+<text x="87" y="297" class="body" text-anchor="start">
+<tspan x="87" dy="0">Read the entire master before processing holdings.</tspan>
+<tspan x="87" dy="23">CSV records or Arrow batches (≤65,536 rows).</tspan>
+<tspan x="87" dy="23">5,760,000 versions / 160,000 instrument IDs.</tspan>
+<tspan x="87" dy="23">Index and sort versions by EffectiveDate.</tspan>
+<tspan x="87" dy="23">Reject blanks, bad dates and duplicate ID/date.</tspan>
+<tspan x="87" dy="23">Share immutable history with every worker.</tspan>
+<tspan x="87" dy="23">Currency is checked; no FX conversion here.</tspan>
+</text>
+<rect x="635" y="232" width="580" height="190" rx="16" fill="#edf6ff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="657" y="265" class="node-title" text-anchor="start">
+<tspan x="657" dy="0">CSV planning: inspect date boundaries</tspan>
+</text>
+<text x="657" y="297" class="body" text-anchor="start">
+<tspan x="657" dy="0">Scan index.csv and portfolio_PF.csv.</tspan>
+<tspan x="657" dy="23">Find whole-date byte ranges; keep row order.</tspan>
+<tspan x="657" dy="23">Planner does not parse returns for attribution.</tspan>
+<tspan x="657" dy="23">Workers later seek and parse their own ranges.</tspan>
+<tspan x="657" dy="23">Multiline records → streaming fallback.</tspan>
+</text>
+<rect x="1255" y="232" width="580" height="190" rx="16" fill="#edf6ff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="1277" y="265" class="node-title" text-anchor="start">
+<tspan x="1277" dy="0">Parquet planning: inspect the footer</tspan>
+</text>
+<text x="1277" y="297" class="body" text-anchor="start">
+<tspan x="1277" dy="0">Current files: 1,095 groups; one date per group.</tspan>
+<tspan x="1277" dy="23">Statistics establish each group’s single date.</tspan>
+<tspan x="1277" dy="23">Keep adjacent groups for the same date together.</tspan>
+<tspan x="1277" dy="23">Assign disjoint complete-date group lists.</tspan>
+<tspan x="1277" dy="23">Missing stats / mixed dates → streaming fallback.</tspan>
+</text>
+<rect x="635" y="512" width="1200" height="155" rx="16" fill="#f2f5f9" stroke="#64748b" stroke-width="1.6"/>
+<text x="657" y="545" class="node-title" text-anchor="start">
+<tspan x="657" dy="0">One bounded pool across both sources</tspan>
+</text>
+<text x="657" y="577" class="body" text-anchor="start">
+<tspan x="657" dy="0">Runtime CPU detection; recorded run: 12 workers and 24 tasks across index + portfolio.</tspan>
+<tspan x="657" dy="23">Each task owns a reader and loops through contiguous dates (up to 92 dates in this run).</tspan>
+<tspan x="657" dy="23">Each worker buffers ONE logical date at a time; it does not load an entire date range into RAM.</tspan>
+<tspan x="657" dy="23">Fallback: existing index-producer / portfolio-worker pipeline; downstream math is identical.</tspan>
+</text>
+<path d="M925 422 V512" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M1545 422 V512" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="935" y="470" class="caption" text-anchor="start">
+<tspan x="935" dy="0">byte ranges</tspan>
+</text>
+<text x="1555" y="470" class="caption" text-anchor="start">
+<tspan x="1555" dy="0">row-group lists</tspan>
+</text>
+<path d="M565 350 H598 V590 H635" fill="none" stroke="#62748a" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<text x="590" y="495" class="small" text-anchor="end">
+<tspan x="590" dy="0">shared</tspan>
+</text>
+<text x="590" y="516" class="small" text-anchor="end">
+<tspan x="590" dy="0">master</tspan>
+</text>
+<path d="M1235 667 V790 H490 V810" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M1235 790 H1410 V810" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<rect x="40" y="713" width="36" height="32" rx="9" fill="#17324d"/>
+<text x="58" y="737" class="section-number" text-anchor="middle">
+<tspan x="58" dy="0">02</tspan>
+</text>
+<text x="90" y="737" class="section" text-anchor="start">
+<tspan x="90" dy="0">WITHIN EACH RANGE WORKER: REPEAT FOR EACH DATE</tspan>
+</text>
+<text x="90" y="766" class="caption" text-anchor="start">
+<tspan x="90" dy="0">Left and right are logical source lanes in the same pool, not fixed one-to-one thread pairs.</tspan>
+</text>
+<rect x="90" y="810" width="800" height="155" rx="16" fill="#edf6ff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="112" y="843" class="node-title" text-anchor="start">
+<tspan x="112" dy="0">PORTFOLIO: read one logical date</tspan>
+</text>
+<text x="112" y="875" class="body" text-anchor="start">
+<tspan x="112" dy="0">Required fields: Entity, EffectiveDate, InstrumentId,</tspan>
+<tspan x="112" dy="23">Weight, BaseReturn, LocalReturn.</tspan>
+<tspan x="112" dy="23">CSV: 1 MiB input buffer. Parquet: Arrow batches ≤65,536 rows.</tspan>
+<tspan x="112" dy="23">60,000 holdings/day; a complete date may span several batches / groups.</tspan>
+</text>
+<rect x="90" y="1000" width="800" height="125" rx="16" fill="#edf6ff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="112" y="1033" class="node-title" text-anchor="start">
+<tspan x="112" dy="0">Validate every row before filtering</tspan>
+</text>
+<text x="112" y="1065" class="body" text-anchor="start">
+<tspan x="112" dy="0">Map instrument ID; require one entity and no duplicate instrument/date.</tspan>
+<tspan x="112" dy="23">Weights ≥0; finite numbers; returns &gt;−1; valid increasing dates.</tspan>
+<tspan x="112" dy="23">Require original full-date weights to sum to 1 (tolerance 1e−6).</tspan>
+</text>
+<rect x="90" y="1160" width="800" height="170" rx="16" fill="#fff7df" stroke="#b77908" stroke-width="1.6"/>
+<text x="112" y="1193" class="node-title" text-anchor="start">
+<tspan x="112" dy="0">Resolve the dated country → keep US only</tspan>
+</text>
+<text x="112" y="1225" class="body" text-anchor="start">
+<tspan x="112" dy="0">For each holding date d, choose the latest master version with date ≤ d.</tspan>
+<tspan x="112" dy="23">No effective master record → fail. Retain only Country == &quot;US&quot;.</tspan>
+<tspan x="112" dy="23">Current data: keep 59,000; exclude 1,000 DE holdings per date.</tspan>
+<tspan x="112" dy="23">s_p = sum of RETAINED original weights; require s_p &gt; 0.</tspan>
+<tspan x="112" dy="23">Discarded holdings were still read and validated.</tspan>
+</text>
+<rect x="90" y="1365" width="800" height="190" rx="16" fill="#f3eeff" stroke="#7951b0" stroke-width="1.6"/>
+<text x="112" y="1398" class="node-title" text-anchor="start">
+<tspan x="112" dy="0">Normalize and group by date + entity + country</tspan>
+</text>
+<text x="112" y="1430" class="body" text-anchor="start">
+<tspan x="112" dy="0">For each retained security i: normalized weight = w_i / s_p.</tspan>
+<tspan x="112" dy="23">Wp,g = Σ(i in g) w_i / s_p</tspan>
+<tspan x="112" dy="23">Cp,g,t = Σ(i in g) (w_i × return_i,t) / s_p</tspan>
+<tspan x="112" dy="23">Repeat contributions for t = base and local; g = US in this scenario.</tspan>
+<tspan x="112" dy="23">Normalize by selected WEIGHT, not security count. Group before BF math.</tspan>
+<tspan x="112" dy="23">Day result stores W, C_base, C_local and presence per country.</tspan>
+</text>
+<rect x="90" y="1590" width="800" height="80" rx="16" fill="#f3eeff" stroke="#7951b0" stroke-width="1.6"/>
+<text x="112" y="1623" class="node-title" text-anchor="start">
+<tspan x="112" dy="0">Save Day aggregate → original source/date slot</tspan>
+</text>
+<text x="112" y="1655" class="body" text-anchor="start">
+<tspan x="112" dy="0">Reuse the worker’s raw daily buffer for the next date in its assigned range.</tspan>
+</text>
+<path d="M490 965 V1000" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M490 1125 V1160" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M490 1330 V1365" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M490 1555 V1590" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<rect x="1010" y="810" width="800" height="155" rx="16" fill="#edf6ff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="1032" y="843" class="node-title" text-anchor="start">
+<tspan x="1032" dy="0">BENCHMARK / INDEX: read one logical date</tspan>
+</text>
+<text x="1032" y="875" class="body" text-anchor="start">
+<tspan x="1032" dy="0">Required fields: Entity, EffectiveDate, InstrumentId,</tspan>
+<tspan x="1032" dy="23">Weight, BaseReturn, LocalReturn.</tspan>
+<tspan x="1032" dy="23">CSV: 1 MiB input buffer. Parquet: Arrow batches ≤65,536 rows.</tspan>
+<tspan x="1032" dy="23">100,000 holdings/day; a complete date may span several batches / groups.</tspan>
+</text>
+<rect x="1010" y="1000" width="800" height="125" rx="16" fill="#edf6ff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="1032" y="1033" class="node-title" text-anchor="start">
+<tspan x="1032" dy="0">Validate every row before filtering</tspan>
+</text>
+<text x="1032" y="1065" class="body" text-anchor="start">
+<tspan x="1032" dy="0">Map instrument ID; require one entity and no duplicate instrument/date.</tspan>
+<tspan x="1032" dy="23">Weights ≥0; finite numbers; returns &gt;−1; valid increasing dates.</tspan>
+<tspan x="1032" dy="23">Require original full-date weights to sum to 1 (tolerance 1e−6).</tspan>
+</text>
+<rect x="1010" y="1160" width="800" height="170" rx="16" fill="#fff7df" stroke="#b77908" stroke-width="1.6"/>
+<text x="1032" y="1193" class="node-title" text-anchor="start">
+<tspan x="1032" dy="0">Resolve the dated country → keep US only</tspan>
+</text>
+<text x="1032" y="1225" class="body" text-anchor="start">
+<tspan x="1032" dy="0">For each holding date d, choose the latest master version with date ≤ d.</tspan>
+<tspan x="1032" dy="23">No effective master record → fail. Retain only Country == &quot;US&quot;.</tspan>
+<tspan x="1032" dy="23">Current data: keep 99,000; exclude 1,000 DE holdings per date.</tspan>
+<tspan x="1032" dy="23">s_b = sum of RETAINED original weights; require s_b &gt; 0.</tspan>
+<tspan x="1032" dy="23">Discarded holdings were still read and validated.</tspan>
+</text>
+<rect x="1010" y="1365" width="800" height="190" rx="16" fill="#f3eeff" stroke="#7951b0" stroke-width="1.6"/>
+<text x="1032" y="1398" class="node-title" text-anchor="start">
+<tspan x="1032" dy="0">Normalize and group by date + entity + country</tspan>
+</text>
+<text x="1032" y="1430" class="body" text-anchor="start">
+<tspan x="1032" dy="0">For each retained security i: normalized weight = w_i / s_b.</tspan>
+<tspan x="1032" dy="23">Wb,g = Σ(i in g) w_i / s_b</tspan>
+<tspan x="1032" dy="23">Cb,g,t = Σ(i in g) (w_i × return_i,t) / s_b</tspan>
+<tspan x="1032" dy="23">Repeat contributions for t = base and local; g = US in this scenario.</tspan>
+<tspan x="1032" dy="23">Normalize by selected WEIGHT, not security count. Group before BF math.</tspan>
+<tspan x="1032" dy="23">Day result stores W, C_base, C_local and presence per country.</tspan>
+</text>
+<rect x="1010" y="1590" width="800" height="80" rx="16" fill="#f3eeff" stroke="#7951b0" stroke-width="1.6"/>
+<text x="1032" y="1623" class="node-title" text-anchor="start">
+<tspan x="1032" dy="0">Save Day aggregate → original source/date slot</tspan>
+</text>
+<text x="1032" y="1655" class="body" text-anchor="start">
+<tspan x="1032" dy="0">Reuse the worker’s raw daily buffer for the next date in its assigned range.</tspan>
+</text>
+<path d="M1410 965 V1000" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M1410 1125 V1160" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M1410 1330 V1365" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M1410 1555 V1590" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M90 1630 H40 V887 H90" fill="none" stroke="#62748a" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<path d="M1810 1630 H1855 V887 H1810" fill="none" stroke="#62748a" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<text x="25" y="1325" class="small" transform="rotate(-90 25 1325)">More dates in this task</text>
+<text x="1875" y="1090" class="small" transform="rotate(90 1875 1090)">More dates in this task</text>
+<rect x="40" y="1686" width="36" height="32" rx="9" fill="#17324d"/>
+<text x="58" y="1710" class="section-number" text-anchor="middle">
+<tspan x="58" dy="0">03</tspan>
+</text>
+<text x="90" y="1710" class="section" text-anchor="start">
+<tspan x="90" dy="0">COLLECT AND ORDER; NO CROSS-DATE NUMERIC REDUCTION</tspan>
+</text>
+<text x="90" y="1739" class="caption" text-anchor="start">
+<tspan x="90" dy="0">A task finishing first does not change output order or the summation order inside a date.</tspan>
+</text>
+<rect x="90" y="1770" width="1720" height="135" rx="16" fill="#f2f5f9" stroke="#64748b" stroke-width="1.6"/>
+<text x="112" y="1803" class="node-title" text-anchor="start">
+<tspan x="112" dy="0">Barrier: all ranges must succeed → align daily aggregates</tspan>
+</text>
+<text x="112" y="1835" class="body" text-anchor="start">
+<tspan x="112" dy="0">Collect 1,095 daily results per source into original positions; retain compact country aggregates, not all securities.</tspan>
+<tspan x="112" dy="23">Check range exhaustion, entity consistency across workers, and matching index/portfolio dates.</tspan>
+<tspan x="112" dy="23">Pair by DATE + COUNTRY, not matching security IDs. “Merge” means reorder/align; do not average or sum different dates.</tspan>
+</text>
+<path d="M490 1670 V1680 H1770 V1770" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M1410 1670 V1680 H1770" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<rect x="40" y="1926" width="36" height="32" rx="9" fill="#17324d"/>
+<text x="58" y="1950" class="section-number" text-anchor="middle">
+<tspan x="58" dy="0">04</tspan>
+</text>
+<text x="90" y="1950" class="section" text-anchor="start">
+<tspan x="90" dy="0">CALCULATE ONE DATE AT A TIME, IN ORDER</tspan>
+</text>
+<text x="90" y="1979" class="caption" text-anchor="start">
+<tspan x="90" dy="0">Run independently for base and local returns. Country uses a fresh one-day period; there is no linking across dates.</tspan>
+</text>
+<path d="M1790 1905 V1998 H490 V2015" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M1790 1998 H1410 V2015" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<rect x="90" y="2015" width="820" height="170" rx="16" fill="#eaf8f0" stroke="#17815b" stroke-width="1.6"/>
+<text x="112" y="2048" class="node-title" text-anchor="start">
+<tspan x="112" dy="0">Portfolio group return and total portfolio return</tspan>
+</text>
+<text x="112" y="2080" class="body" text-anchor="start">
+<tspan x="112" dy="0">For each group g: rp,g = Cp,g / Wp,g when Wp,g &gt; 0.</tspan>
+<tspan x="112" dy="23">Total portfolio return: RP = Σg Cp,g.</tspan>
+<tspan x="112" dy="23">Cp,g is the group’s weighted contribution after US renormalization.</tspan>
+<tspan x="112" dy="23">For this single US group: Wp,US ≈ 1 and RP ≈ rp,US.</tspan>
+</text>
+<rect x="1010" y="2015" width="800" height="170" rx="16" fill="#fff4cd" stroke="#b77908" stroke-width="1.6"/>
+<text x="1032" y="2048" class="node-title" text-anchor="start">
+<tspan x="1032" dy="0">Benchmark group return versus TOTAL benchmark return</tspan>
+</text>
+<text x="1032" y="2080" class="body" text-anchor="start">
+<tspan x="1032" dy="0">Group return: rb,g = Cb,g / Wb,g when Wb,g &gt; 0.</tspan>
+<tspan x="1032" dy="23">TOTAL benchmark return: RB = Σg Cb,g.</tspan>
+<tspan x="1032" dy="23">RB is computed AFTER US filtering and renormalization.</tspan>
+<tspan x="1032" dy="23">It is the US-only benchmark return, not the original full-index return.</tspan>
+</text>
+<path d="M490 2185 V2215 H355 V2270" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M490 2215 H950 V2270" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M1410 2185 V2215 H950" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M1410 2215 H1545 V2270" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="950" y="2204" class="small" text-anchor="middle">
+<tspan x="950" dy="0">group weights and group returns</tspan>
+</text>
+<path d="M1210 2185 V2243 H355 V2270" fill="none" stroke="#b77908" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#reference-arrow)"/>
+<text x="665" y="2235" class="reference-label" text-anchor="middle">
+<tspan x="665" dy="0">RB → allocation reference</tspan>
+</text>
+<rect x="90" y="2270" width="530" height="185" rx="16" fill="#fff4cd" stroke="#b77908" stroke-width="1.8"/>
+<text x="112" y="2304" class="node-title" text-anchor="start">
+<tspan x="112" dy="0">Allocation</tspan>
+</text>
+<rect x="685" y="2270" width="530" height="185" rx="16" fill="#eaf8f0" stroke="#17815b" stroke-width="1.8"/>
+<text x="707" y="2304" class="node-title" text-anchor="start">
+<tspan x="707" dy="0">Selection</tspan>
+</text>
+<rect x="1280" y="2270" width="530" height="185" rx="16" fill="#eaf8f0" stroke="#17815b" stroke-width="1.8"/>
+<text x="1302" y="2304" class="node-title" text-anchor="start">
+<tspan x="1302" dy="0">Interaction</tspan>
+</text>
+<text x="112" y="2344" class="formula" text-anchor="start">
+<tspan x="112" dy="0">A_g = (Wp,g − Wb,g)</tspan>
+<tspan x="112" dy="25">      × (rb,g − RB)</tspan>
+</text>
+<text x="112" y="2410" class="body" text-anchor="start">
+<tspan x="112" dy="0">Uses group rb,g AND total RB.</tspan>
+<tspan x="112" dy="25">Over/underweight × group excess return.</tspan>
+</text>
+<text x="707" y="2344" class="formula" text-anchor="start">
+<tspan x="707" dy="0">S_g = Wb,g × (rp,g − rb,g)</tspan>
+</text>
+<text x="707" y="2390" class="body" text-anchor="start">
+<tspan x="707" dy="0">Uses benchmark GROUP return rb,g.</tspan>
+<tspan x="707" dy="25">Selection does not subtract total RB.</tspan>
+</text>
+<text x="1302" y="2344" class="formula" text-anchor="start">
+<tspan x="1302" dy="0">I_g = (Wp,g − Wb,g)</tspan>
+<tspan x="1302" dy="25">      × (rp,g − rb,g)</tspan>
+</text>
+<text x="1302" y="2410" class="body" text-anchor="start">
+<tspan x="1302" dy="0">Total effect for group g = A_g + S_g + I_g.</tspan>
+</text>
+<rect x="90" y="2520" width="1720" height="145" rx="16" fill="#eaf8f0" stroke="#17815b" stroke-width="1.6"/>
+<text x="112" y="2553" class="node-title" text-anchor="start">
+<tspan x="112" dy="0">Why the current US-only result has almost zero allocation and interaction</tspan>
+</text>
+<text x="112" y="2585" class="body" text-anchor="start">
+<tspan x="112" dy="0">Only one retained country: Wp,US ≈ Wb,US ≈ 1, and RB ≈ rb,US. Thus A_US ≈ 0 and I_US ≈ 0 (floating-point rounding).</tspan>
+<tspan x="112" dy="23">S_US ≈ RP − RB; selection carries the US portfolio-versus-US-benchmark active return.</tspan>
+<tspan x="112" dy="23">Illustrative decimals, not measured data: RP = 0.008, RB = 0.005 → A = 0, S = 0.003, I = 0; Total = 0.003 (0.30 percentage points).</tspan>
+<tspan x="112" dy="23">General zero-group fallback: if Wb,g = 0 use rb,g = rp,g; if Wp,g = 0 use rp,g = rb,g. This US case has positive weight on both sides.</tspan>
+</text>
+<path d="M355 2455 V2505 H950 V2520" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M950 2455 V2520" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M1545 2455 V2505 H950" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<rect x="40" y="2686" width="36" height="32" rx="9" fill="#17324d"/>
+<text x="58" y="2710" class="section-number" text-anchor="middle">
+<tspan x="58" dy="0">05</tspan>
+</text>
+<text x="90" y="2710" class="section" text-anchor="start">
+<tspan x="90" dy="0">RECONCILE, APPEND OUTPUT ROWS, THEN FINALIZE</tspan>
+</text>
+<text x="90" y="2739" class="caption" text-anchor="start">
+<tspan x="90" dy="0">Return values and effect values are decimal returns. Allocation/selection are country-level calculations, not sums of security-level BF effects.</tspan>
+</text>
+<rect x="90" y="2750" width="1720" height="125" rx="16" fill="#eaf8f0" stroke="#17815b" stroke-width="1.6"/>
+<text x="112" y="2783" class="node-title" text-anchor="start">
+<tspan x="112" dy="0">Reconcile each date / return type before publishing</tspan>
+</text>
+<text x="112" y="2815" class="body" text-anchor="start">
+<tspan x="112" dy="0">Require Σg (A_g + S_g + I_g) ≈ RP − RB (daily tolerance 1e−9). Check contribution and report-period reconciliation (1e−8).</tspan>
+<tspan x="112" dy="23">Portfolio contribution = Cp,g; benchmark contribution = Cb,g; active contribution = Cp,g − Cb,g.</tspan>
+<tspan x="112" dy="23">Any invalid input, unmatched date, failed range or failed reconciliation aborts success; no final report is published for that failure.</tspan>
+</text>
+<path d="M1770 2665 V2750" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<rect x="90" y="2930" width="820" height="190" rx="16" fill="#fff0f3" stroke="#c13e62" stroke-width="1.6"/>
+<text x="112" y="2963" class="node-title" text-anchor="start">
+<tspan x="112" dy="0">Map the daily values to the 20 output columns</tspan>
+</text>
+<text x="112" y="2995" class="body" text-anchor="start">
+<tspan x="112" dy="0">8 context fields: scenario, entity, date range, days, row type, country, return type.</tspan>
+<tspan x="112" dy="23">Weights; Allocation A_g; Selection S_g; Interaction I_g; Total = A_g + S_g + I_g.</tspan>
+<tspan x="112" dy="23">PortfolioReturn = RP; BenchmarkReturn = RB; ActiveReturn = RP − RB.</tspan>
+<tspan x="112" dy="23">PortfolioContribution = Cp,g; BenchmarkContribution = Cb,g;</tspan>
+<tspan x="112" dy="23">ActiveContribution = Cp,g − Cb,g. Days = 1; Segment = US.</tspan>
+</text>
+<rect x="1010" y="2930" width="800" height="190" rx="16" fill="#fff0f3" stroke="#c13e62" stroke-width="1.6"/>
+<text x="1032" y="2963" class="node-title" text-anchor="start">
+<tspan x="1032" dy="0">Append in DATE ORDER; format follows portfolio input</tspan>
+</text>
+<text x="1032" y="2995" class="body" text-anchor="start">
+<tspan x="1032" dy="0">CSV input → CSV rows through a buffered writer (Go: 1 MiB buffer).</tspan>
+<tspan x="1032" dy="23">Parquet input → typed Arrow output batches of at most 65,536 rows.</tspan>
+<tspan x="1032" dy="23">Encode / flush a Zstd Parquet batch when full; keep typed numeric values.</tspan>
+<tspan x="1032" dy="23">No worker writes the final report directly; the coordinator owns ordering.</tspan>
+<tspan x="1032" dy="23">Current output: 2 rows/date × 1,095 dates = 2,190 rows per portfolio.</tspan>
+</text>
+<path d="M950 2875 V2900 H490 V2930" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M910 3020 H1010" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M1810 3020 H1880 V1998 H950" fill="none" stroke="#62748a" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<text x="1896" y="2780" class="small" transform="rotate(-90 1896 2780)">Next date: repeat ordered compute and append</text>
+<rect x="340" y="3210" width="1220" height="140" rx="16" fill="#fff0f3" stroke="#c13e62" stroke-width="1.6"/>
+<text x="362" y="3243" class="node-title" text-anchor="start">
+<tspan x="362" dy="0">After the last date: finalize and publish</tspan>
+</text>
+<text x="362" y="3275" class="body" text-anchor="start">
+<tspan x="362" dy="0">Flush remaining CSV / Arrow buffers; finish Parquet compression and footer; fsync and close the .partial file.</tspan>
+<tspan x="362" dy="23">After all reports succeed, rename .partial files to final output names. Record output sizes and runtime metrics.</tspan>
+<tspan x="362" dy="23">The output contains daily country results only; dates are never numerically merged into a full-history return.</tspan>
+</text>
+<path d="M1410 3120 V3170 H950 V3210" fill="none" stroke="#62748a" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="1425" y="3153" class="caption" text-anchor="start">
+<tspan x="1425" dy="0">last date / EOF</tspan>
+</text>
+<text x="50" y="3390" class="small" text-anchor="start">
+<tspan x="50" dy="0">Source: go/cmd/attribution/{main.go, country_parallel.go, parquet_ranges.go, input.go, output.go}</tspan>
+</text>
+<text x="50" y="3415" class="small" text-anchor="start">
+<tspan x="50" dy="0">Source: rust/src/{main.rs, country_parallel.rs, input.rs, output.rs} • Current daily country scenario; other scenarios use different grouping / linking.</tspan>
+</text>
+</svg>

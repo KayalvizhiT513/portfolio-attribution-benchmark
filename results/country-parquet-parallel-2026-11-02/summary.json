@@ -1,0 +1,62 @@
+{
+  "baseline": "results/country-runtime-2026-11-02/parquet",
+  "optimized": "results/country-parquet-parallel-2026-11-02",
+  "single_profiled_run_per_engine": true,
+  "threads_flag_omitted": true,
+  "engines": {
+    "rust": {
+      "baseline_wall_seconds": 36.383943958,
+      "parallel_wall_seconds": 7.894335958,
+      "speedup": 4.608866933402938,
+      "runtime_reduction_percent": 78.30269316841279,
+      "baseline_peak_rss_mib": 503.578125,
+      "parallel_peak_rss_mib": 761.1875,
+      "baseline_average_cores": 1.5796217449617338,
+      "parallel_average_cores": 8.39207261140542
+    },
+    "go": {
+      "baseline_wall_seconds": 41.50105375,
+      "parallel_wall_seconds": 10.5752995,
+      "speedup": 3.924338383986193,
+      "runtime_reduction_percent": 74.51799763036138,
+      "baseline_peak_rss_mib": 701.234375,
+      "parallel_peak_rss_mib": 1917.625,
+      "baseline_average_cores": 2.3211374310112807,
+      "parallel_average_cores": 8.976516755186289
+    }
+  },
+  "exact_output_comparisons": [
+    {
+      "format": "parquet",
+      "language": "go",
+      "comparison": "cross-format/engine",
+      "rows": 2190,
+      "max_absolute_difference": 0.0,
+      "passed": true
+    },
+    {
+      "format": "parquet",
+      "language": "go",
+      "comparison": "original baseline",
+      "rows": 2190,
+      "max_absolute_difference": 0.0,
+      "passed": true
+    },
+    {
+      "format": "parquet",
+      "language": "rust",
+      "comparison": "cross-format/engine",
+      "rows": 2190,
+      "max_absolute_difference": 0.0,
+      "passed": true
+    },
+    {
+      "format": "parquet",
+      "language": "rust",
+      "comparison": "original baseline",
+      "rows": 2190,
+      "max_absolute_difference": 0.0,
+      "passed": true
+    }
+  ]
+}

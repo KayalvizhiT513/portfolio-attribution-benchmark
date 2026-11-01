@@ -20,7 +20,7 @@ def main():
     OUT.mkdir(exist_ok=False)
     binaries = {'rust': ROOT / 'rust/target/release/portfolio-attribution',
                 'go': ROOT / 'benchmark-go-attribution'}
-    environment = {'threads': 4, 'repetitions': 3, 'dates': 1095,
+    environment = {'thread_policy': 'runtime default; resolved threads recorded in each run', 'repetitions': 3, 'dates': 1095,
                    'order': 'Alternate format and engine order between repetitions; runs execute sequentially.',
                    'timing': 'Elapsed durations per stage per worker; repeated calls sum only within that worker. Channel waits/setup are outside stage timers. Workers overlap; do not sum workers.',
                    'profiling': 'CPU/allocation/read-batch diagnostics disabled',
@@ -34,7 +34,7 @@ def main():
                 folder = OUT / f'run-{rep}' / fmt / lang
                 folder.mkdir(parents=True)
                 command = [str(binaries[lang]), '--data', str(ROOT / ('attribution_data' if fmt == 'csv' else 'attribution_data_parquet')),
-                           '--scenario', 'country', '--threads', '4', '--max-days', '0',
+                           '--scenario', 'country', '--max-days', '0',
                            '--output-dir', str(folder), '--metrics', str(folder / 'metrics.csv')]
                 # measured() inherits the process environment.
                 os.environ.clear()

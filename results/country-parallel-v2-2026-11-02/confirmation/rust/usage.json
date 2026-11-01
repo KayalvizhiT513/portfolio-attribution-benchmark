@@ -1,0 +1,18 @@
+{
+  "process_wall_seconds": 15.71686575000058,
+  "cpu_seconds": 71.765962,
+  "peak_rss_mib": 542.375,
+  "average_cores": 4.566175161227508,
+  "command": [
+    "./rust/target/release/portfolio-attribution",
+    "--data",
+    "attribution_data",
+    "--scenario",
+    "country",
+    "--output-dir",
+    "results/country-parallel-v2-2026-11-02/confirmation/rust",
+    "--metrics",
+    "results/country-parallel-v2-2026-11-02/confirmation/rust/metrics.csv"
+  ],
+  "binary_sha256": "fd10e4849091aa16bb491236812734fe7b8893ec82e1c3754fb7179aab5dbd70"
+}

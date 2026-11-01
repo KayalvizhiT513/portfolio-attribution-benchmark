@@ -103,7 +103,7 @@ def main():
     if OUT.exists():raise FileExistsError(OUT)
     (OUT/'profile').mkdir(parents=True)
     binary=ROOT/'benchmark-go-attribution'
-    environment={'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'threads':4,
+    environment={'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'thread_policy':'runtime default; resolved threads recorded in each run',
                  'normal_repetitions':{'country':3,'other_scenarios':1},
                  'normal_order':'CSV/Parquet pairs alternate; OS-managed caches',
                  'diagnostics':'three country pairs plus one cache-off control; CPU samples and whole-process runtime counters',
@@ -117,7 +117,7 @@ def main():
                 out=OUT/scenario/f'run-{repetition}'/fmt;out.mkdir(parents=True)
                 data=ROOT/('attribution_data' if fmt=='csv' else 'attribution_data_parquet')
                 metrics=out/'metrics.csv'
-                command=[str(binary),'--data',str(data),'--scenario',scenario,'--threads','4','--max-days','0',
+                command=[str(binary),'--data',str(data),'--scenario',scenario,'--max-days','0',
                          '--output-dir',str(out),'--metrics',str(metrics),'--instruments-file',str(BASE/'subset.csv')]
                 print(f'NORMAL {scenario} {repetition} {fmt}',flush=True)
                 usage=measured(command,out/'run.log')
@@ -144,12 +144,12 @@ def main():
         env=['env','ATTRIBUTION_PROFILE_READ=1',f'ATTRIBUTION_CPU_PROFILE={cpu}',f'ATTRIBUTION_ALLOC_PROFILE={alloc}',f'ATTRIBUTION_RUNTIME_STATS={stats}']
         if mode=='parquet-cache-off':env+=['ATTRIBUTION_DISABLE_DATE_CACHE=1']
         command=env+[str(binary),'--data',str(ROOT/('attribution_data' if fmt=='csv' else 'attribution_data_parquet')),
-                     '--scenario','country','--threads','4','--max-days','0','--output-dir',str(out),'--metrics',str(metrics)]
+                     '--scenario','country','--max-days','0','--output-dir',str(out),'--metrics',str(metrics)]
         print(f'DIAGNOSTIC {mode} {repetition}',flush=True)
         usage=measured(command,out/'run.log')
         with metrics.open() as f:r=next(csv.DictReader(f))
         assert int(r['rows_read'])==175200000 and int(r['output_rows'])==2190
-        if fmt=='parquet':assert math.isclose(float(r['parquet_batch_read_decode_seconds'])+float(r['parquet_to_daily_buffer_seconds']),float(r['read_parse_seconds']),rel_tol=1e-9,abs_tol=1e-6)
+        if fmt=='parquet':assert math.isclose(float(r['parquet_batch_read_decode_seconds'])+float(r['parquet_to_daily_buffer_seconds']),float(r['read_parse_seconds'])-float(r.get('boundary_scan_seconds',0)),rel_tol=1e-9,abs_tol=1e-6)
         runtime=json.loads(stats.read_text());cpu_summary=analyze(PPROF,cpu)
         top=subprocess.check_output([PPROF,'-sample_index=alloc_space','-top','-nodecount=12',str(alloc)],text=True)
         r.update({'mode':mode,'repetition':repetition,'runtime':runtime,'cpu':cpu_summary,'allocation_top':top,**usage});profiles.append(r)

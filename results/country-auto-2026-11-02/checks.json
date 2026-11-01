@@ -1,0 +1,51 @@
+{
+  "scenario": "country",
+  "input": "attribution_data (CSV, effective-dated master)",
+  "threads_flag_omitted": true,
+  "runs": {
+    "rust": {
+      "threads": "12",
+      "days": "1095",
+      "rows_read": "175200000",
+      "rows_retained": "173010000",
+      "output_rows": "2190",
+      "wall_seconds": "26.571013834",
+      "read_parse_seconds": "31.602946035999985",
+      "filter_seconds": "12.776012363000014",
+      "aggregate_seconds": "0.16027054500000015",
+      "compute_seconds": "0.0011581549999999884",
+      "write_seconds": "0.011359718000000019"
+    },
+    "go": {
+      "threads": "12",
+      "days": "1095",
+      "rows_read": "175200000",
+      "rows_retained": "173010000",
+      "output_rows": "2190",
+      "wall_seconds": "50.101715459",
+      "read_parse_seconds": "67.25305758600001",
+      "filter_seconds": "15.347925550999996",
+      "aggregate_seconds": "0.6130040500000002",
+      "compute_seconds": "0.0009090769999999996",
+      "write_seconds": "0.01012878000000001"
+    }
+  },
+  "comparisons": {
+    "rust_vs_go": {
+      "rows": 2190,
+      "max_absolute_difference": 0.0,
+      "passed": true
+    },
+    "rust_vs_previous_4_threads": {
+      "rows": 2190,
+      "max_absolute_difference": 0.0,
+      "passed": true
+    },
+    "go_vs_previous_4_threads": {
+      "rows": 2190,
+      "max_absolute_difference": 0.0,
+      "passed": true
+    }
+  },
+  "go_wall_time_divided_by_rust": 1.885577862102136
+}

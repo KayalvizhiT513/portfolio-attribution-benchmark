@@ -1,0 +1,26 @@
+{
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "logical_cpus": 12,
+  "thread_policy": "Native runtime automatic; no --threads flag",
+  "read_profile": "ATTRIBUTION_PROFILE_READ=1",
+  "prepared_parquet": {
+    "master_source": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data/security_master.csv",
+    "master_source_sha256": "b06e23b417797d5fcf6540de0f23b68b58bc4b9524e6c52cdf246d5268782c2e",
+    "master_rows": 5760000,
+    "master_verification": "Every typed field and row matches updated CSV, in order",
+    "holdings_symlinks": [
+      "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data_parquet/index.parquet",
+      "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data_parquet/portfolio_PF.parquet"
+    ]
+  },
+  "order": [
+    "rust CSV",
+    "go CSV",
+    "go Parquet",
+    "rust Parquet"
+  ],
+  "binary_sha256": {
+    "rust": "1830802d555bc9774fcd1445453a11bf8b23da8f28d1c5b62d2ecb2043a7c614",
+    "go": "43afce1a8e757b18f956833df2290ee6b77229e241aa1a2a2f9505c46bf182d6"
+  }
+}

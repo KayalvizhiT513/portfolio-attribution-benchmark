@@ -1,0 +1,41 @@
+{
+  "scenario": "country",
+  "input": "attribution_data (CSV, effective-dated master)",
+  "comparison": {
+    "passed": true,
+    "rows": 2190,
+    "numeric_values": 26280,
+    "max_absolute_difference": 0.0,
+    "relative_tolerance": 1e-08,
+    "absolute_tolerance": 1e-10
+  },
+  "runs": {
+    "rust": {
+      "threads": "4",
+      "days": "1095",
+      "rows_read": "175200000",
+      "rows_retained": "173010000",
+      "output_rows": "2190",
+      "wall_seconds": "25.862961042",
+      "read_parse_seconds": "29.014625541999994",
+      "filter_seconds": "12.678068354999997",
+      "aggregate_seconds": "0.15769730800000006",
+      "compute_seconds": "0.0010705269999999713",
+      "write_seconds": "0.011302454000000036"
+    },
+    "go": {
+      "threads": "4",
+      "days": "1095",
+      "rows_read": "175200000",
+      "rows_retained": "173010000",
+      "output_rows": "2190",
+      "wall_seconds": "50.761098791",
+      "read_parse_seconds": "66.30794133800002",
+      "filter_seconds": "15.434708773",
+      "aggregate_seconds": "0.3081710609999999",
+      "compute_seconds": "0.0009244289999999959",
+      "write_seconds": "0.008202974000000016"
+    }
+  },
+  "go_wall_time_divided_by_rust": 1.962694786129354
+}

@@ -68,7 +68,7 @@ def save(runs, checks, environment):
             candidates = sorted([r for r in profiled if r['scenario']==scenario], key=lambda r:float(r['read_parse_seconds']))
             if not candidates: continue
             r = candidates[len(candidates)//2]
-            lines.append(f"| {scenario.capitalize()} | {float(r['parquet_batch_read_decode_seconds']):.3f} | {float(r['parquet_to_daily_buffer_seconds']):.3f} | {float(r['read_parse_seconds']):.3f} |")
+            lines.append(f"| {scenario.capitalize()} | {float(r['parquet_batch_read_decode_seconds']):.3f} | {float(r['parquet_to_daily_buffer_seconds']):.3f} | {float(r['read_parse_seconds'])-float(r.get('boundary_scan_seconds',0)):.3f} |")
         lines += ['', 'Country uses the profiling run with the middle read time out of three; the other scenarios use one run. Each row’s components come from the same run and sum to its read time. Profiled times are kept separate from the uninstrumented comparison above.', '',
                   '[Profile measurements](results/rust-date-cache/profile/runs.csv) · [Profile checks](results/rust-date-cache/profile/checks.json)', '']
         country_profiles = sorted([r for r in profiled if r['scenario']=='country'], key=lambda r:float(r['read_parse_seconds']))
@@ -95,7 +95,7 @@ def profile():
             out=directory/scenario/f'run-{repetition}';out.mkdir(parents=True)
             metrics=out/'metrics.csv'
             command=['env','ATTRIBUTION_PROFILE_READ=1',str(binary),'--data',str(ROOT/'attribution_data_parquet'),
-                     '--scenario',scenario,'--threads','4','--max-days','0','--output-dir',str(out),
+                     '--scenario',scenario,'--max-days','0','--output-dir',str(out),
                      '--metrics',str(metrics),'--instruments-file',str(BASELINE/'subset.csv')]
             print(f'PROFILE {scenario} {repetition}',flush=True)
             usage=measured(command,out/'run.log')
@@ -104,7 +104,7 @@ def profile():
             decoding=float(row['parquet_batch_read_decode_seconds'])
             adapter=float(row['parquet_to_daily_buffer_seconds'])
             assert decoding>0 and adapter>0 and int(row['parquet_batches'])>0
-            assert math.isclose(decoding+adapter,float(row['read_parse_seconds']),rel_tol=1e-9,abs_tol=1e-6)
+            assert math.isclose(decoding+adapter,float(row['read_parse_seconds'])-float(row.get('boundary_scan_seconds',0)),rel_tol=1e-9,abs_tol=1e-6)
             row.update({'repetition':repetition,**usage});profiled.append(row)
             path=out/f'{scenario}-portfolio_PF.parquet'
             for fmt in ['csv','parquet']:
@@ -132,7 +132,7 @@ def main():
     OUT.mkdir(parents=True)
     binary=ROOT/'rust/target/release/portfolio-attribution'
     subset=BASELINE/'subset.csv'
-    environment={'change':'cache date32 text until the integer day changes', 'threads':4,
+    environment={'change':'cache date32 text until the integer day changes', 'thread_policy':'runtime default; resolved threads recorded in each run',
                  'input':'unchanged attribution_data and attribution_data_parquet',
                  'repetitions':{'country':3,'other_scenarios':1}, 'cache':'OS-managed; paired format order alternates',
                  'slowdown_trigger_ratio':1.1,'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest()}
@@ -147,7 +147,7 @@ def main():
                 data=ROOT/('attribution_data' if fmt=='csv' else 'attribution_data_parquet')
                 metrics=out/'metrics.csv'
                 command=[str(binary),'--data',str(data),'--output-dir',str(out),'--metrics',str(metrics),
-                         '--scenario',scenario,'--threads','4','--max-days','0','--instruments-file',str(subset)]
+                         '--scenario',scenario,'--max-days','0','--instruments-file',str(subset)]
                 print(f'START {scenario} pair {repetition} {fmt}',flush=True)
                 usage=measured(command,out/'run.log')
                 with metrics.open() as f: row=next(csv.DictReader(f))

@@ -1,0 +1,17 @@
+{
+  "command": [
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/benchmark-go-attribution",
+    "--data",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-runtime-2026-11-02/inputs/parquet",
+    "--scenario",
+    "country",
+    "--output-dir",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-runtime-2026-11-02/parquet/go",
+    "--metrics",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-runtime-2026-11-02/parquet/go/metrics.csv"
+  ],
+  "process_wall_seconds": 41.52065220800432,
+  "cpu_seconds": 96.37514,
+  "peak_rss_mib": 701.234375,
+  "average_cores": 2.3211374310112807
+}

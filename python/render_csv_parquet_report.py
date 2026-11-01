@@ -79,7 +79,7 @@ def read_breakdown(scenario=None, language='rust'):
         samples = sorted([r for r in profiles if r['scenario'] == name], key=lambda r: float(r['read_parse_seconds']))
         if not samples: continue
         r = samples[len(samples)//2]
-        lines.append(f"| {name.capitalize()} | {float(r['parquet_batch_read_decode_seconds']):.3f} | {float(r['parquet_to_daily_buffer_seconds']):.3f} | {float(r['read_parse_seconds']):.3f} |")
+        lines.append(f"| {name.capitalize()} | {float(r['parquet_batch_read_decode_seconds']):.3f} | {float(r['parquet_to_daily_buffer_seconds']):.3f} | {float(r['read_parse_seconds'])-float(r.get('boundary_scan_seconds',0)):.3f} |")
     lines += ['', 'The first part includes file I/O, decompression, decoding and Arrow batch creation. The second includes row handling, date caching, ID lookup, validation and building daily buffers. It is the remaining read time after subtracting batch time.', '',
               f'[Full date-cache comparison and profiling evidence]({language.upper()}_DATE_READ_REPORT.md)', '']
     return lines

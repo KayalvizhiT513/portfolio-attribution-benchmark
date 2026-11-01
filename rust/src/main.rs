@@ -2,11 +2,13 @@ use std::{
     collections::HashMap,
     error::Error,
     fs::{self, File},
+    io::Read,
     path::{Path, PathBuf},
     sync::{mpsc, Arc},
     thread,
     time::Instant,
 };
+mod country_parallel;
 mod input;
 mod output;
 use input::Input;
@@ -67,6 +69,7 @@ fn config() -> Result<Config> {
     while let Some(a) = args.next() {
         if a == "--help" {
             println!("--scenario security|subset|country|weekly|monthly --data DIR (CSV and/or Parquet) --output-dir DIR --metrics FILE --threads N --max-days N --instruments-file CSV_OR_PARQUET --period all|day|week|month|quarter|year");
+            println!("--threads defaults to available CPU parallelism; caps country date-range workers or streaming portfolio workers.");
             std::process::exit(0);
         }
         let v = args.next().ok_or("missing option value")?;
@@ -116,16 +119,27 @@ struct Stat {
 struct Master {
     ids: HashMap<String, usize>,
     names: Vec<String>,
-    countries: Vec<usize>,
+    history: Vec<Vec<(String, usize)>>,
     country_names: Vec<String>,
     selected: Vec<bool>,
     subset_slots: Vec<usize>,
     subset_names: Vec<String>,
 }
-fn reader(path: &Path, header: &[&str]) -> Result<csv::Reader<File>> {
+impl Master {
+    // Select the latest master version effective on or before the holdings date.
+    fn country_on(&self, id: usize, date: &str) -> Result<usize> {
+        let versions = &self.history[id];
+        let i = versions.partition_point(|v| v.0.as_str() <= date);
+        if i == 0 {
+            return Err(format!("no effective master record: {} on {date}", self.names[id]).into());
+        }
+        Ok(versions[i - 1].1)
+    }
+}
+fn reader(path: &Path, header: &[&str]) -> Result<csv::Reader<std::io::Take<File>>> {
     let mut r = csv::ReaderBuilder::new()
         .buffer_capacity(1024 * 1024)
-        .from_path(path)?;
+        .from_reader(File::open(path)?.take(u64::MAX));
     if !r.headers()?.iter().eq(header.iter().copied()) {
         return Err(format!("bad header {}", path.display()).into());
     }
@@ -135,35 +149,63 @@ fn master(c: &Config) -> Result<Master> {
     let mut m = Master {
         ids: HashMap::new(),
         names: vec![],
-        countries: vec![],
+        history: vec![],
         country_names: vec![],
         selected: vec![],
         subset_slots: vec![],
         subset_names: vec![],
     };
     let mut countries = HashMap::new();
-    let mut rows = Input::open(
-        &input::resolve(&c.data, "security_master")?,
-        &["InstrumentId", "Currency", "Country"],
-    )?;
+    let path = input::resolve(&c.data, "security_master")?;
+    let (mut rows, dated) = match Input::open(
+        &path,
+        &["InstrumentId", "EffectiveDate", "Currency", "Country"],
+    ) {
+        Ok(rows) => (rows, true),
+        Err(_) => (
+            Input::open(&path, &["InstrumentId", "Currency", "Country"])?,
+            false,
+        ),
+    };
     while rows.advance()? {
         let id = rows.text(0)?;
-        let currency = rows.text(1)?;
-        let country = rows.text(2)?;
+        let effective = if dated {
+            rows.text(1)?.into_owned()
+        } else {
+            String::new()
+        };
+        if dated {
+            civil(&effective)?;
+        }
+        let currency = rows.text(if dated { 2 } else { 1 })?;
+        let country = rows.text(if dated { 3 } else { 2 })?;
         if id.is_empty() || currency.is_empty() || country.is_empty() {
             return Err("blank master field".into());
         }
-        let n = m.names.len();
-        if m.ids.insert(id.to_string(), n).is_some() {
-            return Err("duplicate master ID".into());
-        }
-        m.names.push(id.to_string());
+        let n = if let Some(&n) = m.ids.get(id.as_ref()) {
+            if !dated {
+                return Err("duplicate master ID".into());
+            }
+            n
+        } else {
+            let n = m.names.len();
+            m.ids.insert(id.to_string(), n);
+            m.names.push(id.to_string());
+            m.history.push(vec![]);
+            n
+        };
         let next = countries.len();
         let k = *countries.entry(country.to_string()).or_insert(next);
         if k == m.country_names.len() {
             m.country_names.push(country.to_string());
         }
-        m.countries.push(k);
+        m.history[n].push((effective, k));
+    }
+    for (id, versions) in m.history.iter_mut().enumerate() {
+        versions.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        if versions.windows(2).any(|v| v[0].0 == v[1].0) {
+            return Err(format!("duplicate master ID/date: {}", m.names[id]).into());
+        }
     }
     m.selected = vec![c.scenario != "subset"; m.names.len()];
     if let Some(p) = &c.subset {
@@ -192,6 +234,17 @@ fn master(c: &Config) -> Result<Master> {
 }
 #[derive(Default, Clone)]
 struct Metrics {
+    phase_setup: f64,
+    phase_master: f64,
+    phase_boundary: f64,
+    phase_parallel: f64,
+    phase_ordered: f64,
+    phase_streaming: f64,
+    phase_finalize: f64,
+    phase_overhead: f64,
+    range_workers: usize,
+    range_tasks: usize,
+    boundary: f64,
     read: f64,
     filter: f64,
     aggregate: f64,
@@ -212,6 +265,7 @@ struct Metrics {
 }
 impl Metrics {
     fn add(&mut self, b: &Self) {
+        self.boundary += b.boundary;
         self.read += b.read;
         self.batch_decode += b.batch_decode;
         self.to_daily_buffer += b.to_daily_buffer;
@@ -345,10 +399,14 @@ impl Stream {
         }
         self.previous = date.clone();
         let start = Instant::now();
+        let mut dated_countries = vec![0; m.names.len()];
+        for &(id, _) in raw.iter() {
+            dated_countries[id] = m.country_on(id, &date)?;
+        }
         if c.scenario == "subset" {
             raw.retain(|(id, _)| m.selected[*id]);
         } else if c.scenario == "country" {
-            raw.retain(|(id, _)| m.country_names[m.countries[*id]] == "US");
+            raw.retain(|(id, _)| m.country_names[dated_countries[*id]] == "US");
         }
         let selected: f64 = raw.iter().map(|(_, s)| s.w).sum();
         if selected <= 0.0 {
@@ -368,7 +426,7 @@ impl Stream {
         // Normalize even full weights to remove source rounding and make daily reconciliation exact.
         for &(id, s) in raw.iter() {
             let k = if c.scenario == "country" {
-                m.countries[id]
+                dated_countries[id]
             } else if c.scenario == "subset" {
                 m.subset_slots[id]
             } else {
@@ -795,7 +853,9 @@ fn worker(path: &Path, c: &Config, m: &Master, rx: mpsc::Receiver<Arc<Day>>) -> 
 fn run() -> Result<()> {
     let wall = Instant::now();
     let c = config()?;
+    let master_start = Instant::now();
     let m = master(&c)?;
+    let master_seconds = master_start.elapsed().as_secs_f64();
     fs::create_dir_all(&c.output)?;
     if fs::canonicalize(&c.output)? == fs::canonicalize(&c.data)? {
         return Err("output directory must differ from input".into());
@@ -808,56 +868,78 @@ fn run() -> Result<()> {
     let mut portfolio_metrics = Metrics::default();
     let mut observed = 0;
     let mut input_bytes = fs::metadata(&master_path)?.len();
-    // One index producer broadcasts bounded one-day buffers. Batching limits native workers.
-    for batch in paths.chunks(c.threads) {
-        let result: Result<()> = thread::scope(|scope| {
-            let mut senders = vec![];
-            let mut workers = vec![];
-            for p in batch {
-                let (tx, rx) = mpsc::sync_channel(1);
-                senders.push(tx);
-                let (c, m) = (&c, &m);
-                workers.push(scope.spawn(move || worker(p, c, m, rx)));
-            }
-            let mut index = Stream::new(&index_path)?;
-            let mut days = 0;
-            let production: Result<()> = (|| {
-                while c.max_days == 0 || days < c.max_days {
-                    let Some(day) = index.next(&m, &c, &mut metrics)? else {
-                        break;
-                    };
-                    let day = Arc::new(day);
-                    for tx in &senders {
-                        let _ = tx.send(Arc::clone(&day));
-                    }
-                    days += 1;
-                }
-                Ok(())
-            })();
-            index_metrics.read = metrics.read - portfolio_metrics.read;
-            index_metrics.filter = metrics.filter - portfolio_metrics.filter;
-            index_metrics.aggregate = metrics.aggregate - portfolio_metrics.aggregate;
-            drop(senders);
-            let mut errors = vec![];
-            for worker in workers {
-                match worker.join() {
-                    Ok(Ok(x)) => {
-                        metrics.add(&x);
-                        portfolio_metrics.add(&x);
-                    }
-                    Ok(Err(e)) => errors.push(e.to_string()),
-                    Err(_) => errors.push("worker panicked".into()),
-                }
-            }
-            production?;
-            if !errors.is_empty() {
-                return Err(errors.join("; ").into());
-            }
-            observed = days;
-            Ok(())
-        });
-        result?;
+    let pipeline_start = Instant::now();
+    if let Some(result) = country_parallel::run(&c, &m, &paths, &index_path)? {
+        metrics = result.0;
+        index_metrics = result.1;
+        portfolio_metrics = result.2;
+        observed = result.3;
         input_bytes += fs::metadata(&index_path)?.len();
+    } else {
+        // One index producer broadcasts bounded one-day buffers. Batching limits native workers.
+        for batch in paths.chunks(c.threads) {
+            let result: Result<()> = thread::scope(|scope| {
+                let mut senders = vec![];
+                let mut workers = vec![];
+                for p in batch {
+                    let (tx, rx) = mpsc::sync_channel(1);
+                    senders.push(tx);
+                    let (c, m) = (&c, &m);
+                    workers.push(scope.spawn(move || worker(p, c, m, rx)));
+                }
+                let mut index = Stream::new(&index_path)?;
+                let mut days = 0;
+                let production: Result<()> = (|| {
+                    while c.max_days == 0 || days < c.max_days {
+                        let Some(day) = index.next(&m, &c, &mut metrics)? else {
+                            break;
+                        };
+                        let day = Arc::new(day);
+                        for tx in &senders {
+                            let _ = tx.send(Arc::clone(&day));
+                        }
+                        days += 1;
+                    }
+                    Ok(())
+                })();
+                index_metrics.read = metrics.read - portfolio_metrics.read;
+                index_metrics.filter = metrics.filter - portfolio_metrics.filter;
+                index_metrics.aggregate = metrics.aggregate - portfolio_metrics.aggregate;
+                drop(senders);
+                let mut errors = vec![];
+                for worker in workers {
+                    match worker.join() {
+                        Ok(Ok(x)) => {
+                            metrics.add(&x);
+                            portfolio_metrics.add(&x);
+                        }
+                        Ok(Err(e)) => errors.push(e.to_string()),
+                        Err(_) => errors.push("worker panicked".into()),
+                    }
+                }
+                production?;
+                if !errors.is_empty() {
+                    return Err(errors.join("; ").into());
+                }
+                observed = days;
+                Ok(())
+            });
+            result?;
+            input_bytes += fs::metadata(&index_path)?.len();
+        }
+    }
+    let pipeline_end = Instant::now();
+    metrics.phase_master = master_seconds;
+    metrics.phase_setup = pipeline_start.duration_since(wall).as_secs_f64() - master_seconds;
+    let pipeline_seconds = pipeline_end.duration_since(pipeline_start).as_secs_f64();
+    if metrics.range_workers > 0 {
+        metrics.phase_overhead = (pipeline_seconds
+            - metrics.phase_boundary
+            - metrics.phase_parallel
+            - metrics.phase_ordered)
+            .max(0.0);
+    } else {
+        metrics.phase_streaming = pipeline_seconds;
     }
     for path in &paths {
         input_bytes += fs::metadata(path)?.len();
@@ -869,6 +951,8 @@ fn run() -> Result<()> {
         fs::create_dir_all(p)?;
     }
     let mut w = csv::Writer::from_path(&c.metrics)?;
+    let wall_seconds = wall.elapsed().as_secs_f64();
+    metrics.phase_finalize = wall_seconds - pipeline_end.duration_since(wall).as_secs_f64();
     let mut header = vec![
         "language",
         "scenario",
@@ -913,7 +997,7 @@ fn run() -> Result<()> {
         metrics.aggregate.to_string(),
         metrics.compute.to_string(),
         metrics.write.to_string(),
-        wall.elapsed().as_secs_f64().to_string(),
+        wall_seconds.to_string(),
         metrics.report_rows.to_string(),
         metrics.checksum[0].to_string(),
         metrics.checksum[1].to_string(),
@@ -945,6 +1029,39 @@ fn run() -> Result<()> {
         }
     }
     header.extend(side_headers.iter().map(String::as_str));
+    header.extend([
+        "date_range_workers",
+        "date_range_tasks",
+        "boundary_scan_seconds",
+    ]);
+    values.extend([
+        metrics.range_workers.to_string(),
+        metrics.range_tasks.to_string(),
+        metrics.boundary.to_string(),
+    ]);
+    header.extend([
+        "setup_seconds",
+        "master_load_seconds",
+        "boundary_plan_wall_seconds",
+        "parallel_read_filter_aggregate_wall_seconds",
+        "ordered_compute_write_wall_seconds",
+        "streaming_pipeline_wall_seconds",
+        "finalize_seconds",
+        "pipeline_overhead_seconds",
+    ]);
+    values.extend(
+        [
+            metrics.phase_setup,
+            metrics.phase_master,
+            metrics.phase_boundary,
+            metrics.phase_parallel,
+            metrics.phase_ordered,
+            metrics.phase_streaming,
+            metrics.phase_finalize,
+            metrics.phase_overhead,
+        ]
+        .map(|value| value.to_string()),
+    );
     w.write_record(header)?;
     w.write_record(values)?;
     w.flush()?;
@@ -964,6 +1081,31 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn effective_master_boundaries() {
+        let m = Master {
+            ids: HashMap::new(),
+            names: vec!["A".into(), "legacy".into()],
+            history: vec![
+                vec![("2023-01-01".into(), 0), ("2023-02-01".into(), 1)],
+                vec![(String::new(), 0)],
+            ],
+            country_names: vec!["US".into(), "GB".into()],
+            selected: vec![],
+            subset_slots: vec![],
+            subset_names: vec![],
+        };
+        assert!(m.country_on(0, "2022-12-31").is_err());
+        for (date, country) in [
+            ("2023-01-01", 0),
+            ("2023-01-31", 0),
+            ("2023-02-01", 1),
+            ("2024-01-01", 1),
+        ] {
+            assert_eq!(m.country_on(0, date).unwrap(), country);
+        }
+        assert_eq!(m.country_on(1, "1900-01-01").unwrap(), 0);
+    }
     #[test]
     fn dates() {
         assert_eq!(

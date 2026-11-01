@@ -78,7 +78,7 @@ def main():
     subset.write_text('InstrumentId\n' + '\n'.join(ids) + '\n')
     binaries = {'rust': ROOT / 'rust/target/release/portfolio-attribution', 'go': ROOT / 'benchmark-go-attribution'}
     hashes = {lang: hashlib.sha256(path.read_bytes()).hexdigest() for lang, path in binaries.items()}
-    environment = {'platform': platform.platform(), 'threads': 4, 'repetitions': 1,
+    environment = {'platform': platform.platform(), 'thread_policy': 'runtime default; resolved threads recorded in each run', 'repetitions': 1,
                    'format_order': ['csv', 'parquet'], 'cache': 'OS-managed, no explicit eviction',
                    'executables': {lang: {'path': str(path), 'sha256': hashes[lang]} for lang, path in binaries.items()},
                    'input_manifests': {fmt: json.loads((ROOT / folder / 'manifest.json').read_text())
@@ -93,7 +93,7 @@ def main():
                 out.mkdir(parents=True)
                 metrics = out / 'metrics.csv'
                 command = [str(binaries[lang]), '--data', str(ROOT / folder), '--scenario', scenario,
-                           '--output-dir', str(out), '--metrics', str(metrics), '--threads', '4',
+                           '--output-dir', str(out), '--metrics', str(metrics),
                            '--max-days', '0', '--instruments-file', str(subset)]
                 print(f'START {fmt} {scenario} {lang}: all 1,095 dates', flush=True)
                 usage = measured(command, out / 'run.log')

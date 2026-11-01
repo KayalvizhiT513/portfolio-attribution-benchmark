@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -28,24 +29,33 @@ type stat struct {
 	r       [2]float64
 	present bool
 }
+type masterVersion struct {
+	date    string
+	country int
+}
 type master struct {
 	ids                 map[string]int
 	names, countryNames []string
-	countries           []int
+	history             [][]masterVersion
 	selected            []bool
 	subsetSlots         []int
 	subsetNames         []string
 }
 type metrics struct {
-	read, filter, aggregate, compute, write                 float64
-	rows, retained, groups, effects, written, bytes, parsed uint64
-	reportRows                                              uint64
-	checksum                                                [3]float64
-	batchDecode, toDailyBuffer                              float64
-	parquetBatches                                          uint64
+	phaseSetup, phaseMaster, phaseBoundary, phaseParallel, phaseOrdered float64
+	phaseStreaming, phaseFinalize, phaseOverhead                        float64
+	rangeWorkers, rangeTasks                                            uint64
+	boundary                                                            float64
+	read, filter, aggregate, compute, write                             float64
+	rows, retained, groups, effects, written, bytes, parsed             uint64
+	reportRows                                                          uint64
+	checksum                                                            [3]float64
+	batchDecode, toDailyBuffer                                          float64
+	parquetBatches                                                      uint64
 }
 
 func (m *metrics) add(b metrics) {
+	m.boundary += b.boundary
 	m.read += b.read
 	m.batchDecode += b.batchDecode
 	m.toDailyBuffer += b.toDailyBuffer
@@ -87,7 +97,12 @@ func loadMaster(c config) (master, error) {
 	if e != nil {
 		return m, e
 	}
-	r, e := openInput(path, []string{"InstrumentId", "Currency", "Country"})
+	dated := true
+	r, e := openInput(path, []string{"InstrumentId", "EffectiveDate", "Currency", "Country"})
+	if e != nil {
+		dated = false
+		r, e = openInput(path, []string{"InstrumentId", "Currency", "Country"})
+	}
 	if e != nil {
 		return m, e
 	}
@@ -101,25 +116,48 @@ func loadMaster(c config) (master, error) {
 		if !ok {
 			break
 		}
+		effective := ""
+		currencyCol, countryCol := 1, 2
+		if dated {
+			effective = strings.Clone(r.text(1))
+			if _, err := parseDate(effective); err != nil {
+				return m, err
+			}
+			currencyCol, countryCol = 2, 3
+		}
 		// Master strings outlive the current Arrow batch.
-		row := []string{strings.Clone(r.text(0)), r.text(1), strings.Clone(r.text(2))}
+		row := []string{strings.Clone(r.text(0)), r.text(currencyCol), strings.Clone(r.text(countryCol))}
 		for _, v := range row {
 			if v == "" {
 				return m, errors.New("blank master field")
 			}
 		}
-		if _, ok := m.ids[row[0]]; ok {
+		id, exists := m.ids[row[0]]
+		if exists && !dated {
 			return m, errors.New("duplicate master ID")
 		}
-		m.ids[row[0]] = len(m.names)
-		m.names = append(m.names, row[0])
+		if !exists {
+			id = len(m.names)
+			m.ids[row[0]] = id
+			m.names = append(m.names, row[0])
+			m.history = append(m.history, nil)
+		}
 		k, ok := countries[row[2]]
 		if !ok {
 			k = len(countries)
 			countries[row[2]] = k
 			m.countryNames = append(m.countryNames, row[2])
 		}
-		m.countries = append(m.countries, k)
+		m.history[id] = append(m.history[id], masterVersion{effective, k})
+	}
+	for id := range m.history {
+		versions := m.history[id]
+		sort.Slice(versions, func(i, j int) bool { return versions[i].date < versions[j].date })
+		for i := 1; i < len(versions); i++ {
+			if versions[i-1].date == versions[i].date {
+				return m, fmt.Errorf("duplicate master ID/date: %s/%s", m.names[id], versions[i].date)
+			}
+		}
 	}
 	if len(m.names) == 0 {
 		return m, errors.New("empty master")
@@ -160,6 +198,16 @@ func loadMaster(c config) (master, error) {
 		}
 	}
 	return m, nil
+}
+
+// Select the latest master version effective on or before the holdings date.
+func (m *master) countryOn(id int, date string) (int, error) {
+	versions := m.history[id]
+	i := sort.Search(len(versions), func(i int) bool { return versions[i].date > date })
+	if i == 0 {
+		return 0, fmt.Errorf("no effective master record: %s on %s", m.names[id], date)
+	}
+	return versions[i-1].country, nil
 }
 
 type day struct {
@@ -284,12 +332,20 @@ func (s *stream) next(m *master, c config, mt *metrics) (*day, error) {
 	}
 	s.previous = date
 	start = time.Now()
+	datedCountries := make([]int, len(m.names))
+	for _, r := range rows {
+		country, err := m.countryOn(r.id, date)
+		if err != nil {
+			return nil, err
+		}
+		datedCountries[r.id] = country
+	}
 	retained := rows[:0]
 	selected := 0.0
 	for _, r := range rows {
 		keep := c.scenario != "subset" || m.selected[r.id]
 		if c.scenario == "country" {
-			keep = m.countryNames[m.countries[r.id]] == "US"
+			keep = m.countryNames[datedCountries[r.id]] == "US"
 		}
 		if keep {
 			retained = append(retained, r)
@@ -312,7 +368,7 @@ func (s *stream) next(m *master, c config, mt *metrics) (*day, error) {
 	for _, r := range retained {
 		k := r.id
 		if c.scenario == "country" {
-			k = m.countries[k]
+			k = datedCountries[k]
 		} else if c.scenario == "subset" {
 			k = m.subsetSlots[k]
 		}
@@ -689,7 +745,7 @@ func run() error {
 	flag.StringVar(&c.scenario, "scenario", "country", "security|subset|country|weekly|monthly")
 	flag.StringVar(&c.period, "period", "", "all|day|week|month|quarter|year")
 	flag.StringVar(&c.subset, "instruments-file", "", "one-column InstrumentId CSV or Parquet")
-	flag.IntVar(&c.threads, "threads", runtime.NumCPU(), "GOMAXPROCS")
+	flag.IntVar(&c.threads, "threads", runtime.GOMAXPROCS(0), "CPU parallelism (default: Go runtime limit; respects GOMAXPROCS)")
 	flag.IntVar(&c.maxDays, "max-days", 0, "0 reads all dates")
 	flag.Parse()
 	if c.threads < 1 || c.maxDays < 0 {
@@ -724,7 +780,9 @@ func run() error {
 		return errors.New("subset requires --instruments-file")
 	}
 	runtime.GOMAXPROCS(c.threads)
+	masterStart := time.Now()
 	m, e := loadMaster(c)
+	masterSeconds := seconds(masterStart)
 	if e != nil {
 		return e
 	}
@@ -759,65 +817,78 @@ func run() error {
 	if e != nil {
 		return e
 	}
-	type result struct {
-		m metrics
-		e error
+	pipelineStart := time.Now()
+	mt, indexMetrics, portfolioMetrics, days, parallel, e := countryParallel(c, &m, paths, indexPath)
+	if e != nil {
+		return e
 	}
-	results := make(chan result, len(paths))
-	inputs := make([]chan *day, len(paths))
-	done := make([]chan struct{}, len(paths))
-	for i, path := range paths {
-		inputs[i] = make(chan *day, 1)
-		done[i] = make(chan struct{})
-		go func(i int, path string) {
-			mt, e := worker(path, c, &m, inputs[i])
-			close(done[i])
-			results <- result{mt, e}
-		}(i, path)
-	}
-	var mt metrics
-	index, e := newStream(indexPath)
-	days := 0
-	production := e
-	if e == nil {
-		for c.maxDays == 0 || days < c.maxDays {
-			d, e := index.next(&m, c, &mt)
-			if e != nil {
-				production = e
-				break
-			}
-			if d == nil {
-				break
-			}
-			for i, ch := range inputs {
-				select {
-				case ch <- d:
-				case <-done[i]:
+	if !parallel {
+		type result struct {
+			m metrics
+			e error
+		}
+		results := make(chan result, len(paths))
+		inputs := make([]chan *day, len(paths))
+		done := make([]chan struct{}, len(paths))
+		for i, path := range paths {
+			inputs[i] = make(chan *day, 1)
+			done[i] = make(chan struct{})
+			go func(i int, path string) {
+				mt, e := worker(path, c, &m, inputs[i])
+				close(done[i])
+				results <- result{mt, e}
+			}(i, path)
+		}
+		index, e := newStream(indexPath)
+		days = 0
+		production := e
+		if e == nil {
+			for c.maxDays == 0 || days < c.maxDays {
+				d, e := index.next(&m, c, &mt)
+				if e != nil {
+					production = e
+					break
 				}
+				if d == nil {
+					break
+				}
+				for i, ch := range inputs {
+					select {
+					case ch <- d:
+					case <-done[i]:
+					}
+				}
+				days++
 			}
-			days++
+			index.r.Close()
 		}
-		index.r.Close()
-	}
-	for _, ch := range inputs {
-		close(ch)
-	}
-	indexMetrics := mt
-	var portfolioMetrics metrics
-	var workerError error
-	for range paths {
-		r := <-results
-		mt.add(r.m)
-		portfolioMetrics.add(r.m)
-		if r.e != nil {
-			workerError = r.e
+		for _, ch := range inputs {
+			close(ch)
+		}
+		indexMetrics = mt
+		var workerError error
+		for range paths {
+			r := <-results
+			mt.add(r.m)
+			portfolioMetrics.add(r.m)
+			if r.e != nil {
+				workerError = r.e
+			}
+		}
+		if production != nil {
+			return production
+		}
+		if workerError != nil {
+			return workerError
 		}
 	}
-	if production != nil {
-		return production
-	}
-	if workerError != nil {
-		return workerError
+	pipelineEnd := time.Now()
+	mt.phaseMaster = masterSeconds
+	mt.phaseSetup = pipelineStart.Sub(wall).Seconds() - masterSeconds
+	if parallel {
+		mt.phaseOverhead = math.Max(0, pipelineEnd.Sub(pipelineStart).Seconds()-mt.phaseBoundary-mt.phaseParallel-mt.phaseOrdered)
+	} else {
+		mt.phaseStreaming = pipelineEnd.Sub(pipelineStart).Seconds()
 	}
 	var inputBytes uint64
 	for _, p := range append(append([]string{}, paths...), indexPath, masterPath) {
@@ -849,9 +920,11 @@ func run() error {
 	}
 	defer f.Close()
 	w := csv.NewWriter(f)
+	wallSeconds := seconds(wall)
+	mt.phaseFinalize = wallSeconds - pipelineEnd.Sub(wall).Seconds()
 	header := []string{"language", "scenario", "period", "threads", "days", "input_file_bytes", "rows_read", "rows_retained", "groups", "effect_values", "output_rows", "output_bytes", "parsed_input_bytes", "read_parse_seconds", "filter_seconds", "aggregate_seconds", "compute_seconds", "write_seconds", "wall_seconds", "report_rows", "checksum_allocation", "checksum_selection", "checksum_interaction"}
 	u := func(v uint64) string { return strconv.FormatUint(v, 10) }
-	values := []string{"go", c.scenario, c.period, strconv.Itoa(c.threads), strconv.Itoa(days), u(inputBytes), u(mt.rows), u(mt.retained), u(mt.groups), u(mt.effects), u(mt.written), u(mt.bytes), u(mt.parsed), number(mt.read), number(mt.filter), number(mt.aggregate), number(mt.compute), number(mt.write), number(seconds(wall)), u(mt.reportRows), number(mt.checksum[0]), number(mt.checksum[1]), number(mt.checksum[2])}
+	values := []string{"go", c.scenario, c.period, strconv.Itoa(c.threads), strconv.Itoa(days), u(inputBytes), u(mt.rows), u(mt.retained), u(mt.groups), u(mt.effects), u(mt.written), u(mt.bytes), u(mt.parsed), number(mt.read), number(mt.filter), number(mt.aggregate), number(mt.compute), number(mt.write), number(wallSeconds), u(mt.reportRows), number(mt.checksum[0]), number(mt.checksum[1]), number(mt.checksum[2])}
 	if os.Getenv("ATTRIBUTION_PROFILE_READ") == "1" {
 		header = append(header, "parquet_batch_read_decode_seconds", "parquet_to_daily_buffer_seconds", "parquet_batches")
 		values = append(values, number(mt.batchDecode), number(mt.toDailyBuffer), u(mt.parquetBatches))
@@ -863,6 +936,10 @@ func run() error {
 		header = append(header, side.name+"_read_seconds", side.name+"_filter_seconds", side.name+"_aggregate_seconds", side.name+"_compute_seconds", side.name+"_write_seconds")
 		values = append(values, number(side.m.read), number(side.m.filter), number(side.m.aggregate), number(side.m.compute), number(side.m.write))
 	}
+	header = append(header, "date_range_workers", "date_range_tasks", "boundary_scan_seconds")
+	values = append(values, u(mt.rangeWorkers), u(mt.rangeTasks), number(mt.boundary))
+	header = append(header, "setup_seconds", "master_load_seconds", "boundary_plan_wall_seconds", "parallel_read_filter_aggregate_wall_seconds", "ordered_compute_write_wall_seconds", "streaming_pipeline_wall_seconds", "finalize_seconds", "pipeline_overhead_seconds")
+	values = append(values, number(mt.phaseSetup), number(mt.phaseMaster), number(mt.phaseBoundary), number(mt.phaseParallel), number(mt.phaseOrdered), number(mt.phaseStreaming), number(mt.phaseFinalize), number(mt.phaseOverhead))
 	w.Write(header)
 	w.Write(values)
 	w.Flush()

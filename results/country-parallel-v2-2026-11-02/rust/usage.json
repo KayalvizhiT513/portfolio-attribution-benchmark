@@ -1,0 +1,17 @@
+{
+  "command": [
+    "./rust/target/release/portfolio-attribution",
+    "--data",
+    "attribution_data",
+    "--scenario",
+    "country",
+    "--output-dir",
+    "results/country-parallel-v2-2026-11-02/rust",
+    "--metrics",
+    "results/country-parallel-v2-2026-11-02/rust/metrics.csv"
+  ],
+  "process_wall_seconds": 14.447103540995158,
+  "cpu_seconds": 66.884831,
+  "peak_rss_mib": 538.78125,
+  "average_cores": 4.629636024287314
+}

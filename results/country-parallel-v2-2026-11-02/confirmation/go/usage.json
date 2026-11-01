@@ -1,0 +1,18 @@
+{
+  "process_wall_seconds": 20.705036209001264,
+  "cpu_seconds": 113.862921,
+  "peak_rss_mib": 815.0,
+  "average_cores": 5.499286253385033,
+  "command": [
+    "./benchmark-go-attribution",
+    "--data",
+    "attribution_data",
+    "--scenario",
+    "country",
+    "--output-dir",
+    "results/country-parallel-v2-2026-11-02/confirmation/go",
+    "--metrics",
+    "results/country-parallel-v2-2026-11-02/confirmation/go/metrics.csv"
+  ],
+  "binary_sha256": "eef36ad22d74476c78a95b53cb8719ba1a70806a7da0c414d3686b9630886c52"
+}

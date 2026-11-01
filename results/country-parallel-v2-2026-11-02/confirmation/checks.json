@@ -1,0 +1,147 @@
+{
+  "threads_flag_omitted": true,
+  "runs": {
+    "rust": {
+      "metrics": {
+        "language": "rust",
+        "scenario": "country",
+        "period": "day",
+        "threads": "12",
+        "days": "1095",
+        "input_file_bytes": "12777351660",
+        "rows_read": "175200000",
+        "rows_retained": "173010000",
+        "groups": "2190",
+        "effect_values": "6570",
+        "output_rows": "2190",
+        "output_bytes": "709851",
+        "parsed_input_bytes": "12621831463",
+        "read_parse_seconds": "59.709269707999994",
+        "filter_seconds": "21.262134593",
+        "aggregate_seconds": "0.207454136",
+        "compute_seconds": "0.0001672310000000061",
+        "write_seconds": "0.007763448999999995",
+        "wall_seconds": "15.638230583",
+        "report_rows": "2190",
+        "checksum_allocation": "0.0000000000000000000000000000014055257750429455",
+        "checksum_selection": "-0.015924110460169005",
+        "checksum_interaction": "0.00000000000000039046985041262355",
+        "index_read_seconds": "35.80616221099999",
+        "index_filter_seconds": "13.899260174999998",
+        "index_aggregate_seconds": "0.13633847300000002",
+        "index_compute_seconds": "0",
+        "index_write_seconds": "0",
+        "portfolio_read_seconds": "23.903107497",
+        "portfolio_filter_seconds": "7.362874417999999",
+        "portfolio_aggregate_seconds": "0.07111566300000001",
+        "portfolio_compute_seconds": "0.0001672310000000061",
+        "portfolio_write_seconds": "0.007763448999999995",
+        "date_range_workers": "12",
+        "date_range_tasks": "24",
+        "boundary_scan_seconds": "8.743822458"
+      },
+      "usage": {
+        "process_wall_seconds": 15.71686575000058,
+        "cpu_seconds": 71.765962,
+        "peak_rss_mib": 542.375,
+        "average_cores": 4.566175161227508,
+        "command": [
+          "./rust/target/release/portfolio-attribution",
+          "--data",
+          "attribution_data",
+          "--scenario",
+          "country",
+          "--output-dir",
+          "results/country-parallel-v2-2026-11-02/confirmation/rust",
+          "--metrics",
+          "results/country-parallel-v2-2026-11-02/confirmation/rust/metrics.csv"
+        ],
+        "binary_sha256": "fd10e4849091aa16bb491236812734fe7b8893ec82e1c3754fb7179aab5dbd70"
+      },
+      "baseline_wall_seconds": 26.571013834,
+      "optimized_wall_seconds": 15.638230583,
+      "speedup": 1.6991061548155455,
+      "runtime_reduction_percent": 41.14552541841863
+    },
+    "go": {
+      "metrics": {
+        "language": "go",
+        "scenario": "country",
+        "period": "day",
+        "threads": "12",
+        "days": "1095",
+        "input_file_bytes": "12777351660",
+        "rows_read": "175200000",
+        "rows_retained": "173010000",
+        "groups": "2190",
+        "effect_values": "6570",
+        "output_rows": "2190",
+        "output_bytes": "704911",
+        "parsed_input_bytes": "12621831463",
+        "read_parse_seconds": "104.99058321800001",
+        "filter_seconds": "21.807541840000003",
+        "aggregate_seconds": "0.389269387",
+        "compute_seconds": "0.00041374900000000546",
+        "write_seconds": "0.007233053999999993",
+        "wall_seconds": "20.654454292",
+        "report_rows": "2190",
+        "checksum_allocation": "1.4055257750429455e-30",
+        "checksum_selection": "-0.015924110460169005",
+        "checksum_interaction": "3.9046985041262355e-16",
+        "index_read_seconds": "60.872547296",
+        "index_filter_seconds": "13.678102673000001",
+        "index_aggregate_seconds": "0.24368024500000002",
+        "index_compute_seconds": "0",
+        "index_write_seconds": "0",
+        "portfolio_read_seconds": "44.118035922000004",
+        "portfolio_filter_seconds": "8.129439167000001",
+        "portfolio_aggregate_seconds": "0.145589142",
+        "portfolio_compute_seconds": "0.00041374900000000546",
+        "portfolio_write_seconds": "0.007233053999999993",
+        "date_range_workers": "12",
+        "date_range_tasks": "24",
+        "boundary_scan_seconds": "9.303238376"
+      },
+      "usage": {
+        "process_wall_seconds": 20.705036209001264,
+        "cpu_seconds": 113.862921,
+        "peak_rss_mib": 815.0,
+        "average_cores": 5.499286253385033,
+        "command": [
+          "./benchmark-go-attribution",
+          "--data",
+          "attribution_data",
+          "--scenario",
+          "country",
+          "--output-dir",
+          "results/country-parallel-v2-2026-11-02/confirmation/go",
+          "--metrics",
+          "results/country-parallel-v2-2026-11-02/confirmation/go/metrics.csv"
+        ],
+        "binary_sha256": "eef36ad22d74476c78a95b53cb8719ba1a70806a7da0c414d3686b9630886c52"
+      },
+      "baseline_wall_seconds": 50.101715459,
+      "optimized_wall_seconds": 20.654454292,
+      "speedup": 2.4257099582827357,
+      "runtime_reduction_percent": 58.774955901655154
+    }
+  },
+  "comparisons": {
+    "rust_vs_baseline": {
+      "rows": 2190,
+      "max_absolute_difference": 0.0,
+      "passed": true
+    },
+    "go_vs_baseline": {
+      "rows": 2190,
+      "max_absolute_difference": 0.0,
+      "passed": true
+    },
+    "rust_vs_go": {
+      "rows": 2190,
+      "max_absolute_difference": 0.0,
+      "passed": true
+    }
+  },
+  "baseline": "results/country-auto-2026-11-02"
+}

@@ -1,0 +1,147 @@
+{
+  "scenario": "country",
+  "threads_flag_omitted": true,
+  "baseline": "results/country-auto-2026-11-02",
+  "runs": {
+    "rust": {
+      "baseline_wall_seconds": 26.571013834,
+      "optimized_wall_seconds": 14.342217833,
+      "speedup": 1.8526433040824948,
+      "runtime_reduction_percent": 46.0230688877673,
+      "metrics": {
+        "language": "rust",
+        "scenario": "country",
+        "period": "day",
+        "threads": "12",
+        "days": "1095",
+        "input_file_bytes": "12777351660",
+        "rows_read": "175200000",
+        "rows_retained": "173010000",
+        "groups": "2190",
+        "effect_values": "6570",
+        "output_rows": "2190",
+        "output_bytes": "709851",
+        "parsed_input_bytes": "12621831463",
+        "read_parse_seconds": "57.92052371599999",
+        "filter_seconds": "17.883760613",
+        "aggregate_seconds": "0.20946241799999993",
+        "compute_seconds": "0.00013921599999999838",
+        "write_seconds": "0.007158364000000002",
+        "wall_seconds": "14.342217833",
+        "report_rows": "2190",
+        "checksum_allocation": "0.0000000000000000000000000000014055257750429455",
+        "checksum_selection": "-0.015924110460169005",
+        "checksum_interaction": "0.00000000000000039046985041262355",
+        "index_read_seconds": "36.132090305999995",
+        "index_filter_seconds": "11.747689544",
+        "index_aggregate_seconds": "0.14031415499999994",
+        "index_compute_seconds": "0",
+        "index_write_seconds": "0",
+        "portfolio_read_seconds": "21.78843341",
+        "portfolio_filter_seconds": "6.136071069",
+        "portfolio_aggregate_seconds": "0.06914826299999999",
+        "portfolio_compute_seconds": "0.00013921599999999838",
+        "portfolio_write_seconds": "0.007158364000000002",
+        "date_range_workers": "12",
+        "date_range_tasks": "24",
+        "boundary_scan_seconds": "7.712919917000001"
+      },
+      "usage": {
+        "command": [
+          "./rust/target/release/portfolio-attribution",
+          "--data",
+          "attribution_data",
+          "--scenario",
+          "country",
+          "--output-dir",
+          "results/country-parallel-v2-2026-11-02/rust",
+          "--metrics",
+          "results/country-parallel-v2-2026-11-02/rust/metrics.csv"
+        ],
+        "process_wall_seconds": 14.447103540995158,
+        "cpu_seconds": 66.884831,
+        "peak_rss_mib": 538.78125,
+        "average_cores": 4.629636024287314
+      }
+    },
+    "go": {
+      "baseline_wall_seconds": 50.101715459,
+      "optimized_wall_seconds": 20.2484745,
+      "speedup": 2.4743451887696524,
+      "runtime_reduction_percent": 59.58526706222257,
+      "metrics": {
+        "language": "go",
+        "scenario": "country",
+        "period": "day",
+        "threads": "12",
+        "days": "1095",
+        "input_file_bytes": "12777351660",
+        "rows_read": "175200000",
+        "rows_retained": "173010000",
+        "groups": "2190",
+        "effect_values": "6570",
+        "output_rows": "2190",
+        "output_bytes": "704911",
+        "parsed_input_bytes": "12621831463",
+        "read_parse_seconds": "103.999331287",
+        "filter_seconds": "21.355138680000003",
+        "aggregate_seconds": "0.3991889099999999",
+        "compute_seconds": "0.00039404000000000587",
+        "write_seconds": "0.006744425999999991",
+        "wall_seconds": "20.2484745",
+        "report_rows": "2190",
+        "checksum_allocation": "1.4055257750429455e-30",
+        "checksum_selection": "-0.015924110460169005",
+        "checksum_interaction": "3.9046985041262355e-16",
+        "index_read_seconds": "61.371649086000005",
+        "index_filter_seconds": "13.272101286",
+        "index_aggregate_seconds": "0.25099528299999996",
+        "index_compute_seconds": "0",
+        "index_write_seconds": "0",
+        "portfolio_read_seconds": "42.627682201",
+        "portfolio_filter_seconds": "8.083037394000002",
+        "portfolio_aggregate_seconds": "0.14819362699999997",
+        "portfolio_compute_seconds": "0.00039404000000000587",
+        "portfolio_write_seconds": "0.006744425999999991",
+        "date_range_workers": "12",
+        "date_range_tasks": "24",
+        "boundary_scan_seconds": "8.923364249999999"
+      },
+      "usage": {
+        "command": [
+          "./benchmark-go-attribution",
+          "--data",
+          "attribution_data",
+          "--scenario",
+          "country",
+          "--output-dir",
+          "results/country-parallel-v2-2026-11-02/go",
+          "--metrics",
+          "results/country-parallel-v2-2026-11-02/go/metrics.csv"
+        ],
+        "process_wall_seconds": 20.29849008400197,
+        "cpu_seconds": 112.786035,
+        "peak_rss_mib": 822.546875,
+        "average_cores": 5.5563755990348795
+      }
+    }
+  },
+  "comparisons": {
+    "rust_vs_baseline": {
+      "passed": true,
+      "rows": 2190,
+      "max_absolute_difference": 0.0
+    },
+    "go_vs_baseline": {
+      "passed": true,
+      "rows": 2190,
+      "max_absolute_difference": 0.0
+    },
+    "rust_vs_go": {
+      "passed": true,
+      "rows": 2190,
+      "numeric_values": 26280,
+      "max_absolute_difference": 0.0
+    }
+  }
+}

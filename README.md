@@ -55,6 +55,12 @@ python3 python/render_stage_report.py
 python3 python/render_attribution_flows.py
 ```
 
+Omit `--threads` to use the machine's available parallelism. Go uses its runtime CPU limit, including `GOMAXPROCS` and supported container CPU limits; Rust detects available CPU parallelism. Pass `--threads N` only to override the default. Benchmark scripts leave this setting automatic and record the resolved value in each run's metrics.
+
+For daily country attribution, CSV files whose records fit on one physical line are partitioned at complete date boundaries. Parquet files with single-date row-group statistics are partitioned by row group, keeping adjacent groups for the same date together. A worker pool sized from available parallelism reads and aggregates independent ranges, then daily reports are reconciled and written in date order. Each date preserves its original instrument order. Metrics record `date_range_workers`, `date_range_tasks`, and `boundary_scan_seconds`; boundary discovery (CSV scanning or Parquet footer inspection) is included in read time and total runtime. The pool shares the immutable effective-dated master and retains only daily country aggregates.
+
+Multiline CSV, Parquet without metadata-proven single-date groups, and other scenarios use the streaming pipeline. In that path the setting controls Go's CPU parallelism and Rust's maximum concurrent portfolio workers, with a separate index producer. `--threads 1` selects streaming country execution for comparison. See [initial CSV optimization measurements](COUNTRY_OPTIMIZATION.md) and [parallel Parquet results](PARQUET_PARALLEL_REPORT.md). The [end-to-end SVG flowchart](docs/flows/country-parallel-end-to-end.svg) shows read units, filtering, aggregation, benchmark return selection, BF formulas and ordered output. Whole-run and worker-stage timing for CSV and Parquet is available in the [runtime breakdown](results/country-runtime-2026-11-02/REPORT.md).
+
 Use a fresh `--output-dir` for another benchmark execution. Generated attribution CSVs remain local; metrics and reports are retained separately. Sources are in `python/`, `go/` and `rust/`; inputs are in `attribution_data/`.
 
 The current synthetic dataset has one merged portfolio and index, with exactly 1,000 shared DE/EUR securities and no US overlap. Entity returns are independently generated. This measures computational correctness and performance; real investment analysis needs agreed pricing, timing and attribution conventions.
@@ -122,3 +128,15 @@ existing US holdings equally between their original IDs and new IDs
 preserves daily total weight and weighted returns. Split provenance is recorded
 in `attribution_data_parquet/expansion_provenance.parquet`. The expansion and
 CSV/Parquet verification are implemented in `python/expand_portfolio_us.py`.
+
+To measure country runtime phases for both formats with the updated master:
+
+```sh
+.venv/bin/python python/benchmark_country_runtime.py --output-dir results/new-country-runtime
+```
+
+Use a new output directory. The script prepares and verifies an effective-dated
+Parquet master from CSV, links the existing Parquet holdings, runs each engine
+and format once without a thread override, and validates every report value.
+`REPORT.md` separates additive whole-run phases from overlapping worker-stage
+timers and includes the Parquet batch-decode / row-preparation split.

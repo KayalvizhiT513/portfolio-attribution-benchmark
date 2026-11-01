@@ -50,7 +50,7 @@ def main():
     root.mkdir(parents=True)
     data=ROOT/'attribution_data';subset=root/'subset.csv';subset_file(data,subset)
     binaries={'rust':ROOT/'rust/target/release/portfolio-attribution','go':ROOT/'benchmark-go-attribution'}
-    metadata={'platform':platform.platform(),'logical_cpus':os.cpu_count(),'days':1095,'runs':args.runs,'rust_threads':4,'go_GOMAXPROCS':os.cpu_count() or 1,
+    metadata={'platform':platform.platform(),'logical_cpus':os.cpu_count(),'days':1095,'runs':args.runs,'thread_policy':'runtime default; resolved threads recorded in each run',
               'cache_policy':'OS-managed; language order alternates; first run included',
               'executables':{l:{'path':str(p),'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for l,p in binaries.items()},
               'inputs':[{'name':p.name,'bytes':p.stat().st_size,'mtime_ns':p.stat().st_mtime_ns} for p in sorted(data.glob('*.csv'))]}
@@ -61,7 +61,7 @@ def main():
             for language in languages:
                 folder=root/scenario/'compact'/language;folder.mkdir(parents=True,exist_ok=True)
                 metrics=folder/f'metrics-run-{rep}.csv'
-                command=[str(binaries[language]),'--data',str(data),'--scenario',scenario,'--output-dir',str(folder),'--metrics',str(metrics),'--max-days','0','--threads',str(4 if language=='rust' else os.cpu_count() or 1),'--instruments-file',str(subset)]
+                command=[str(binaries[language]),'--data',str(data),'--scenario',scenario,'--output-dir',str(folder),'--metrics',str(metrics),'--max-days','0','--instruments-file',str(subset)]
                 print(f'{scenario} | {language} | full history {rep}/{args.runs}',flush=True)
                 usage=measured(command,folder/f'run-{rep}.log')
                 with metrics.open(newline='') as f:r=next(csv.DictReader(f))

@@ -211,6 +211,11 @@ func (r *parquetInput) parsedBytes() int64 { return 0 }
 func (r *parquetInput) Close() error       { r.r.Release(); return r.f.Close() }
 
 func openInput(path string, header []string) (inputReader, error) {
+	return openInputGroups(path, header, nil)
+}
+
+// A non-nil rowGroups list bounds Parquet decoding to this task's groups.
+func openInputGroups(path string, header []string, rowGroups []int) (inputReader, error) {
 	if filepath.Ext(path) == ".csv" {
 		f, r, err := openCSV(path, header)
 		if err != nil {
@@ -264,7 +269,7 @@ func openInput(path string, header []string) (inputReader, error) {
 		}
 		leaves = append(leaves, field.ColIndex)
 	}
-	rr, err := ar.GetRecordReader(context.Background(), leaves, nil)
+	rr, err := ar.GetRecordReader(context.Background(), leaves, rowGroups)
 	if err != nil {
 		return fail(err)
 	}

@@ -1,6 +1,8 @@
 # Country attribution: US only
 
-Country uses the latest rerun: three runs per engine/format. Its elapsed-time breakdown uses one complete run per column, selected by the middle whole-run time; supporting metrics use medians. Other scenarios retain their date-cache follow-up runs. The latest country runs alternate format and engine order and execute sequentially.
+Latest Parquet date-range optimization and measurements are in the [parallel Parquet report](PARQUET_PARALLEL_REPORT.md). The preceding effective-dated-master measurements, including parallel CSV and streaming Parquet execution, are in the [country runtime breakdown](results/country-runtime-2026-11-02/REPORT.md).
+
+The tables below retain the earlier date-cache benchmark: three runs per engine/format with the older master. Its elapsed-time breakdown uses one complete run per column, selected by the middle whole-run time; supporting metrics use medians. These historical measurements alternate format and engine order and execute sequentially.
 
 Keep US holdings in the portfolio and index. Scale each side’s US weights to 100%, then calculate daily Brinson–Fachler effects and return contributions.
 

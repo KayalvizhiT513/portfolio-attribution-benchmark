@@ -7,6 +7,8 @@ Run: python python/generate_attribution_csvs.py --output-dir ./attribution_data
 The dataset includes 1,095 calendar dates (including weekends), 1 portfolio of
 60,000 instruments, 1 index of 100,000 instruments, and 160,000 unique
 security-master identifiers. All returns and weights are synthetic.
+The security master has one effective-dated record per security per month
+from January 2023 through December 2025 (36 records per security).
 """
 import argparse
 import csv
@@ -20,15 +22,20 @@ N_SECURITIES = 160_000
 US_SECURITIES = 159_000
 PORT_HOLDINGS = 60_000
 INDEX_HOLDINGS = 100_000
+MASTER_DATES = tuple(date(year, month, 1).isoformat()
+                     for year in range(2023, 2026) for month in range(1, 13))
 HEADER = ['Entity', 'EffectiveDate', 'InstrumentId', 'Weight', 'BaseReturn', 'LocalReturn']
 
 
 def write_master(out: Path):
     with (out / 'security_master.csv').open('w', newline='', buffering=1024 * 1024) as f:
         w = csv.writer(f)
-        w.writerow(['InstrumentId', 'Currency', 'Country'])
-        w.writerows((f'S{i:06d}', 'USD' if i <= US_SECURITIES else 'EUR',
-                     'US' if i <= US_SECURITIES else 'DE') for i in range(1, N_SECURITIES + 1))
+        w.writerow(['InstrumentId', 'EffectiveDate', 'Currency', 'Country'])
+        w.writerows((f'S{i:06d}', effective_date,
+                     'USD' if i <= US_SECURITIES else 'EUR',
+                     'US' if i <= US_SECURITIES else 'DE')
+                    for i in range(1, N_SECURITIES + 1)
+                    for effective_date in MASTER_DATES)
 
 
 def daily_rows(rng, security_ids, entity, day, weight_mode, batch_size):
@@ -90,7 +97,7 @@ def main():
     master = args.output_dir / 'security_master.csv'
     write_master(args.output_dir)
     if args.verify:
-        verify(master, N_SECURITIES)
+        verify(master, N_SECURITIES * len(MASTER_DATES))
 
     # One 60k-instrument portfolio: S000001-S060000.
     # Index overlaps the portfolio, allowing valid attribution joins.

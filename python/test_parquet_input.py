@@ -69,7 +69,7 @@ def compare_outputs(a, b):
                 decode = float(row['parquet_batch_read_decode_seconds'])
                 adapter = float(row['parquet_to_daily_buffer_seconds'])
                 assert decode > 0 and adapter > 0 and int(row['parquet_batches']) > 0
-                assert math.isclose(decode + adapter, float(row['read_parse_seconds']), rel_tol=1e-9, abs_tol=1e-6)
+                assert math.isclose(decode + adapter, float(row['read_parse_seconds'])-float(row.get('boundary_scan_seconds',0)), rel_tol=1e-9, abs_tol=1e-6)
 
 
 def main():

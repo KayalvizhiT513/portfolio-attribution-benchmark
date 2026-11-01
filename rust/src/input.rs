@@ -12,6 +12,7 @@ use std::{
     borrow::Cow,
     collections::BTreeMap,
     fs::{self, File},
+    io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
     time::Instant,
 };
@@ -54,8 +55,9 @@ pub fn portfolios(dir: &Path) -> Result<Vec<PathBuf>> {
 
 pub enum Input {
     Csv {
-        reader: csv::Reader<File>,
+        reader: csv::Reader<std::io::Take<File>>,
         row: csv::StringRecord,
+        expected_fields: usize,
     },
     Parquet {
         reader: ParquetRecordBatchReader,
@@ -132,10 +134,15 @@ fn is_string(t: &DataType) -> bool {
 
 impl Input {
     pub fn open(path: &Path, header: &[&str]) -> Result<Self> {
+        Self::open_groups(path, header, None)
+    }
+
+    pub fn open_groups(path: &Path, header: &[&str], groups: Option<Vec<usize>>) -> Result<Self> {
         match path.extension().and_then(|s| s.to_str()) {
             Some("csv") => Ok(Self::Csv {
                 reader: reader(path, header)?,
                 row: csv::StringRecord::new(),
+                expected_fields: header.len(),
             }),
             Some("parquet") => {
                 let builder = ParquetRecordBatchReaderBuilder::try_new(File::open(path)?)?;
@@ -171,6 +178,11 @@ impl Input {
                     indices.push(index);
                 }
                 let projection = ProjectionMask::roots(builder.parquet_schema(), indices);
+                let builder = if let Some(groups) = groups {
+                    builder.with_row_groups(groups)
+                } else {
+                    builder
+                };
                 let reader = builder
                     .with_projection(projection)
                     .with_batch_size(65_536)
@@ -199,9 +211,33 @@ impl Input {
         }
     }
 
+    pub fn csv_range(path: &Path, start: u64, end: u64) -> Result<Self> {
+        let mut file = File::open(path)?;
+        file.seek(SeekFrom::Start(start))?;
+        let reader = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .buffer_capacity(1024 * 1024)
+            .from_reader(file.take(end - start));
+        Ok(Self::Csv {
+            reader,
+            row: csv::StringRecord::new(),
+            expected_fields: crate::HEADER.len(),
+        })
+    }
+
     pub fn advance(&mut self) -> Result<bool> {
         match self {
-            Self::Csv { reader, row } => Ok(reader.read_record(row)?),
+            Self::Csv {
+                reader,
+                row,
+                expected_fields,
+            } => {
+                let advanced = reader.read_record(row)?;
+                if advanced && row.len() != *expected_fields {
+                    return Err("invalid CSV field count".into());
+                }
+                Ok(advanced)
+            }
             Self::Parquet {
                 reader,
                 batch,
