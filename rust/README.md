@@ -1,6 +1,6 @@
-# Streaming attribution with final reports
+# Native attribution engines: CLI, output contracts and formulas
 
-Rust and Go implement the same attribution contracts with native CSV or Arrow/Parquet streaming, bounded immutable index broadcasts and independent portfolio workers. Python provides independent correctness checks and benchmark orchestration.
+Rust and Go implement the same attribution contracts with native CSV or Arrow/Parquet streaming, bounded immutable index broadcasts and independent portfolio workers. Daily country attribution uses a complete-date pool for eligible CSV and Parquet inputs; other paths retain streaming execution. Python provides independent correctness checks and benchmark orchestration. See the [current country performance report](../COUNTRY_REPORT.md).
 
 ## Output contracts
 

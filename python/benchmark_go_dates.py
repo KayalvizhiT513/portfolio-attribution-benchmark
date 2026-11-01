@@ -30,7 +30,7 @@ def save(runs,checks,environment,profiles,profile_checks):
             w=csv.DictWriter(f,fieldnames=list(runs[0]));w.writeheader();w.writerows(runs)
     dump(OUT/'profile/runs.json',profiles);dump(OUT/'profile/checks.json',profile_checks)
     status='Complete' if len(runs)==14 and len(profiles)==7 else 'Progress'
-    lines=['# Go: date cache and reader costs','',f'{status}: {len(runs)}/14 normal runs; {len(profiles)}/7 diagnostic runs. All use all 1,095 dates and four configured threads.','',
+    lines=['# Archived Go profiling: date caching, Arrow decoding and memory','','Archived experiment; see [COUNTRY_REPORT.md](COUNTRY_REPORT.md) for the current optimized country measurements.','',f'{status}: {len(runs)}/14 normal runs; {len(profiles)}/7 diagnostic runs. All use all 1,095 dates and four configured threads.','',
            'Date32 text is now cached until the date changes, including across batches. CSV parsing, calculations, native output formats and batch sizes are unchanged. Normal timing runs do not enable the diagnostic clocks, CPU sampling or memory snapshots.','',
            '## Normal runtime after the fix','',
            'Country uses the median of three alternating CSV/Parquet pairs; other scenarios use one pair. Read time combines the two input workers and can exceed whole-run time.','',

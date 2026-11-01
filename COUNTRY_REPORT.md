@@ -1,190 +1,176 @@
-# Country attribution: US only
+# Country attribution performance: optimized CSV and Parquet in Rust and Go
 
-Latest Parquet date-range optimization and measurements are in the [parallel Parquet report](PARQUET_PARALLEL_REPORT.md). The preceding effective-dated-master measurements, including parallel CSV and streaming Parquet execution, are in the [country runtime breakdown](results/country-runtime-2026-11-02/REPORT.md).
+**Current report for the daily US-only country scenario, updated 2 November 2026.** This file contains the results, optimization history, timing definitions, calculation flow and evidence links. Per-run folders retain raw metrics and validation records, not separate narrative reports.
 
-The tables below retain the earlier date-cache benchmark: three runs per engine/format with the older master. Its elapsed-time breakdown uses one complete run per column, selected by the middle whole-run time; supporting metrics use medians. These historical measurements alternate format and engine order and execute sequentially.
+## Latest recorded optimized runtimes
 
-Keep US holdings in the portfolio and index. Scale each side’s US weights to 100%, then calculate daily Brinson–Fachler effects and return contributions.
-
-**Scope:** 1,095 dates (2023-01-01 to 2025-12-30), 59,000 US portfolio holdings and 99,000 US index holdings per date. DE holdings are excluded.
-
-**Output:** 2,190 rows per run—one US group × 1,095 dates × base/local returns. CSV input writes CSV; Parquet input writes Parquet. All reports include the same 20 columns.
-
-## Total runtime
-
-| Input → output | Rust seconds | Go seconds | Output rows |
+| Input → output | Rust elapsed seconds | Go elapsed seconds | Output rows per engine |
 |---|---:|---:|---:|
-| CSV → CSV | 13.430 | 22.980 | 2,190 |
-| PARQUET → PARQUET | 14.945 | 16.636 | 2,190 |
+| CSV → CSV | 16.582 | 20.846 | 2,190 |
+| PARQUET → PARQUET | 7.894 | 10.575 | 2,190 |
 
-## Country Parquet: read-time split
+CSV values are the latest fully instrumented CSV range runs; Parquet values are the later row-group range runs. The formats were measured in separate batches. Each value is one complete release-build run with normal filesystem caching, not a repeated-run median or a controlled cold-cache measurement. All selected runs omit `--threads`; detected parallelism, worker counts and task counts are recorded below.
 
-| Part of reading | What is actually measured | Rust seconds | Go seconds |
-|---|---|---:|---:|
-| Fetch decoded Arrow batches | File reading + decompression + decoding + Arrow array creation; timed around each batch fetch. | 6.859 | 16.004 |
-| Read decoded rows and prepare daily calculation data | Read typed Arrow values, reuse cached date text, look up security positions, validate rows, assemble each date and fill reusable calculation arrays. Calculated as total read time minus batch-fetch time. | 14.973 | 11.307 |
-| Total read | Both parts above; excludes filtering, grouping, Brinson calculations and output writing. | 21.832 | 27.311 |
+## Dataset and calculation scope
 
-**Decompression is included, not measured separately from file reading and decoding. No decompression optimization was made.** The implemented optimization caches date strings instead of formatting a date for every row. Preparing calculation data still handles rows individually; it is more than copying an Arrow buffer.
+- 1,095 dates: 1 January 2023 through 30 December 2025.
+- One 60,000-security portfolio and a 100,000-security index per date: 175,200,000 total holdings rows.
+- Keep 59,000 US portfolio holdings and 99,000 US index holdings per date; 173,010,000 rows remain after filtering.
+- Effective-dated master: 160,000 instruments × 36 monthly versions = 5,760,000 records.
+- Separately normalize retained weights on each side to one; group by date, entity and country; calculate base and local returns independently.
+- Output: 2,190 rows per engine, with the same 20 fields. CSV input writes CSV; Parquet input writes typed Zstd Parquet.
 
-These are separate profiling runs, not the normal runtime runs. For each engine, all three country runs cover all 1,095 dates; the table uses the run with the middle total read time and takes both parts from that same run. Times add the concurrent index and portfolio readers, so they can exceed whole-run runtime. Rust and Go were measured in separate sessions; Go diagnostics also enabled CPU/allocation profiling.
+The benchmark prepares a separate Parquet master from the updated CSV and verifies every typed field and row. Existing Parquet holdings are linked without modification. The original `attribution_data_parquet` master remains the older undated source; it is not the master used for these comparable measurements.
 
-Both engines passed all six country Parquet profiling-output comparisons against their CSV and Parquet reference outputs. This checks decoded results; it does not isolate decompression performance.
+## Whole-run elapsed phases, in seconds
 
-[Rust profiling measurements](results/rust-date-cache/profile/runs.json) · [Go profiling measurements](results/go-date-cache/profile/runs.json)
+**Each column adds to its whole-run runtime, subject to displayed rounding.** Concurrent reading, filtering and aggregation form one measured wall interval. Their overlapping worker stages cannot be split into additive wall durations without an attribution convention. No such allocation is estimated here.
 
-<details>
-<summary>Go: decoding, row handling, allocations and garbage collection</summary>
+| Step | Rust CSV → CSV | Go CSV → CSV | Rust Parquet → Parquet | Go Parquet → Parquet |
+|---|---:|---:|---:|---:|
+| Configuration, paths and output setup | 0.000230 | 0.000208 | 0.000226 | 0.000233 |
+| Load, validate and index security master | 0.637504 | 1.243391 | 1.085545 | 1.423565 |
+| Discover and plan complete-date input ranges | 8.624785 | 9.298910 | 0.004032 | 0.011990 |
+| Concurrent range reading, filtering and aggregation | 7.304019 | 10.296463 | 6.796207 | 9.130459 |
+| Streaming pipeline, when the range path is unavailable | 0.000000 | 0.000000 | 0.000000 | 0.000000 |
+| Ordered daily BF computation, reconciliation and writing | 0.014891 | 0.006665 | 0.008015 | 0.008835 |
+| Finalize reports, sizes and metrics setup | 0.000195 | 0.000218 | 0.000205 | 0.000217 |
+| Remaining pipeline coordination | 0.000092 | 0.000001 | 0.000107 | 0.000001 |
+| **Whole run** | 16.581717 | 20.845857 | 7.894336 | 10.575299 |
 
-Country diagnostic runs only: three runs per format, separate from the normal timing runs above. These measure the whole process, including setup and output.
+## Read, filter, aggregate, compute and write, in worker seconds
 
-| Memory / garbage collection | CSV | Parquet with cached dates |
-|---|---:|---:|
-| Total allocated GiB | 11.577 | 80.389 |
-| Allocated objects (millions) | 175.698 | 4.243 |
-| Garbage collections | 467.000 | 1173.000 |
-| Estimated garbage-collection CPU seconds | 1.273 | 6.969 |
-| Pause seconds | 0.026 | 0.110 |
+**These rows do not add to whole-run runtime.** They accumulate elapsed intervals across workers, including descheduling or blocking inside a stage; they are not OS CPU seconds. Master loading is separate. Range-planning time is shown separately and subtracted from the holdings-read row.
 
-Values above are medians. Allocated GiB is the total allocated over the run, **not peak memory**. Garbage-collection CPU is a Go-runtime estimate that may overestimate CPU use and is not directly comparable with OS CPU time. It overlaps the stage measurements; do not add it to runtime.
+| Step | Rust CSV → CSV | Go CSV → CSV | Rust Parquet → Parquet | Go Parquet → Parquet |
+|---|---:|---:|---:|---:|
+| Range planning: CSV scan or Parquet footer inspection | 8.624758 | 9.298808 | 0.004029 | 0.011982 |
+| Read, parse, validate holdings and assemble daily rows | 64.742497 | 98.079565 | 52.526882 | 81.588201 |
+| Effective-date lookup, US filtering and selected-weight sum | 19.127010 | 21.674480 | 25.385906 | 24.148151 |
+| Normalize weights and aggregate country contributions | 0.219081 | 0.646402 | 0.255178 | 0.422578 |
+| BF effects, contributions and reconciliation | 0.000163 | 0.000363 | 0.000136 | 0.000243 |
+| Format/encode reports, flush, footer and sync | 0.014546 | 0.006161 | 0.007739 | 0.008460 |
 
-| Work sampled on CPU | CSV CPU seconds | Parquet CPU seconds |
-|---|---:|---:|
-| File reads | 17.267 | 7.683 |
-| Text parsing / Parquet decoding | 10.380 | 2.707 |
-| Row handling and ID lookup | 2.850 | 4.460 |
-| Allocate / resize memory | 0.543 | 0.733 |
-| Garbage collection | 0.780 | 2.903 |
-| Release unused heap memory | 0.037 | 1.800 |
-| Go runtime / profiling support | 4.513 | 10.207 |
+### Parquet holdings-read detail
 
-CPU rows are means from 10 ms samples, not elapsed stage times. Each sample is counted once; parsing/decoding and row handling exclude samples assigned to file reads, allocation or garbage collection. Runtime support includes scheduling, waits and profiling support. Remaining calculation, output and setup samples are in the full Go report.
+The two Parquet rows below are subsets of the holdings-read stage above. Batch fetch combines file reading, decompression, decoding and Arrow array creation; decompression is not isolated. Daily preparation includes typed access, date reuse, ID lookup, validation and daily-buffer construction. CSV has no Arrow batch work.
 
-CSV spends most sampled CPU on file reads and text parsing. Parquet allocates large Arrow and dictionary-decoding buffers. A separate single-run control with the date cache disabled creates about 175.2 million more objects than cached Parquet; the cache removes repeated date-string allocations.
+| Step | Rust CSV → CSV | Go CSV → CSV | Rust Parquet → Parquet | Go Parquet → Parquet |
+|---|---:|---:|---:|---:|
+| Fetch, decompress and decode Arrow batches | 0.000000 | 0.000000 | 12.826591 | 40.293811 |
+| Prepare daily rows from decoded Arrow data | 0.000000 | 0.000000 | 39.700291 | 41.294389 |
 
-[Full Go analysis](GO_DATE_READ_REPORT.md) · [Diagnostic measurements](results/go-date-cache/profile/runs.json) · [Diagnostic checks](results/go-date-cache/profile/checks.json)
+## CPU use and memory
 
-</details>
+| Step | Rust CSV → CSV | Go CSV → CSV | Rust Parquet → Parquet | Go Parquet → Parquet |
+|---|---:|---:|---:|---:|
+| Available parallelism | 12 | 12 | 12 | 12 |
+| Range workers | 12 | 12 | 12 | 12 |
+| Complete-date tasks | 24 | 24 | 24 | 24 |
+| Process CPU seconds | 80.838809 | 114.557222 | 66.837671 | 95.275923 |
+| Average CPU cores used | 4.849471 | 5.481978 | 8.392073 | 8.976517 |
+| Peak process RSS, MiB | 542.781250 | 840.562500 | 761.187500 | 1917.625000 |
 
+CPU time and peak RSS come from child-process `wait4` counters. Average cores means CPU time divided by full process elapsed time. Peak RSS is whole-process memory, not per-worker memory. Parallel Parquet decoding increases concurrent Arrow buffers; its current peaks are about 761 MiB in Rust and 1,918 MiB in Go.
 
-## Elapsed time and processing steps
+## Optimization history and baseline comparisons
 
-Each timing column below sums to whole-run elapsed time. Overlapping index work is not counted twice.
+All measurements in this section use the effective-dated master. They are separate individual runs; differences between confirmation and later instrumented runs are visible rather than presented as medians.
 
-### CSV input → CSV output
+| Measurement | I/O | Rust seconds | Go seconds | Evidence |
+|---|---|---:|---:|---|
+| Streaming with explicit four-thread setting | CSV | 25.863 | 50.761 | [Recorded metrics and checks](<results/country-effective-dates-2026-11-02/checks.json>) |
+| Streaming with automatic parallelism | CSV | 26.571 | 50.102 | [Recorded metrics and checks](<results/country-auto-2026-11-02/checks.json>) |
+| First complete-date parallel run | CSV | 14.342 | 20.248 | [Recorded metrics and checks](<results/country-parallel-v2-2026-11-02/checks.json>) |
+| Parallel binary confirmation | CSV | 15.638 | 20.654 | [Recorded metrics and checks](<results/country-parallel-v2-2026-11-02/confirmation/checks.json>) |
+| Instrumented streaming baseline | Parquet | 36.384 | 41.501 | [Recorded metrics and checks](<results/country-runtime-2026-11-02/checks.json>) |
 
-| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
-|---|---|---:|---:|
-| Read | Read and check portfolio CSV records. | 9.245057 | 15.927452 |
-| Filter | Keep US portfolio holdings. | 0.103318 | 0.138032 |
-| Prepare / group | Scale portfolio US weights to 100% and combine their weighted returns into one US group. | 0.070083 | 0.116835 |
-| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000766 | 0.000832 |
-| Write | Save the CSV report to disk. | 0.011830 | 0.010097 |
-| Setup, waiting, and remaining work | Everything outside the timed portfolio stages, including waiting for index data, setup and shutdown; calculated as whole run minus the five stages. | 3.998659 | 6.786590 |
-| **Whole run** | **Sum of the six rows above.** | 13.429713 | 22.979838 |
+### Parquet row-group optimization
 
-Each column sums to whole-run elapsed time. All values in a column come from the same run: the middle whole-run time of three repetitions. The five timed stages follow the portfolio worker; index preparation runs concurrently and is not added again. The remaining-time row is a subtraction, not a separately measured index-reading or waiting timer. Other supporting metrics retain three-run medians.
+| Engine | Streaming baseline | Latest parallel run | Speedup | Runtime reduction | Peak RSS before → after |
+|---|---:|---:|---:|---:|---:|
+| Rust | 36.384 s | 7.894 s | 4.61× | 78.3% | 503.6 → 761.2 MiB |
+| Go | 41.501 s | 10.575 s | 3.92× | 74.5% | 701.2 → 1917.6 MiB |
 
-[Latest country measurements](results/country-worker-stages/runs.csv) · [Output checks](results/country-worker-stages/checks.json)
+The earlier CSV stage used one index producer and one portfolio worker; raising the thread limit alone did not split either reader. Complete-date processing exposed more independent work. Parquet initially retained that streaming path; row-group processing then removed that concurrency limitation. These comparisons measure the implemented pipelines, not an intrinsic universal format or language ranking.
 
-<details>
-<summary>Counts, throughput, and memory — CSV</summary>
+## Implemented processing flow
 
-Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.
+[Open the end-to-end SVG: physical reads, effective-date filtering, grouping, BF formulas, ordered merging and output](docs/flows/country-parallel-end-to-end.svg).
 
-| Step | Supporting metric | Rust | Go |
-|---|---|---:|---:|
-| Read | Million rows read per second | 8.024 | 4.561 |
-| Read | CSV bytes parsed per second (MiB) | 551.294 | 313.387 |
-| Read | Stored file size / read time (MiB/sec) | 551.441 | 313.471 |
-| Filter | Rows checked | 175,200,000 | 175,200,000 |
-| Filter | Rows kept | 173,010,000 | 173,010,000 |
-| Prepare / group | Rows prepared per second | 1,064,181,171.822 | 553,287,476.298 |
-| Prepare / group | Groups prepared across dates, counting portfolio and index separately | 2,190 | 2,190 |
-| Calculate | Daily BF effect values calculated | 6,570 | 6,570 |
-| Calculate | Daily BF effect values per second | 8,577,706.580 | 7,843,989.379 |
-| Calculate | Final BF effect values / calculation time | 8,577,706.580 | 7,843,989.379 |
-| Calculate | Report rows | 2,190 | 2,190 |
-| Write | Report rows written per second | 181,655.408 | 216,898.063 |
-| Write | Output written per second (MiB) | 56.153 | 66.580 |
-| Write | Report rows written | 2,190 | 2,190 |
-| Write | Output file size (MB) | 0.709851 | 0.704911 |
-| Whole run | Runtime range across repeat runs | 13.393–15.862 | 22.903–23.526 |
-| Whole run | Highest memory use (MiB) | 42.797 | 76.672 |
-| Whole run | Total CPU time (seconds) | 22.394922 | 40.567501 |
-| Whole run | Average CPU cores used | 1.672 | 1.761 |
+1. Load and validate the master once; sort versions by effective date and share the immutable index.
+2. CSV scans physical records to discover whole-date byte ranges. Parquet reads footer statistics to establish complete-date group ranges; adjacent groups for the same date stay together.
+3. A bounded CPU-sized pool opens an independent reader per task. Each worker buffers one logical date; Parquet decodes projected Arrow batches of at most 65,536 rows. No row group is assigned to two tasks.
+4. Validate every holding, then resolve the latest master version effective on or before its date. Keep `Country == US` and sum retained original weights independently for portfolio and benchmark.
+5. Divide retained weights and weighted returns by that side’s selected weight. Aggregate daily country weights and contributions, preserving instrument summation order.
+6. Collect small daily aggregates into their original positions. Check range exhaustion, entity consistency and portfolio/index date alignment. This merge reorders results; it does not average or sum different dates.
+7. After all ranges succeed, calculate and reconcile each date in order, then append base/local output rows. Flush buffers, finish Parquet footers, sync/close partial files and publish completed reports.
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. Both engines use three-run country medians.
+### Benchmark return used in allocation and selection
 
-</details>
+For one date and one return type, `W` is normalized country weight and `C` is weighted country contribution. Group returns are `rp,g = Cp,g / Wp,g` and `rb,g = Cb,g / Wb,g`; total returns are `RP = Σg Cp,g` and `RB = Σg Cb,g`.
 
-### PARQUET input → PARQUET output
+```text
+Allocation_g  = (Wp,g − Wb,g) × (rb,g − RB)
+Selection_g   = Wb,g × (rp,g − rb,g)
+Interaction_g = (Wp,g − Wb,g) × (rp,g − rb,g)
+Total_g       = Allocation_g + Selection_g + Interaction_g
+```
 
-| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
-|---|---|---:|---:|
-| Read | Read and decode portfolio Parquet batches. | 9.055367 | 10.362680 |
-| Filter | Keep US portfolio holdings. | 0.102618 | 0.137314 |
-| Prepare / group | Scale portfolio US weights to 100% and combine their weighted returns into one US group. | 0.061585 | 0.119112 |
-| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000734 | 0.000815 |
-| Write | Save the PARQUET report to disk. | 0.010223 | 0.011689 |
-| Setup, waiting, and remaining work | Everything outside the timed portfolio stages, including waiting for index data, setup and shutdown; calculated as whole run minus the five stages. | 5.714021 | 6.004804 |
-| **Whole run** | **Sum of the six rows above.** | 14.944548 | 16.636414 |
+**Allocation uses total benchmark return `RB` after US filtering and renormalization, not the original full-index return. Selection uses benchmark group return `rb,g`, not `RB`.** With one retained US group, both group weights are approximately one and `RB ≈ rb,US`; allocation and interaction are approximately zero, while selection carries `RP − RB`. Contributions are `Cp,g`, `Cb,g` and their difference. The country period is one day, so returns are not linked across dates.
 
-Each column sums to whole-run elapsed time. All values in a column come from the same run: the middle whole-run time of three repetitions. The five timed stages follow the portfolio worker; index preparation runs concurrently and is not added again. The remaining-time row is a subtraction, not a separately measured index-reading or waiting timer. Other supporting metrics retain three-run medians.
+### Fallbacks and measurement limits
 
-[Latest country measurements](results/country-worker-stages/runs.csv) · [Output checks](results/country-worker-stages/checks.json)
+- `--threads 1` retains streaming execution. Multiline CSV, missing Parquet statistics, empty groups or mixed-date row groups also use streaming for the entire pipeline. Those layouts remain correct but are not parallelized here.
+- `--max-days` selects complete dates, including every row group belonging to the last selected date.
+- `boundary_scan_seconds` includes CSV scanning or Parquet footer inspection and is included in `read_parse_seconds`. For Parquet, batch decode plus daily preparation equals holdings read time minus planning time.
+- Read stages include lookup and validation rather than isolated disk I/O. Stored file sizes and parsed byte counters do not measure physical disk traffic.
+- Whole-run timing starts in native `run()` and ends at the metrics snapshot. Process startup/exit and metrics CSV serialization fall outside that timer; `process_wall_seconds` includes the entire child process.
+- Concurrent buffers increase memory needs; `--threads N` remains an optional concurrency override.
 
-<details>
-<summary>Counts, throughput, and memory — PARQUET</summary>
+## Correctness checks
 
-Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.
+All four selected results cover every input date and holding and reproduce the same 2,190 report rows. Every one of the 26,280 numeric values matches exactly across engines, formats and the original streaming outputs. The Parquet checks compare against the preceding verified results, which already match CSV; report keys and order also match.
 
-| Step | Supporting metric | Rust | Go |
-|---|---|---:|---:|
-| Read | Million rows read per second | 7.392 | 6.602 |
-| Read | CSV bytes parsed per second (MiB) | N/A (no parsed-byte counter) | N/A (no parsed-byte counter) |
-| Read | Stored file size / read time (MiB/sec) | 213.841 | 190.975 |
-| Filter | Rows checked | 175,200,000 | 175,200,000 |
-| Filter | Rows kept | 173,010,000 | 173,010,000 |
-| Prepare / group | Rows prepared per second | 938,202,462.215 | 549,213,398.071 |
-| Prepare / group | Groups prepared across dates, counting portfolio and index separately | 2,190 | 2,190 |
-| Calculate | Daily BF effect values calculated | 6,570 | 6,570 |
-| Calculate | Daily BF effect values per second | 8,955,699.955 | 7,878,434.674 |
-| Calculate | Final BF effect values / calculation time | 8,955,699.955 | 7,878,434.674 |
-| Calculate | Report rows | 2,190 | 2,190 |
-| Write | Report rows written per second | 242,054.318 | 175,071.316 |
-| Write | Output written per second (MiB) | 21.873 | 16.164 |
-| Write | Report rows written | 2,190 | 2,190 |
-| Write | Output file size (MB) | 0.207507 | 0.212026 |
-| Whole run | Runtime range across repeat runs | 13.181–15.069 | 16.475–16.750 |
-| Whole run | Highest memory use (MiB) | 105.812 | 205.578 |
-| Whole run | Total CPU time (seconds) | 21.528375 | 33.832283 |
-| Whole run | Average CPU cores used | 1.446 | 2.034 |
+- 156 exact Parquet serial/parallel comparisons cover split-date groups, typed/string dates, projected/reordered schemas, mixed I/O, multiple portfolios, maximum-date limits, layout fallback and six invalid fixtures.
+- 78 exact CSV comparisons cover effective-date transitions, leading blank lines, CRLF, missing final newline, quoted records, multiline fallback, worker counts 2/4/12, limits and ten invalid fixtures.
+- The independent attribution oracle and CSV/Parquet compatibility checks pass across nine scenario/period cases.
+- `cargo test --locked` and `go test -race ./cmd/attribution` pass, including native parallel Parquet execution.
+- Daily attribution and contribution reconciliation remain enforced; reports are finalized only after successful processing.
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. Both engines use three-run country medians.
+## Recorded evidence for the selected results
 
-</details>
+| Selected run | Native metrics | Process resources | Output comparisons |
+|---|---|---|---|
+| Rust CSV | [Metrics CSV](<results/country-runtime-2026-11-02/csv/rust/metrics.csv>) | [Usage JSON](<results/country-runtime-2026-11-02/csv/rust/usage.json>) | [Checks JSON](<results/country-runtime-2026-11-02/checks.json>) |
+| Go CSV | [Metrics CSV](<results/country-runtime-2026-11-02/csv/go/metrics.csv>) | [Usage JSON](<results/country-runtime-2026-11-02/csv/go/usage.json>) | [Checks JSON](<results/country-runtime-2026-11-02/checks.json>) |
+| Rust PARQUET | [Metrics CSV](<results/country-parquet-parallel-2026-11-02/parquet/rust/metrics.csv>) | [Usage JSON](<results/country-parquet-parallel-2026-11-02/parquet/rust/usage.json>) | [Checks JSON](<results/country-parquet-parallel-2026-11-02/checks.json>) |
+| Go PARQUET | [Metrics CSV](<results/country-parquet-parallel-2026-11-02/parquet/go/metrics.csv>) | [Usage JSON](<results/country-parquet-parallel-2026-11-02/parquet/go/usage.json>) | [Checks JSON](<results/country-parquet-parallel-2026-11-02/checks.json>) |
 
-<details>
-<summary>View the country flow diagram</summary>
+## Reproduce or refresh this report
 
-[![Country: CSV/Parquet paths and Rust/Go stages](docs/flows/csv-parquet/country.svg)](docs/flows/csv-parquet/country.svg)
+```sh
+cargo build --release --manifest-path rust/Cargo.toml
+go -C go build -trimpath -ldflags='-s -w' -o ../benchmark-go-attribution ./cmd/attribution
+.venv/bin/python python/benchmark_country_runtime.py --output-dir results/new-country-run
+```
 
-</details>
+Choose a new raw-results directory. The benchmark records metrics/usage/checks, then updates **this existing `COUNTRY_REPORT.md` only after both engines complete and validate for every requested format**. A Parquet-only run (`--formats parquet`) replaces the two Parquet selections and retains the recorded CSV selections. It does not generate another Markdown report.
 
-<details>
-<summary>Calculation and worker details</summary>
+To rebuild the report from its selected evidence without rerunning benchmarks:
 
-US weights and weighted base/local returns are added into one US group separately for the portfolio and index on each date. There is no linking across dates in this scenario. With one normalized country group, allocation and interaction are zero apart from rounding; selection equals the difference between US portfolio and US index returns.
+```sh
+python3 python/render_country_report.py
+```
 
-Daily portfolio and benchmark contributions equal the corresponding US weighted returns. Active contribution is their difference. The index producer runs concurrently with one portfolio worker; stages inside the portfolio worker run in sequence. Parquet uses Arrow for reading and writing, while the calculations use the shared daily buffers.
+## Archived experiments with different scope
 
-</details>
+Older undated-master and date-cache experiments are historical and are not the optimization baselines above. Their timings, four-thread settings and memory results should not be mixed with the current effective-dated dataset.
 
-## Checks and measurement notes
+- [Historical five-scenario CSV/Parquet benchmark](CSV_PARQUET_REPORT.md).
+- [Archived Go date-cache, Arrow and memory profiling](GO_DATE_READ_REPORT.md).
+- [Archived Rust date-cache and Parquet reader profiling](RUST_DATE_READ_REPORT.md).
+- [Earlier country worker-stage evidence](results/country-worker-stages/runs.csv).
+- [Contribution calculation definitions](docs/CONTRIBUTIONS.md).
 
-**Latest checks:** Rust country has 15 output comparisons and 6 profiling comparisons; Go country has 15 output comparisons and 14 diagnostic/control comparisons. All passed; original baseline checks are retained. The new worker-timing country rerun adds 24 passed comparisons against the existing CSV/Parquet references. Every output value is compared; each engine checks BF and contribution totals.
-
-The latest country rerun uses three runs per engine/format, alternating format and engine order. Runs execute sequentially with four configured threads and normal filesystem caching. CPU/allocation profiling and batch-fetch diagnostic timers are disabled for this rerun. The read-time split and Go allocation findings above remain from earlier separate diagnostic runs.
-
-[Latest country rerun](results/country-worker-stages/runs.csv) · [Rerun checks](results/country-worker-stages/checks.json) · [Full comparison](CSV_PARQUET_REPORT.md) · [Latest Rust measurements](results/rust-date-cache/runs.csv) · [Latest Go measurements](results/go-date-cache/runs.csv) · [Original measurements](results/csv-parquet-native-output/runs.csv) · [Checks](results/csv-parquet-native-output/checks.json) · [Calculation definitions](docs/CONTRIBUTIONS.md)
+<!-- country-report-sources: {"csv/go": "results/country-runtime-2026-11-02/csv/go/metrics.csv", "csv/rust": "results/country-runtime-2026-11-02/csv/rust/metrics.csv", "parquet/go": "results/country-parquet-parallel-2026-11-02/parquet/go/metrics.csv", "parquet/rust": "results/country-parquet-parallel-2026-11-02/parquet/rust/metrics.csv"} -->

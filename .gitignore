@@ -80,7 +80,6 @@ benchmark-go-attribution
 !/results/country-runtime-2026-11-02/
 /results/country-runtime-2026-11-02/**
 !/results/country-runtime-2026-11-02/**/
-!/results/country-runtime-2026-11-02/REPORT.md
 !/results/country-runtime-2026-11-02/runs.csv
 !/results/country-runtime-2026-11-02/runs.json
 !/results/country-runtime-2026-11-02/checks.json
@@ -94,7 +93,6 @@ benchmark-go-attribution
 !/results/country-parquet-parallel-2026-11-02/
 /results/country-parquet-parallel-2026-11-02/**
 !/results/country-parquet-parallel-2026-11-02/**/
-!/results/country-parquet-parallel-2026-11-02/REPORT.md
 !/results/country-parquet-parallel-2026-11-02/runs.csv
 !/results/country-parquet-parallel-2026-11-02/runs.json
 !/results/country-parquet-parallel-2026-11-02/checks.json

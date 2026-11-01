@@ -1,4 +1,6 @@
-# CSV vs Parquet: Go and Rust
+# Historical CSV and Parquet benchmarks: five attribution scenarios in Rust and Go
+
+Archived experiment with a different dataset or execution path. See the [current country attribution performance report](COUNTRY_REPORT.md) for optimized CSV and Parquet results.
 
 Country uses the latest rerun: three runs per engine/format. Its elapsed-time breakdown uses one complete run per column, selected by the middle whole-run time; supporting metrics use medians. Other scenarios retain their date-cache follow-up runs. The latest country runs alternate format and engine order and execute sequentially.
 Updated with date caches in both Rust and Go.

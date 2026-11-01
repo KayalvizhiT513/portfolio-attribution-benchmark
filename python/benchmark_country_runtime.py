@@ -20,16 +20,8 @@ from benchmark_native import measured
 from test_attribution import compare_files
 
 ROOT = Path(__file__).resolve().parents[1]
-PHASES = [
-    ('Configuration, paths and output setup', 'setup_seconds'),
-    ('Load, validate and index security master', 'master_load_seconds'),
-    ('Discover and plan whole-date input ranges', 'boundary_plan_wall_seconds'),
-    ('Concurrent range reading / filtering / aggregation', 'parallel_read_filter_aggregate_wall_seconds'),
-    ('Streaming pipeline (overlapping index and portfolio stages)', 'streaming_pipeline_wall_seconds'),
-    ('Ordered daily BF computation, reconciliation and writing', 'ordered_compute_write_wall_seconds'),
-    ('Finalize reports, file sizes and metrics setup', 'finalize_seconds'),
-    ('Remaining pipeline coordination', 'pipeline_overhead_seconds'),
-]
+from render_country_report import PHASES, update_report
+
 MASTER_TYPES = {'InstrumentId': pa.string(), 'EffectiveDate': pa.date32(),
                 'Currency': pa.string(), 'Country': pa.string()}
 
@@ -91,50 +83,8 @@ def validate_metrics(m):
 
 
 def report(root,runs):
-    columns = [(fmt,lang) for fmt in ['csv','parquet'] for lang in ['rust','go']]
-    rows = {(r['format'],r['language']):r for r in runs}
-    columns = [key for key in columns if key in rows]
-    def table(title, entries, integral_rows=0):
-        text = ([title,''] if title else [])+['| Step | '+' | '.join(f'{lang.title()} {fmt.upper()}' for fmt,lang in columns)+' |',
-                '|---|'+'---:|'*len(columns)]
-        for i,(label,value) in enumerate(entries):
-            pattern=',.0f' if i<integral_rows else '.6f'
-            text.append('| '+label+' | '+' | '.join(format(value(rows[key]),pattern) for key in columns)+' |')
-        return text+['']
-    lines=['# Country runtime breakdown','',
-           'One complete profiled release run per engine/format, executed sequentially with automatic CPU detection and normal filesystem caching. These are individual observations, not repeated-run medians. CSV input writes CSV; Parquet input writes Parquet. Both formats use the same effective-dated master; the prepared Parquet master is verified field-for-field against CSV. Holdings use the existing Parquet files through read-only symlinks.','',
-           '## Whole-run elapsed phases (seconds)','',
-           '**Each column below adds to its whole-run elapsed time.** A concurrent pipeline is one measured wall interval: its overlapping read/filter/aggregate stages cannot be separated into additive wall durations without an attribution convention. These measurements use no artificial allocation of shared wall time.','']
-    lines+=table('',[(label,lambda r,k=key:float(r[k])) for label,key in PHASES]+[('**Whole run**',lambda r:float(r['wall_seconds']))])
-    lines+=['## Read, filter, aggregate, compute and write (accumulated worker seconds)','',
-            '**These rows do not add to whole-run elapsed time.** They sum timed intervals across concurrent workers and include time spent blocked or descheduled within each stage; they are not OS CPU seconds. Range planning is shown separately and subtracted from the read row here. Master loading is measured separately in the whole-run table.','']
-    lines+=table('',[
-        ('Range planning: CSV scanning / Parquet footer inspection',lambda r:float(r['boundary_scan_seconds'])),
-        ('Read / parse / validate holdings and assemble daily rows',lambda r:float(r['read_parse_seconds'])-float(r['boundary_scan_seconds'])),
-        ('Effective-date lookup, US filtering and selected-weight sum',lambda r:float(r['filter_seconds'])),
-        ('Normalize weights and aggregate country returns',lambda r:float(r['aggregate_seconds'])),
-        ('BF effects, contributions and reconciliation',lambda r:float(r['compute_seconds'])),
-        ('Format / encode report, flush, footer and sync',lambda r:float(r['write_seconds'])),
-    ])
-    lines+=['## Parquet read detail (accumulated worker seconds)','',
-            'These two rows are subsets of the holdings read stage above. Batch fetch combines file reads, decompression, decoding and Arrow construction; decompression is not isolated. Row preparation is the remaining read time, including typed access, ID lookup, validation and daily-buffer construction. CSV columns have zero Arrow batch work.','']
-    lines+=table('',[
-        ('Fetch / decompress / decode Arrow batches',lambda r:float(r['parquet_batch_read_decode_seconds'])),
-        ('Prepare daily data from decoded Arrow rows',lambda r:float(r['parquet_to_daily_buffer_seconds'])),
-    ])
-    lines+=['## Scope and resource checks','']
-    lines+=table('',[
-        ('Input dates',lambda r:float(r['days'])),('Holdings rows read',lambda r:float(r['rows_read'])),
-        ('US rows retained',lambda r:float(r['rows_retained'])),('Output rows',lambda r:float(r['output_rows'])),
-        ('Detected parallelism',lambda r:float(r['threads'])),('Date-range workers (zero means streaming)',lambda r:float(r['date_range_workers'])),
-        ('Date-range tasks',lambda r:float(r['date_range_tasks'])),('OS CPU seconds',lambda r:float(r['cpu_seconds'])),
-        ('Average CPU cores',lambda r:float(r['average_cores'])),('Peak RSS (MiB)',lambda r:float(r['peak_rss_mib'])),
-    ], integral_rows=7)
-    lines+=['Read timing includes numeric validation, instrument mapping and assembly; it does not isolate physical disk I/O. Filter timing includes effective-dated country selection. Write includes buffered report serialization and final flush/sync; final publication/rename appears under finalization. Input file sizes describe stored bytes, not measured disk traffic.','',
-            'The internal whole-run timer starts in `run()` and ends at the metrics snapshot; process startup/exit and serialization of the metrics CSV itself are outside it. `process_wall_seconds` records the full child-process duration. Detailed read profiling is enabled for every run.','',
-            'The date-range worker count identifies parallel versus streaming execution. CSV discovers byte boundaries; Parquet uses footer statistics to group complete dates. Dates spanning adjacent single-date row groups stay together. Missing statistics or mixed-date groups retain streaming execution. Both formats write daily results in input date order.','',
-            'Artifacts: `runs.csv`, `runs.json`, `checks.json`, `environment.json`, and per-run `metrics.csv`, `usage.json`, and `run.log`. Each run is checked against the first run and the requested original baseline.','']
-    (root/'REPORT.md').write_text('\n'.join(lines))
+    """Refresh the existing canonical report only from completed engine pairs."""
+    return update_report(root,runs)
 
 
 def main():
@@ -196,11 +146,11 @@ def main():
             (root/'checks.json').write_text(json.dumps(checks,indent=2)+'\n')
             with (root/'runs.csv').open('w',newline='') as f:
                 writer=csv.DictWriter(f,fieldnames=list(runs[0]));writer.writeheader();writer.writerows(runs)
-            report(root,runs)
             print(f"PASS {lang} {fmt}: {float(metrics['wall_seconds']):.3f}s; {metrics['output_rows']} output rows",flush=True)
     finally:
         os.environ.clear();os.environ.update(saved)
-    print(f'Complete: {root}/REPORT.md',flush=True)
+    updated=report(root,runs)
+    print(f'Complete: raw evidence in {root}; updated {updated}',flush=True)
 
 
 if __name__=='__main__': main()

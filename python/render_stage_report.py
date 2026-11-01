@@ -57,7 +57,7 @@ def main():
     rows={(r['scenario'],r['language']):r for r in summary}
     assert len(rows)==10 and len(runs)==10*env['runs'] and len(checks)==5
     assert all(int(r['days'])==1095 and int(r['runs'])==env['runs'] for r in summary)
-    lines=['# Attribution: Rust and Go','',
+    lines=['# Historical attribution stage benchmarks: five scenarios and four portfolios','','Archived experiment; see [COUNTRY_REPORT.md](COUNTRY_REPORT.md) for the current optimized country measurements.','',
            'All five scenarios process all **1,095 effective dates**, all four portfolios, and separate base/local returns. Calculation granularity is independent of report granularity. The report contains one section per scenario, comparing Rust and Go.','',
            f"Each language/scenario has **{env['runs']} fresh complete repetitions**. Stage times, OS CPU, peak RSS and process wall times are medians; overall ranges are also shown. All displayed measurements use the reporting contracts defined below.",'',
            '## Output contract and benchmark-only reconciliation','',OVERVIEW,'',

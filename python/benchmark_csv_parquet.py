@@ -30,7 +30,7 @@ def save(runs, checks, environment, persist=True):
         r = lookup(scenario, fmt, language)
         return f"{r['process_wall_seconds']:.2f}" if r else '—'
     done = {fmt: sum(r['format'] == fmt for r in runs) for fmt in ['csv', 'parquet']}
-    lines = ['# CSV vs Parquet: Go and Rust', '',
+    lines = ['# Historical CSV and Parquet benchmarks: five attribution scenarios in Rust and Go', '', 'Archived experiment; see [COUNTRY_REPORT.md](COUNTRY_REPORT.md) for the current optimized country measurements.', '',
              f"Progress: CSV {done['csv']}/10; Parquet {done['parquet']}/10. CSV runs finish before Parquet starts.", '',
              'One full-history run per cell; 1,095 dates, one 60,000-security portfolio, a 100,000-security index, and 1,000 shared DE IDs. Four threads configured for both engines. BF effects and contribution columns included. CSV input writes CSV; Parquet input writes typed Zstandard Parquet.', '',
              '## Total runtime (seconds)', '',
@@ -64,7 +64,7 @@ def save(runs, checks, environment, persist=True):
     REPORT.write_text('\n'.join(lines))
     if followup.exists():
         report_text = REPORT.read_text()
-        report_text = report_text.replace('# CSV vs Parquet: Go and Rust\n', '# CSV vs Parquet: Go and Rust\n\n**Baseline measurements.** See the [Rust date-format fix and fresh comparison](RUST_DATE_READ_REPORT.md) for the follow-up.', 1)
+        report_text = report_text.replace('# Historical CSV and Parquet benchmarks: five attribution scenarios in Rust and Go\n', '# Historical CSV and Parquet benchmarks: five attribution scenarios in Rust and Go\n\n**Baseline measurements.** See the [Rust date-format fix and fresh comparison](RUST_DATE_READ_REPORT.md) for the follow-up.', 1)
         REPORT.write_text(report_text)
 
 
