@@ -1,0 +1,122 @@
+[
+  {
+    "format": "csv",
+    "scenario": "security",
+    "comparison": "Go/Rust",
+    "rows": 318000,
+    "maximum_absolute_difference": 6.2341624917916505e-19,
+    "status": "PASS"
+  },
+  {
+    "format": "csv",
+    "scenario": "subset",
+    "comparison": "Go/Rust",
+    "rows": 602,
+    "maximum_absolute_difference": 1.5959455978986625e-16,
+    "status": "PASS"
+  },
+  {
+    "format": "csv",
+    "scenario": "country",
+    "comparison": "Go/Rust",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "format": "csv",
+    "scenario": "weekly",
+    "comparison": "Go/Rust",
+    "rows": 316,
+    "maximum_absolute_difference": 1.734723475976807e-18,
+    "status": "PASS"
+  },
+  {
+    "format": "csv",
+    "scenario": "monthly",
+    "comparison": "Go/Rust",
+    "rows": 72,
+    "maximum_absolute_difference": 6.938893903907228e-18,
+    "status": "PASS"
+  },
+  {
+    "format": "parquet",
+    "scenario": "security",
+    "comparison": "Go/Rust",
+    "rows": 318000,
+    "maximum_absolute_difference": 6.2341624917916505e-19,
+    "status": "PASS"
+  },
+  {
+    "format": "parquet",
+    "scenario": "security",
+    "comparison": "CSV/Parquet",
+    "rows": 318000,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "format": "parquet",
+    "scenario": "subset",
+    "comparison": "Go/Rust",
+    "rows": 602,
+    "maximum_absolute_difference": 1.5959455978986625e-16,
+    "status": "PASS"
+  },
+  {
+    "format": "parquet",
+    "scenario": "subset",
+    "comparison": "CSV/Parquet",
+    "rows": 602,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "format": "parquet",
+    "scenario": "country",
+    "comparison": "Go/Rust",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "format": "parquet",
+    "scenario": "country",
+    "comparison": "CSV/Parquet",
+    "rows": 2190,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "format": "parquet",
+    "scenario": "weekly",
+    "comparison": "Go/Rust",
+    "rows": 316,
+    "maximum_absolute_difference": 1.734723475976807e-18,
+    "status": "PASS"
+  },
+  {
+    "format": "parquet",
+    "scenario": "weekly",
+    "comparison": "CSV/Parquet",
+    "rows": 316,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "format": "parquet",
+    "scenario": "monthly",
+    "comparison": "Go/Rust",
+    "rows": 72,
+    "maximum_absolute_difference": 6.938893903907228e-18,
+    "status": "PASS"
+  },
+  {
+    "format": "parquet",
+    "scenario": "monthly",
+    "comparison": "CSV/Parquet",
+    "rows": 72,
+    "maximum_absolute_difference": 0.0,
+    "status": "PASS"
+  }
+]

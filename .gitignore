@@ -1,5 +1,6 @@
 data/
 attribution_data/
+attribution_data_parquet/
 __pycache__/
 *.pyc
 *.exe
@@ -13,6 +14,10 @@ benchmark-go-attribution
 # Generated benchmark executables and attribution outputs
 /benchmark-*
 /results/*
+!/results/csv-parquet-native-output/
+/results/csv-parquet-native-output/**
+!/results/csv-parquet-native-output/*.json
+!/results/csv-parquet-native-output/*.csv
 !/results/native-benchmark/
 /results/native-benchmark/*
 !/results/native-benchmark/REPORT.md
@@ -28,10 +33,6 @@ benchmark-go-attribution
 !/results/native-full-history/environment.json
 !/results/native-full-history/subset.csv
 
-!/results/size-guarded-full-history/
-/results/size-guarded-full-history/*
-!/results/size-guarded-full-history/estimates.json
-!/results/size-guarded-full-history/runs.json
 
 !/results/period-full-history/
 /results/period-full-history/*

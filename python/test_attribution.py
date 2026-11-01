@@ -12,33 +12,46 @@ from datetime import date, timedelta
 from pathlib import Path
 
 HEADER = ['Entity', 'EffectiveDate', 'InstrumentId', 'Weight', 'BaseReturn', 'LocalReturn']
-FIELDS = ['PortfolioWeight', 'BenchmarkWeight', 'Allocation', 'Selection', 'Interaction', 'Total', 'PortfolioReturn', 'BenchmarkReturn', 'ActiveReturn']
+FIELDS = ['PortfolioWeight', 'BenchmarkWeight', 'Allocation', 'Selection', 'Interaction', 'Total', 'PortfolioReturn', 'BenchmarkReturn', 'ActiveReturn', 'PortfolioContribution', 'BenchmarkContribution', 'ActiveContribution']
 
 
 def key(row):
-    return tuple(row[k] for k in ['Entity', 'PeriodStart', 'PeriodEnd', 'Days', 'RowType', 'Segment', 'ReturnType'])
+    return tuple(str(row[k]) for k in ['Entity', 'PeriodStart', 'PeriodEnd', 'Days', 'RowType', 'Segment', 'ReturnType'])
+
+
+def records(path):
+    """Read CSV or typed Parquet reports with bounded memory."""
+    if path.suffix == '.parquet':
+        import pyarrow.parquet as pq
+        for batch in pq.ParquetFile(path).iter_batches(batch_size=65536):
+            for row in batch.to_pylist():
+                for name in ['Scenario', 'Entity', 'PeriodStart', 'PeriodEnd', 'Days', 'RowType', 'Segment', 'ReturnType']:
+                    row[name] = str(row[name])
+                yield row
+    else:
+        with path.open(newline='') as f:
+            yield from csv.DictReader(f)
 
 
 def compare_files(left, right):
-    """Bounded-memory comparison; native outputs share master-order traversal."""
+    """Bounded-memory, cross-format comparison of every output field."""
     from itertools import zip_longest
     maximum = 0.0
     count = 0
-    with left.open(newline='') as a, right.open(newline='') as b:
-        for x, y in zip_longest(csv.DictReader(a), csv.DictReader(b)):
-            assert x is not None and y is not None, 'output row count differs'
-            assert key(x) == key(y), (key(x), key(y))
-            for f in FIELDS:
-                xv, yv = float(x[f]), float(y[f])
-                assert math.isfinite(xv) and math.isfinite(yv)
-                maximum = max(maximum, abs(xv - yv))
-                assert math.isclose(xv, yv, rel_tol=1e-8, abs_tol=1e-10), (key(x), f, xv, yv)
-            count += 1
+    for x, y in zip_longest(records(left), records(right)):
+        assert x is not None and y is not None, 'output row count differs'
+        assert x['Scenario'] == y['Scenario'] and key(x) == key(y), (key(x), key(y))
+        for f in FIELDS:
+            xv, yv = float(x[f]), float(y[f])
+            assert math.isfinite(xv) and math.isfinite(yv)
+            maximum = max(maximum, abs(xv - yv))
+            assert math.isclose(xv, yv, rel_tol=1e-8, abs_tol=1e-10), (key(x), f, xv, yv)
+        count += 1
     return count, maximum
 
 
 def fixture(folder):
-    countries = {'A': 'US', 'B': 'DE', 'C': 'US', 'D': 'JP', 'E': 'DE'}
+    countries = {'A': 'US', 'B': 'DE', 'C': 'US', 'D': 'JP', 'E': 'DE', 'F': 'US'}
     with (folder / 'security_master.csv').open('w', newline='') as f:
         w = csv.writer(f)
         w.writerow(['InstrumentId', 'Currency', 'Country'])
@@ -50,7 +63,7 @@ def fixture(folder):
         days = []
         for i in range(105):
             d = (date(2023, 12, 25) + timedelta(days=i)).isoformat()
-            ids = list(countries) if entity == 'INDEX' else (['A', 'C'] + (['D'] if i % 3 else []) if entity == 'PF1' else ['B', 'D'])
+            ids = [sid for sid in countries if sid != 'F'] if entity == 'INDEX' else (['A', 'C', 'F'] + (['D'] if i % 3 else []) if entity == 'PF1' else ['B', 'D', 'C'])
             raw = [1 + (i + j) % 5 for j in range(len(ids))]
             weights = [v / sum(raw) for v in raw]
             holdings = {}
@@ -89,7 +102,7 @@ def reference(countries, data, entity, scenario, period):
     for (d, pr), (_, br) in zip(data[entity], data['INDEX']):
         sides = []
         for holdings in [pr, br]:
-            filtered = {s: v for s, v in holdings.items() if scenario != 'subset' or s in {'A', 'B'}}
+            filtered = {s: v for s, v in holdings.items() if (scenario != 'subset' or s in {'A', 'B'}) and (scenario != 'country' or countries[s] == 'US')}
             denominator = sum(v[0] for v in filtered.values())
             groups = defaultdict(lambda: [0., 0., 0.])
             for sid, (w, base, local) in filtered.items():
@@ -112,7 +125,7 @@ def reference(countries, data, entity, scenario, period):
                 if rb is None:
                     rb = rp
                 effects.append([(ps[0] - bs[0]) * (rb - returns[1][t]), bs[0] * (rp - rb), (ps[0] - bs[0]) * (rp - rb)])
-            daily[g] = (ps[0], bs[0], effects)
+            daily[g] = (ps[0], bs[0], effects, [ps[1:], bs[1:]])
         buckets[period_key(d, period)].append((d, daily, returns))
     expected = {}
     for days in buckets.values():
@@ -129,10 +142,12 @@ def reference(countries, data, entity, scenario, period):
                     effects.append(effect)
                     totals[t][component] += effect
                 k = (entity, days[0][0], days[-1][0], str(len(days)), 'detail', g, ['base', 'local'][t])
-                expected[k] = weights + effects + [sum(effects), growth[0][t], growth[1][t], growth[0][t] - growth[1][t]]
+                contribution = [sum(day[1][g][3][side][t] * math.prod(1 + x[2][side][t] for x in days[:i])
+                                    for i, day in enumerate(days) if g in day[1]) for side in range(2)]
+                expected[k] = weights + effects + [sum(effects), growth[0][t], growth[1][t], growth[0][t] - growth[1][t]] + contribution + [contribution[0] - contribution[1]]
         for t in range(2):
             k = (entity, days[0][0], days[-1][0], str(len(days)), 'total', 'ALL', ['base', 'local'][t])
-            expected[k] = [1., 1.] + totals[t] + [sum(totals[t]), growth[0][t], growth[1][t], growth[0][t] - growth[1][t]]
+            expected[k] = [1., 1.] + totals[t] + [sum(totals[t]), growth[0][t], growth[1][t], growth[0][t] - growth[1][t], growth[0][t], growth[1][t], growth[0][t] - growth[1][t]]
     # Map the detailed closed-form oracle to the requested final report contract.
     compact = {}
     residuals = {}
@@ -143,7 +158,7 @@ def reference(countries, data, entity, scenario, period):
             continue
         if k[4] != 'detail':
             continue
-        if scenario == 'country':
+        if scenario in ['security', 'country']:
             compact[k] = values
             continue
         held = {sid for day, holdings in data[entity] if k[1] <= day <= k[2] for sid in holdings if scenario != 'subset' or sid in {'A', 'B'}}
@@ -152,8 +167,8 @@ def reference(countries, data, entity, scenario, period):
         else:
             rk = (*k[:4], 'benchmark_only', 'BENCHMARK_ONLY', k[6])
             if rk not in residuals:
-                residuals[rk] = [0.] * 6 + values[6:]
-            for i in range(6):
+                residuals[rk] = [0.] * 6 + values[6:9] + [0.] * 3
+            for i in [*range(6), 9, 10, 11]:
                 residuals[rk][i] += values[i]
     compact.update(residuals)
     return compact
@@ -170,7 +185,7 @@ def main():
         data_dir = root / 'input'
         data_dir.mkdir()
         countries, data = fixture(data_dir)
-        cases = [('security', 'all'), ('subset', 'all'), ('country', 'all'), ('weekly', 'week'), ('monthly', 'month'), ('monthly', 'quarter'), ('monthly', 'year'), ('subset', 'month'), ('country', 'month')]
+        cases = [('security', 'all'), ('subset', 'all'), ('country', 'day'), ('weekly', 'week'), ('monthly', 'month'), ('monthly', 'quarter'), ('monthly', 'year'), ('subset', 'month'), ('security', 'month')]
         for scenario, period in cases:
             for language, binary in zip(['rust', 'go'], binaries):
                 out = root / language / f'{scenario}-{period}'
@@ -180,7 +195,31 @@ def main():
                     expected = reference(countries, data, entity, scenario, period)
                     with (out / f'{scenario}-portfolio_{entity}.csv').open(newline='') as f:
                         rows = list(csv.DictReader(f))
+                    if scenario == 'security':
+                        assert all(row['RowType'] == 'detail' for row in rows)
+                        assert any(row['Segment'] == 'E' and float(row['PortfolioWeight']) == 0
+                                   and float(row['BenchmarkWeight']) > 0 for row in rows)
+                        if entity == 'PF1':
+                            assert any(row['Segment'] == 'F' and float(row['BenchmarkWeight']) == 0
+                                       and float(row['PortfolioWeight']) > 0 for row in rows)
                     assert len(rows) == len(expected), (language, scenario, len(rows), len(expected))
+                    contribution_groups = defaultdict(list)
+                    for row in rows:
+                        contribution_groups[(row['PeriodStart'], row['PeriodEnd'], row['ReturnType'])].append(row)
+                        assert math.isclose(float(row['ActiveContribution']),
+                                            float(row['PortfolioContribution']) - float(row['BenchmarkContribution']),
+                                            abs_tol=1e-12)
+                        if scenario == 'security':
+                            if float(row['PortfolioWeight']) == 0:
+                                assert float(row['PortfolioContribution']) == 0
+                            if float(row['BenchmarkWeight']) == 0:
+                                assert float(row['BenchmarkContribution']) == 0
+                    for group in contribution_groups.values():
+                        for contribution, total_return in [('PortfolioContribution', 'PortfolioReturn'),
+                                                           ('BenchmarkContribution', 'BenchmarkReturn'),
+                                                           ('ActiveContribution', 'ActiveReturn')]:
+                            assert math.isclose(sum(float(r[contribution]) for r in group),
+                                                float(group[0][total_return]), abs_tol=1e-10)
                     seen = set()
                     for row in rows:
                         k = key(row)
@@ -207,7 +246,7 @@ def main():
         for binary in binaries:
             result = subprocess.run([str(binary), '--data', str(data_dir), '--output-dir', str(root / 'zero'), '--scenario', 'subset', '--instruments-file', str(data_dir / 'subset.csv')], capture_output=True, text=True)
             assert result.returncode != 0 and 'zero selected weight' in result.stderr
-    print('PASS: both languages match independent reference across 9 compact scenario/period combinations; benchmark-only residuals reconcile; invalid inputs rejected')
+    print('PASS: both languages match independent reference across 9 compact scenario/period combinations; security outer-join detail and subset residuals reconcile; invalid inputs rejected')
 
 
 if __name__ == '__main__':

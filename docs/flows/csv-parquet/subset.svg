@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="2180" viewBox="0 0 1440 2180" role="img" aria-labelledby="title desc">
+<title id="title">Subset · CSV and Parquet · Rust and Go</title>
+<desc id="desc">Alternative input paths → shared BF/contribution engine → native CSV or Parquet output · 1,095 dates</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#475569"/></marker></defs>
+<rect width="1440" height="2180" fill="white"/>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#0f172a}.title{font-size:32px;font-weight:700}.sub{font-size:18px;fill:#475569}.head{font-size:20px;font-weight:700}.body{font-size:17px}.label{font-size:16px;fill:#475569}.edge{fill:none;stroke:#475569;stroke-width:2.2;marker-end:url(#arrow)}</style>
+<text x="65" y="58" class="title" text-anchor="start">
+<tspan x="65" dy="0">Subset · CSV and Parquet · Rust and Go</tspan>
+</text>
+<text x="65" y="94" class="sub" text-anchor="start">
+<tspan x="65" dy="0">Alternative input paths → shared BF/contribution engine → native CSV or Parquet output · 1,095 dates</tspan>
+</text>
+<rect x="75" y="130" width="1290" height="110" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="720.0" y="160" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">MASTER LOOKUP AND WORKERS</tspan>
+</text>
+<text x="720.0" y="191" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Rust: integer master slots; index Arc&lt;Day&gt; → capacity-1 channel → one portfolio worker; --threads 4.</tspan>
+<tspan x="720.0" dy="25">Go: concurrent index producer + portfolio goroutine; shared immutable day; channel capacity 1; GOMAXPROCS 4.</tspan>
+</text>
+<rect x="75" y="280" width="600" height="135" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="375.0" y="310" class="head" text-anchor="middle">
+<tspan x="375.0" dy="0">CSV INPUT FILES</tspan>
+</text>
+<text x="375.0" y="341" class="body" text-anchor="middle">
+<tspan x="375.0" dy="0">Buffered text: portfolio, index and security master.</tspan>
+<tspan x="375.0" dy="25">Reader/header construction occurs during setup.</tspan>
+<tspan x="375.0" dy="25">CSV path does not use Arrow.</tspan>
+</text>
+<rect x="765" y="280" width="600" height="135" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="1065.0" y="310" class="head" text-anchor="middle">
+<tspan x="1065.0" dy="0">PARQUET FILES + COLUMN PROJECTION</tspan>
+</text>
+<text x="1065.0" y="341" class="body" text-anchor="middle">
+<tspan x="1065.0" dy="0">Columnar portfolio/index files; master loaded once.</tspan>
+<tspan x="1065.0" dy="25">Rust: ProjectionMask; Go: required leaf columns.</tspan>
+<tspan x="1065.0" dy="25">Schema/type validation and projection are setup.</tspan>
+</text>
+<path d="M375 240 V280" class="edge"/>
+<path d="M1065 240 V280" class="edge"/>
+<path d="M375 415 V455" class="edge"/>
+<path d="M1065 415 V455" class="edge"/>
+<rect x="75" y="455" width="600" height="160" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="375.0" y="485" class="head" text-anchor="middle">
+<tspan x="375.0" dy="0">1a · CSV RECORDS → PARSED VALUES</tspan>
+</text>
+<text x="375.0" y="516" class="body" text-anchor="middle">
+<tspan x="375.0" dy="0">Rust: csv Reader + reusable StringRecord.</tspan>
+<tspan x="375.0" dy="25">Go: encoding/csv + ReuseRecord.</tspan>
+<tspan x="375.0" dy="25">Numeric text → f64 / float64 using parsers.</tspan>
+<tspan x="375.0" dy="25">Read records; validate values and look up IDs.</tspan>
+</text>
+<rect x="765" y="455" width="600" height="135" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="1065.0" y="485" class="head" text-anchor="middle">
+<tspan x="1065.0" dy="0">1a · COLUMN CHUNKS → DECODE</tspan>
+</text>
+<text x="1065.0" y="516" class="body" text-anchor="middle">
+<tspan x="1065.0" dy="0">Read projected Parquet pages/column chunks.</tspan>
+<tspan x="1065.0" dy="25">Decompress Zstandard; decode encodings.</tspan>
+<tspan x="1065.0" dy="25">Numeric fields retain their typed representation.</tspan>
+</text>
+<path d="M375 615 V655" class="edge"/>
+<path d="M1065 590 V630" class="edge"/>
+<rect x="75" y="655" width="600" height="160" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="375.0" y="685" class="head" text-anchor="middle">
+<tspan x="375.0" dy="0">1b · CSV DAILY ADAPTER</tspan>
+</text>
+<text x="375.0" y="716" class="body" text-anchor="middle">
+<tspan x="375.0" dy="0">Rust Stream::next / Go stream.next group dates.</tspan>
+<tspan x="375.0" dy="25">Lookahead preserves the next date boundary.</tspan>
+<tspan x="375.0" dy="25">Reusable raw records with integer IDs.</tspan>
+<tspan x="375.0" dy="25">CSV: Rust 24.373s · Go 39.979s</tspan>
+</text>
+<rect x="765" y="630" width="600" height="135" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="1065.0" y="660" class="head" text-anchor="middle">
+<tspan x="1065.0" dy="0">1b · APACHE ARROW RECORD BATCHES</tspan>
+</text>
+<text x="1065.0" y="691" class="body" text-anchor="middle">
+<tspan x="1065.0" dy="0">Rust: ParquetRecordBatchReaderBuilder.</tspan>
+<tspan x="1065.0" dy="25">Go: column decoding is serial within each reader.</tspan>
+<tspan x="1065.0" dy="25">Typed string/date32/float64 arrays; ≤65,536 rows.</tspan>
+</text>
+<path d="M1065 765 V805" class="edge"/>
+<rect x="765" y="805" width="600" height="160" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="1065.0" y="835" class="head" text-anchor="middle">
+<tspan x="1065.0" dy="0">1c · ARROW → DAILY ADAPTER</tspan>
+</text>
+<text x="1065.0" y="866" class="body" text-anchor="middle">
+<tspan x="1065.0" dy="0">Typed numeric access; date32 → ISO date.</tspan>
+<tspan x="1065.0" dy="25">ID lookup/validation; assemble complete dates</tspan>
+<tspan x="1065.0" dy="25">across batches into reusable raw buffers.</tspan>
+<tspan x="1065.0" dy="25">PARQUET: Rust 34.452s · Go 37.644s</tspan>
+</text>
+<path d="M375 815 V1010 H720 V1050" class="edge"/>
+<path d="M1065 965 V1010 H720" class="edge"/>
+<rect x="160" y="1050" width="1120" height="160" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+<text x="720.0" y="1080" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">2 · SHARED FILTER + DENOMINATOR SCAN</tspan>
+</text>
+<text x="720.0" y="1111" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Membership mask: retain 400 selected IDs; excluded rows were still read and validated.</tspan>
+<tspan x="720.0" dy="25">Selection = 200 portfolio-only US + 100 index-only US + 100 shared DE IDs.</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 0.080s · Go 0.205s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 0.084s · Go 0.195s</tspan>
+</text>
+<path d="M720 1210 V1250" class="edge"/>
+<rect x="160" y="1250" width="1120" height="185" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+<text x="720.0" y="1280" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">3 · SHARED NORMALIZATION + AGGREGATION + ALIGNMENT</tspan>
+</text>
+<text x="720.0" y="1311" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Normalize each side within the selected universe; reject zero selected weight.</tspan>
+<tspan x="720.0" dy="25">300 portfolio holdings and 200 index holdings form a 400-ID selected union.</tspan>
+<tspan x="720.0" dy="25">Use compact selected-ID slots; missing-side weights and contributions are zero.</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 0.004s · Go 0.004s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 0.003s · Go 0.005s</tspan>
+</text>
+<path d="M720 1435 V1475" class="edge"/>
+<rect x="160" y="1475" width="1120" height="185" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="720.0" y="1505" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">4 · SHARED BF + CONTRIBUTIONS + LINK + RECONCILE</tspan>
+</text>
+<text x="720.0" y="1536" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Daily BF effects and contributions use the independently normalized subset.</tspan>
+<tspan x="720.0" dy="25">Link across all dates; keep selected per-ID state and reconcile active return.</tspan>
+<tspan x="720.0" dy="25">At output, reduce the 100 selected index-only IDs into one residual bucket.</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 0.003s · Go 0.008s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 0.003s · Go 0.008s</tspan>
+</text>
+<path d="M720 1660 V1705 H375 V1740" class="edge"/>
+<text x="970" y="1690" class="label" text-anchor="middle">
+<tspan x="970" dy="0">EOF after all dates</tspan>
+</text>
+<path d="M720 1705 H1065 V1740" class="edge"/>
+<rect x="75" y="1740" width="600" height="185" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="375.0" y="1770" class="head" text-anchor="middle">
+<tspan x="375.0" dy="0">5a · CSV OUTPUT</tspan>
+</text>
+<text x="375.0" y="1801" class="body" text-anchor="middle">
+<tspan x="375.0" dy="0">602 rows · 20 columns · numeric text formatting.</tspan>
+<tspan x="375.0" dy="25">Rust: csv Writer + Ryū; Go: escaped byte buffer.</tspan>
+<tspan x="375.0" dy="25">Buffer → flush → fsync → publish final .csv.</tspan>
+<tspan x="375.0" dy="25">CSV: Rust 0.012s · Go 0.004s</tspan>
+</text>
+<rect x="765" y="1740" width="600" height="185" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="1065.0" y="1770" class="head" text-anchor="middle">
+<tspan x="1065.0" dy="0">5b · TYPED PARQUET OUTPUT</tspan>
+</text>
+<text x="1065.0" y="1801" class="body" text-anchor="middle">
+<tspan x="1065.0" dy="0">602 rows · 20 typed columns · Arrow builders.</tspan>
+<tspan x="1065.0" dy="25">Rust: ArrowWriter; Go: pqarrow.FileWriter.</tspan>
+<tspan x="1065.0" dy="25">≤65,536 rows → Zstd → footer → fsync → .parquet.</tspan>
+<tspan x="1065.0" dy="25">PARQUET: Rust 0.007s · Go 0.007s</tspan>
+</text>
+<path d="M160 1540 H35 V435 H375 V455" class="edge"/>
+<path d="M1280 1540 H1400 V435 H1065 V455" class="edge"/>
+<text x="85" y="1310" class="label" text-anchor="middle">
+<tspan x="85" dy="0">Next</tspan>
+<tspan x="85" dy="25">date</tspan>
+</text>
+<text x="1350" y="1310" class="label" text-anchor="middle">
+<tspan x="1350" dy="0">Next</tspan>
+<tspan x="1350" dy="25">date</tspan>
+</text>
+<rect x="75" y="1950" width="1290" height="170" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="720.0" y="1980" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">WHAT IS SHARED AND WHAT THE TIMES MEAN</tspan>
+</text>
+<text x="720.0" y="2011" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Within a portfolio worker, read → filter → aggregate → compute → write execute sequentially.</tspan>
+<tspan x="720.0" dy="25">Parquet uses Arrow decoding followed by an adapter; the BF calculation is currently in dense buffers.</tspan>
+<tspan x="720.0" dy="25">All displayed stage times accumulate across workers, overlap, and do not sum to wall time.</tspan>
+<tspan x="720.0" dy="25">Read times cover decoding/parsing, typed access, lookup and validation; setup is outside stage clocks.</tspan>
+</text>
+<text x="65" y="2162" class="label" text-anchor="start">
+<tspan x="65" dy="0">Every execution validates attribution and writes the final CSV report.</tspan>
+</text>
+</svg>

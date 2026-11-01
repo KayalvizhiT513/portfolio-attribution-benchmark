@@ -1,0 +1,139 @@
+{
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "threads": 4,
+  "repetitions": 1,
+  "format_order": [
+    "csv",
+    "parquet"
+  ],
+  "cache": "OS-managed, no explicit eviction",
+  "executables": {
+    "rust": {
+      "path": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/rust/target/release/portfolio-attribution",
+      "sha256": "fd76aeab211bbd0432ebb98d6899089014b8a0bb06e7200592e5ec297de2e46d"
+    },
+    "go": {
+      "path": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/benchmark-go-attribution",
+      "sha256": "9f2caf7a5d23e19289536246371a8c31cf79f5658872a6a4af2216944eb350b0"
+    }
+  },
+  "input_manifests": {
+    "csv": {
+      "source": "attribution_data_parquet",
+      "verification": "Every parsed CSV value equals its typed Parquet source value",
+      "files": {
+        "security_master.csv": {
+          "rows": 160000,
+          "bytes": 3360036
+        },
+        "index.csv": {
+          "rows": 109500000,
+          "bytes": 7246180941
+        },
+        "portfolio_PF.csv": {
+          "bytes": 5375650674,
+          "rows": 65700000
+        }
+      },
+      "dates": 1095,
+      "portfolio": {
+        "entity": "PF_MERGED",
+        "holdings_per_date": 60000,
+        "USD": 59000,
+        "EUR": 1000,
+        "rows": 65700000,
+        "source_allocations": {
+          "PF1": 0.25,
+          "PF2": 0.25,
+          "PF3": 0.25,
+          "PF4": 0.25
+        }
+      },
+      "index": {
+        "holdings_per_date": 100000,
+        "USD": 99000,
+        "EUR": 1000,
+        "rows": 109500000
+      },
+      "shared_ids_per_date": 1000,
+      "shared_country": "DE",
+      "shared_currency": "EUR",
+      "portfolio_expansion": {
+        "additional_US_ids": 3000,
+        "rule": "Split 3,000 existing US weights equally between original and new US IDs; copy base/local returns",
+        "provenance": "attribution_data_parquet/expansion_provenance.parquet",
+        "verification": "All dates checked for exact holdings, DE-only overlap, normalized weights and preserved daily returns; every CSV value equals Parquet"
+      }
+    },
+    "parquet": {
+      "source": "attribution_data_parquet",
+      "dates": 1095,
+      "portfolio": {
+        "entity": "PF_MERGED",
+        "holdings_per_date": 60000,
+        "USD": 59000,
+        "EUR": 1000,
+        "rows": 65700000,
+        "source_allocations": {
+          "PF1": 0.25,
+          "PF2": 0.25,
+          "PF3": 0.25,
+          "PF4": 0.25
+        }
+      },
+      "index": {
+        "holdings_per_date": 100000,
+        "USD": 99000,
+        "EUR": 1000,
+        "rows": 109500000
+      },
+      "shared_ids_per_date": 1000,
+      "shared_currency": "EUR",
+      "shared_country": "DE",
+      "merge_rule": "Normalize each source daily, allocate 25% each, sum duplicate weights and weight-average base/local returns",
+      "index_rule": "Replace last 1,000 source index US IDs with EUR IDs; preserve weights and returns",
+      "remapping_file": "instrument_remapping.parquet",
+      "verification": "Reloaded all dates; exact ID sets, EUR-only intersection, weights and source-derived weighted returns checked",
+      "elapsed_seconds": 77.67527637500007,
+      "files": {
+        "security_master.parquet": {
+          "bytes": 241007,
+          "rows": 160000
+        },
+        "index.parquet": {
+          "bytes": 3356731041,
+          "rows": 109500000
+        },
+        "instrument_remapping.parquet": {
+          "bytes": 272207,
+          "rows": 57000
+        },
+        "portfolio_PF.parquet": {
+          "bytes": 1957441554,
+          "rows": 65700000
+        },
+        "expansion_provenance.parquet": {
+          "bytes": 14133,
+          "rows": 3000
+        }
+      },
+      "country_verification": "All-date ID-set checks plus master lookup confirm the intersection equals all 1,000 DE securities; no other shared IDs",
+      "portfolio_expansion": {
+        "additional_US_ids": 3000,
+        "rule": "Split 3,000 existing US weights equally between original and new US IDs; copy base/local returns",
+        "provenance": "attribution_data_parquet/expansion_provenance.parquet",
+        "verification": "All dates checked for exact holdings, DE-only overlap, normalized weights and preserved daily returns; every CSV value equals Parquet"
+      }
+    }
+  },
+  "output_format": {
+    "csv": "CSV",
+    "parquet": "native typed Parquet; Zstandard; at most 65,536 rows per batch/group"
+  },
+  "final_verification": {
+    "runs": 20,
+    "pairwise_comparisons": 15,
+    "native_parquet_schemas_row_groups_compression_sizes": "PASS",
+    "input_rows_per_run": 175200000
+  }
+}

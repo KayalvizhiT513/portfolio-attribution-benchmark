@@ -2,12 +2,14 @@ use std::{
     collections::HashMap,
     error::Error,
     fs::{self, File},
-    io::BufWriter,
     path::{Path, PathBuf},
     sync::{mpsc, Arc},
     thread,
     time::Instant,
 };
+mod input;
+mod output;
+use input::Input;
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 const HEADER: [&str; 6] = [
     "Entity",
@@ -17,7 +19,7 @@ const HEADER: [&str; 6] = [
     "BaseReturn",
     "LocalReturn",
 ];
-const OUT: [&str; 17] = [
+const OUT: [&str; 20] = [
     "Scenario",
     "Entity",
     "PeriodStart",
@@ -35,6 +37,9 @@ const OUT: [&str; 17] = [
     "PortfolioReturn",
     "BenchmarkReturn",
     "ActiveReturn",
+    "PortfolioContribution",
+    "BenchmarkContribution",
+    "ActiveContribution",
 ];
 #[derive(Clone)]
 struct Config {
@@ -61,7 +66,7 @@ fn config() -> Result<Config> {
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         if a == "--help" {
-            println!("--scenario security|subset|country|weekly|monthly --data DIR --output-dir DIR --metrics FILE --threads N --max-days N --instruments-file CSV --period all|day|week|month|quarter|year");
+            println!("--scenario security|subset|country|weekly|monthly --data DIR (CSV and/or Parquet) --output-dir DIR --metrics FILE --threads N --max-days N --instruments-file CSV_OR_PARQUET --period all|day|week|month|quarter|year");
             std::process::exit(0);
         }
         let v = args.next().ok_or("missing option value")?;
@@ -84,6 +89,7 @@ fn config() -> Result<Config> {
     }
     if c.period.is_empty() {
         c.period = match c.scenario.as_str() {
+            "country" => "day",
             "weekly" => "week",
             "monthly" => "month",
             _ => "all",
@@ -92,6 +98,9 @@ fn config() -> Result<Config> {
     }
     if !["all", "day", "week", "month", "quarter", "year"].contains(&c.period.as_str()) {
         return Err("invalid period".into());
+    }
+    if c.scenario == "country" && c.period != "day" {
+        return Err("country requires --period day (US-only daily attribution)".into());
     }
     if c.scenario == "subset" && c.subset.is_none() {
         return Err("subset requires --instruments-file".into());
@@ -133,33 +142,37 @@ fn master(c: &Config) -> Result<Master> {
         subset_names: vec![],
     };
     let mut countries = HashMap::new();
-    for row in reader(
-        &c.data.join("security_master.csv"),
+    let mut rows = Input::open(
+        &input::resolve(&c.data, "security_master")?,
         &["InstrumentId", "Currency", "Country"],
-    )?
-    .records()
-    {
-        let r = row?;
-        if r.iter().any(str::is_empty) {
+    )?;
+    while rows.advance()? {
+        let id = rows.text(0)?;
+        let currency = rows.text(1)?;
+        let country = rows.text(2)?;
+        if id.is_empty() || currency.is_empty() || country.is_empty() {
             return Err("blank master field".into());
         }
         let n = m.names.len();
-        if m.ids.insert(r[0].into(), n).is_some() {
+        if m.ids.insert(id.to_string(), n).is_some() {
             return Err("duplicate master ID".into());
         }
-        m.names.push(r[0].into());
+        m.names.push(id.to_string());
         let next = countries.len();
-        let k = *countries.entry(r[2].to_string()).or_insert(next);
+        let k = *countries.entry(country.to_string()).or_insert(next);
         if k == m.country_names.len() {
-            m.country_names.push(r[2].into())
+            m.country_names.push(country.to_string());
         }
         m.countries.push(k);
     }
     m.selected = vec![c.scenario != "subset"; m.names.len()];
     if let Some(p) = &c.subset {
-        for r in reader(p, &["InstrumentId"])?.records() {
-            let r = r?;
-            let i = *m.ids.get(&r[0]).ok_or("unknown subset instrument")?;
+        let mut rows = Input::open(p, &["InstrumentId"])?;
+        while rows.advance()? {
+            let i = *m
+                .ids
+                .get(rows.text(0)?.as_ref())
+                .ok_or("unknown subset instrument")?;
             m.selected[i] = true;
         }
     }
@@ -220,9 +233,8 @@ struct Day {
     stats: Vec<Stat>,
 }
 struct Stream {
-    r: csv::Reader<File>,
-    pending: Option<csv::StringRecord>,
-    record: csv::StringRecord,
+    r: Input,
+    pending: bool,
     previous: String,
     entity: String,
     raw: Vec<(usize, Stat)>,
@@ -231,9 +243,8 @@ struct Stream {
 impl Stream {
     fn new(path: &Path) -> Result<Self> {
         Ok(Self {
-            r: reader(path, &HEADER)?,
-            pending: None,
-            record: csv::StringRecord::new(),
+            r: Input::open(path, &HEADER)?,
+            pending: false,
             previous: String::new(),
             entity: String::new(),
             raw: Vec::new(),
@@ -242,7 +253,7 @@ impl Stream {
     }
     fn next(&mut self, m: &Master, c: &Config, metrics: &mut Metrics) -> Result<Option<Day>> {
         let start = Instant::now();
-        let offset = self.r.position().byte();
+        let offset = self.r.parsed_bytes();
         self.raw.clear();
         self.seen.resize(m.names.len(), false);
         self.seen.fill(false);
@@ -251,40 +262,45 @@ impl Stream {
         let mut date = String::new();
         let mut total = 0.0;
         loop {
-            if let Some(p) = self.pending.take() {
-                self.record = p;
-            } else if !self.r.read_record(&mut self.record)? {
+            if self.pending {
+                self.pending = false;
+            } else if !self.r.advance()? {
                 break;
             }
-            let r = &self.record;
+            let row_date = self.r.text(1)?;
             if date.is_empty() {
-                date = r[1].into();
+                date = row_date.to_string();
                 if !self.previous.is_empty() && date <= self.previous {
                     return Err("dates must strictly increase".into());
                 }
                 civil(&date)?;
             }
-            if r[1] != date {
-                self.pending = Some(r.clone());
+            if row_date != date {
+                self.pending = true;
                 break;
             }
-            if r.iter().any(str::is_empty) {
+            let entity = self.r.text(0)?;
+            let instrument = self.r.text(2)?;
+            if entity.is_empty() || instrument.is_empty() || row_date.is_empty() {
                 return Err("blank return field".into());
             }
             if self.entity.is_empty() {
-                self.entity = r[0].into()
+                self.entity = entity.to_string()
             }
-            if self.entity != r[0] {
+            if self.entity != entity {
                 return Err("mixed entities".into());
             }
-            let id = *m.ids.get(&r[2]).ok_or("unmapped instrument")?;
+            let id = *m
+                .ids
+                .get(instrument.as_ref())
+                .ok_or("unmapped instrument")?;
             if seen[id] {
                 return Err(format!("duplicate instrument on {date}").into());
             }
             seen[id] = true;
-            let w: f64 = r[3].parse()?;
-            let b: f64 = r[4].parse()?;
-            let l: f64 = r[5].parse()?;
+            let w = self.r.number(3)?;
+            let b = self.r.number(4)?;
+            let l = self.r.number(5)?;
             if !w.is_finite()
                 || w < 0.0
                 || !b.is_finite()
@@ -306,7 +322,7 @@ impl Stream {
         }
         metrics.read += start.elapsed().as_secs_f64();
         metrics.rows += raw.len() as u64;
-        metrics.parsed += self.r.position().byte() - offset;
+        metrics.parsed += self.r.parsed_bytes() - offset;
         if date.is_empty() {
             return Ok(None);
         }
@@ -317,6 +333,8 @@ impl Stream {
         let start = Instant::now();
         if c.scenario == "subset" {
             raw.retain(|(id, _)| m.selected[*id]);
+        } else if c.scenario == "country" {
+            raw.retain(|(id, _)| m.country_names[m.countries[*id]] == "US");
         }
         let selected: f64 = raw.iter().map(|(_, s)| s.w).sum();
         if selected <= 0.0 {
@@ -431,6 +449,7 @@ fn effect(p: Stat, b: Stat, t: usize, total_b: f64) -> [f64; 3] {
 struct Acc {
     w: [f64; 2],
     e: [[f64; 3]; 2],
+    contribution: [[f64; 2]; 2],
     present: bool,
     held: bool,
 }
@@ -492,6 +511,10 @@ impl Period {
                 a.held |= ps.present;
                 a.w[0] += ps.w;
                 a.w[1] += bs.w;
+                for t in 0..2 {
+                    a.contribution[0][t] += ps.r[t] * self.growth[0][t];
+                    a.contribution[1][t] += bs.r[t] * self.growth[1][t];
+                }
             }
         }
         for t in 0..2 {
@@ -505,6 +528,9 @@ impl Period {
                 }
             }
             for side in 0..2 {
+                if self.portfolio_only {
+                    self.acc[0].contribution[side][t] += totals[side][t] * self.growth[side][t];
+                }
                 self.growth[side][t] *= 1.0 + totals[side][t];
                 if !self.growth[side][t].is_finite() {
                     return Err("nonfinite compounded return".into());
@@ -528,24 +554,33 @@ impl Period {
         c: &Config,
         entity: &str,
         names: &[String],
-        w: &mut csv::Writer<BufWriter<File>>,
+        w: &mut output::Writer,
         metrics: &mut Metrics,
     ) -> Result<()> {
         let start = Instant::now();
         let write_before = metrics.write;
         let mut totals = [[0.0; 3]; 2];
         let mut residual = Acc::default();
-        let security = ["security", "subset"].contains(&c.scenario.as_str());
+        let mut contributions = [[0.0; 2]; 2];
+        let compact_subset = c.scenario == "subset";
         for a in &self.acc {
+            for side in 0..2 {
+                for t in 0..2 {
+                    contributions[side][t] += a.contribution[side][t];
+                }
+            }
             for t in 0..2 {
                 for j in 0..3 {
                     totals[t][j] += a.e[t][j];
                 }
             }
-            if security && a.present && !a.held {
+            if compact_subset && a.present && !a.held {
                 residual.present = true;
                 for side in 0..2 {
                     residual.w[side] += a.w[side];
+                    for t in 0..2 {
+                        residual.contribution[side][t] += a.contribution[side][t];
+                    }
                 }
                 for t in 0..2 {
                     for j in 0..3 {
@@ -561,6 +596,15 @@ impl Period {
                 return Err("linked reconciliation failed".into());
             }
         }
+        for side in 0..2 {
+            for t in 0..2 {
+                if !contributions[side][t].is_finite()
+                    || (contributions[side][t] - (self.growth[side][t] - 1.0)).abs() > 1e-8
+                {
+                    return Err("contribution reconciliation failed".into());
+                }
+            }
+        }
         let mut record = csv::ByteRecord::new();
         let days = self.days.to_string();
         if self.portfolio_only {
@@ -573,6 +617,7 @@ impl Period {
                     t,
                     self.acc[0].w,
                     totals[t],
+                    self.acc[0].contribution,
                     &days,
                     &mut record,
                     w,
@@ -581,7 +626,7 @@ impl Period {
             }
         } else {
             for (k, a) in self.acc.iter().enumerate() {
-                if a.present && (!security || a.held) {
+                if a.present && (!compact_subset || a.held) {
                     for t in 0..2 {
                         self.row(
                             c,
@@ -591,6 +636,7 @@ impl Period {
                             t,
                             a.w,
                             a.e[t],
+                            a.contribution,
                             &days,
                             &mut record,
                             w,
@@ -609,6 +655,7 @@ impl Period {
                         t,
                         residual.w,
                         residual.e[t],
+                        residual.contribution,
                         &days,
                         &mut record,
                         w,
@@ -630,9 +677,10 @@ impl Period {
         t: usize,
         weights: [f64; 2],
         e: [f64; 3],
+        contribution: [[f64; 2]; 2],
         days: &str,
         record: &mut csv::ByteRecord,
-        w: &mut csv::Writer<BufWriter<File>>,
+        w: &mut output::Writer,
         metrics: &mut Metrics,
     ) -> Result<()> {
         metrics.report_rows += 1;
@@ -642,8 +690,7 @@ impl Period {
         let start = Instant::now();
         let rp = self.growth[0][t] - 1.0;
         let rb = self.growth[1][t] - 1.0;
-        record.clear();
-        for field in [
+        let fields = [
             c.scenario.as_str(),
             entity,
             &self.start,
@@ -652,11 +699,8 @@ impl Period {
             kind,
             name,
             if t == 0 { "base" } else { "local" },
-        ] {
-            record.push_field(field.as_bytes());
-        }
-        let mut buffer = ryu::Buffer::new();
-        for value in [
+        ];
+        let numbers = [
             weights[0] / self.days as f64,
             weights[1] / self.days as f64,
             e[0],
@@ -666,10 +710,11 @@ impl Period {
             rp,
             rb,
             rp - rb,
-        ] {
-            record.push_field(buffer.format(value).as_bytes());
-        }
-        w.write_byte_record(record)?;
+            contribution[0][t],
+            contribution[1][t],
+            contribution[0][t] - contribution[1][t],
+        ];
+        w.row(&fields, &numbers, record)?;
         metrics.written += 1;
         metrics.write += start.elapsed().as_secs_f64();
         Ok(())
@@ -679,16 +724,12 @@ impl Period {
 fn worker(path: &Path, c: &Config, m: &Master, rx: mpsc::Receiver<Arc<Day>>) -> Result<Metrics> {
     let mut metrics = Metrics::default();
     let mut stream = Stream::new(path)?;
-    let stem = path.file_stem().unwrap().to_string_lossy();
-    let partial = c.output.join(format!("{}-{stem}.csv.partial", c.scenario));
+    let target = output::path(c, path);
     let start = Instant::now();
-    let mut writer = csv::WriterBuilder::new()
-        .buffer_capacity(1024 * 1024)
-        .from_writer(BufWriter::with_capacity(
-            1024 * 1024,
-            File::create(partial)?,
-        ));
-    writer.write_record(OUT)?;
+    let mut writer = output::Writer::new(
+        &output::partial(&target),
+        path.extension().is_some_and(|e| e == "parquet"),
+    )?;
     metrics.write += start.elapsed().as_secs_f64();
     let mut period: Option<Period> = None;
     let mut entity = String::new();
@@ -732,8 +773,7 @@ fn worker(path: &Path, c: &Config, m: &Master, rx: mpsc::Receiver<Arc<Day>>) -> 
         .write(c, &entity, names, &mut writer, &mut metrics)?;
     let start = Instant::now();
 
-    writer.flush()?;
-    writer.get_ref().get_ref().sync_all()?;
+    writer.finish()?;
     metrics.write += start.elapsed().as_secs_f64();
 
     Ok(metrics)
@@ -746,21 +786,12 @@ fn run() -> Result<()> {
     if fs::canonicalize(&c.output)? == fs::canonicalize(&c.data)? {
         return Err("output directory must differ from input".into());
     }
-    let mut paths: Vec<_> = fs::read_dir(&c.data)?
-        .map(|e| e.map(|e| e.path()))
-        .collect::<std::io::Result<_>>()?;
-    paths.retain(|p| {
-        p.file_name()
-            .and_then(|s| s.to_str())
-            .is_some_and(|n| n.starts_with("portfolio_") && n.ends_with(".csv"))
-    });
-    paths.sort();
-    if paths.is_empty() {
-        return Err("no portfolios".into());
-    }
+    let paths = input::portfolios(&c.data)?;
+    let index_path = input::resolve(&c.data, "index")?;
+    let master_path = input::resolve(&c.data, "security_master")?;
     let mut metrics = Metrics::default();
     let mut observed = 0;
-    let mut input_bytes = fs::metadata(c.data.join("security_master.csv"))?.len();
+    let mut input_bytes = fs::metadata(&master_path)?.len();
     // One index producer broadcasts bounded one-day buffers. Batching limits native workers.
     for batch in paths.chunks(c.threads) {
         let result: Result<()> = thread::scope(|scope| {
@@ -772,7 +803,7 @@ fn run() -> Result<()> {
                 let (c, m) = (&c, &m);
                 workers.push(scope.spawn(move || worker(p, c, m, rx)));
             }
-            let mut index = Stream::new(&c.data.join("index.csv"))?;
+            let mut index = Stream::new(&index_path)?;
             let mut days = 0;
             let production: Result<()> = (|| {
                 while c.max_days == 0 || days < c.max_days {
@@ -804,14 +835,12 @@ fn run() -> Result<()> {
             Ok(())
         });
         result?;
-        input_bytes += fs::metadata(c.data.join("index.csv"))?.len();
+        input_bytes += fs::metadata(&index_path)?.len();
     }
     for path in &paths {
         input_bytes += fs::metadata(path)?.len();
-        let stem = path.file_stem().unwrap().to_string_lossy();
-        let target = c.output.join(format!("{}-{stem}.csv", c.scenario));
-
-        fs::rename(target.with_extension("csv.partial"), &target)?;
+        let target = output::path(&c, path);
+        fs::rename(output::partial(&target), &target)?;
         metrics.bytes += fs::metadata(target)?.len();
     }
     if let Some(p) = c.metrics.parent().filter(|p| !p.as_os_str().is_empty()) {
