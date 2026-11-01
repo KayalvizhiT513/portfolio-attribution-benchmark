@@ -4,8 +4,8 @@
 Install: pip install numpy
 Run: python python/generate_attribution_csvs.py --output-dir ./attribution_data
 
-The dataset includes 1,095 calendar dates (including weekends), 4 portfolios of
-15,000 instruments each, 1 index of 100,000 instruments, and 160,000 unique
+The dataset includes 1,095 calendar dates (including weekends), 1 portfolio of
+60,000 instruments, 1 index of 100,000 instruments, and 160,000 unique
 security-master identifiers. All returns and weights are synthetic.
 """
 import argparse
@@ -18,8 +18,7 @@ import numpy as np
 DAYS = 1095
 N_SECURITIES = 160_000
 US_SECURITIES = 159_000
-PORTFOLIOS = 4
-PORT_HOLDINGS = 15_000
+PORT_HOLDINGS = 60_000
 INDEX_HOLDINGS = 100_000
 HEADER = ['Entity', 'EffectiveDate', 'InstrumentId', 'Weight', 'BaseReturn', 'LocalReturn']
 
@@ -93,15 +92,13 @@ def main():
     if args.verify:
         verify(master, N_SECURITIES)
 
-    # Disjoint 15k-instrument portfolios: PF1 S000001-S015000, etc.
-    # Index overlaps the portfolios, allowing valid attribution joins.
-    for p in range(PORTFOLIOS):
-        entity = f'PF{p + 1}'
-        securities = np.arange(p * PORT_HOLDINGS + 1, (p + 1) * PORT_HOLDINGS + 1)
-        path = write_returns(args.output_dir, f'portfolio_{entity}.csv', entity,
-                             securities, rng, first_day, args.batch_size, args.weights)
-        if args.verify:
-            verify(path, DAYS * PORT_HOLDINGS)
+    # One 60k-instrument portfolio: S000001-S060000.
+    # Index overlaps the portfolio, allowing valid attribution joins.
+    securities = np.arange(1, PORT_HOLDINGS + 1)
+    path = write_returns(args.output_dir, 'portfolio_PF.csv', 'PF',
+                         securities, rng, first_day, args.batch_size, args.weights)
+    if args.verify:
+        verify(path, DAYS * PORT_HOLDINGS)
 
     path = write_returns(args.output_dir, 'index.csv', 'INDEX',
                          np.arange(1, INDEX_HOLDINGS + 1), rng, first_day,
