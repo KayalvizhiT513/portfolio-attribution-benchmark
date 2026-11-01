@@ -804,6 +804,8 @@ fn run() -> Result<()> {
     let index_path = input::resolve(&c.data, "index")?;
     let master_path = input::resolve(&c.data, "security_master")?;
     let mut metrics = Metrics::default();
+    let mut index_metrics = Metrics::default();
+    let mut portfolio_metrics = Metrics::default();
     let mut observed = 0;
     let mut input_bytes = fs::metadata(&master_path)?.len();
     // One index producer broadcasts bounded one-day buffers. Batching limits native workers.
@@ -832,11 +834,17 @@ fn run() -> Result<()> {
                 }
                 Ok(())
             })();
+            index_metrics.read = metrics.read - portfolio_metrics.read;
+            index_metrics.filter = metrics.filter - portfolio_metrics.filter;
+            index_metrics.aggregate = metrics.aggregate - portfolio_metrics.aggregate;
             drop(senders);
             let mut errors = vec![];
             for worker in workers {
                 match worker.join() {
-                    Ok(Ok(x)) => metrics.add(&x),
+                    Ok(Ok(x)) => {
+                        metrics.add(&x);
+                        portfolio_metrics.add(&x);
+                    }
                     Ok(Err(e)) => errors.push(e.to_string()),
                     Err(_) => errors.push("worker panicked".into()),
                 }
@@ -923,6 +931,20 @@ fn run() -> Result<()> {
             metrics.parquet_batches.to_string(),
         ]);
     }
+    let mut side_headers = Vec::new();
+    for (side, item) in [("index", &index_metrics), ("portfolio", &portfolio_metrics)] {
+        for (stage, value) in [
+            ("read", item.read),
+            ("filter", item.filter),
+            ("aggregate", item.aggregate),
+            ("compute", item.compute),
+            ("write", item.write),
+        ] {
+            side_headers.push(format!("{side}_{stage}_seconds"));
+            values.push(value.to_string());
+        }
+    }
+    header.extend(side_headers.iter().map(String::as_str));
     w.write_record(header)?;
     w.write_record(values)?;
     w.flush()?;

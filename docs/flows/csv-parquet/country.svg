@@ -69,7 +69,7 @@
 <tspan x="375.0" dy="0">Rust Stream::next / Go stream.next group dates.</tspan>
 <tspan x="375.0" dy="25">Lookahead preserves the next date boundary.</tspan>
 <tspan x="375.0" dy="25">Reusable raw records with integer IDs.</tspan>
-<tspan x="375.0" dy="25">CSV: Rust 21.739s · Go 38.821s</tspan>
+<tspan x="375.0" dy="25">CSV: Rust 21.834s · Go 38.410s</tspan>
 </text>
 <rect x="765" y="630" width="600" height="135" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
 <text x="1065.0" y="660" class="head" text-anchor="middle">
@@ -89,7 +89,7 @@
 <tspan x="1065.0" dy="0">Both cache date text; numeric values stay typed.</tspan>
 <tspan x="1065.0" dy="25">ID lookup/validation; assemble complete dates</tspan>
 <tspan x="1065.0" dy="25">across batches into reusable raw buffers.</tspan>
-<tspan x="1065.0" dy="25">PARQUET: Rust 23.481s · Go 26.925s</tspan>
+<tspan x="1065.0" dy="25">PARQUET: Rust 23.701s · Go 26.539s</tspan>
 </text>
 <path d="M375 815 V1010 H720 V1050" class="edge"/>
 <path d="M1065 965 V1010 H720" class="edge"/>
@@ -100,8 +100,8 @@
 <text x="720.0" y="1111" class="body" text-anchor="middle">
 <tspan x="720.0" dy="0">Country lookup: retain US on both sides; exclude DE after full input validation.</tspan>
 <tspan x="720.0" dy="25">59,000 US portfolio and 99,000 US index holdings per date.</tspan>
-<tspan x="720.0" dy="25">CSV: Rust 0.220s · Go 0.347s</tspan>
-<tspan x="720.0" dy="25">PARQUET: Rust 0.218s · Go 0.346s</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 0.224s · Go 0.350s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 0.225s · Go 0.352s</tspan>
 </text>
 <path d="M720 1210 V1250" class="edge"/>
 <rect x="160" y="1250" width="1120" height="185" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
@@ -112,8 +112,8 @@
 <tspan x="720.0" dy="0">Normalize US portfolio weights and US index weights separately to one.</tspan>
 <tspan x="720.0" dy="25">Sum normalized weights and weighted returns into one US group on each side.</tspan>
 <tspan x="720.0" dy="25">Align the US country groups; BF is calculated after country aggregation.</tspan>
-<tspan x="720.0" dy="25">CSV: Rust 0.169s · Go 0.309s</tspan>
-<tspan x="720.0" dy="25">PARQUET: Rust 0.161s · Go 0.313s</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 0.163s · Go 0.313s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 0.184s · Go 0.315s</tspan>
 </text>
 <path d="M720 1435 V1475" class="edge"/>
 <rect x="160" y="1475" width="1120" height="185" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
@@ -124,8 +124,8 @@
 <tspan x="720.0" dy="0">Calculate daily US-group BF effects and portfolio/index/active contributions.</tspan>
 <tspan x="720.0" dy="25">One US group: allocation/interaction are zero up to rounding; selection is active return.</tspan>
 <tspan x="720.0" dy="25">Reset period state each date; require daily output and reconcile each side.</tspan>
-<tspan x="720.0" dy="25">CSV: Rust 0.000932s · Go 0.000819s</tspan>
-<tspan x="720.0" dy="25">PARQUET: Rust 0.000804s · Go 0.000812s</tspan>
+<tspan x="720.0" dy="25">CSV: Rust 0.000766s · Go 0.000838s</tspan>
+<tspan x="720.0" dy="25">PARQUET: Rust 0.000734s · Go 0.000834s</tspan>
 </text>
 <path d="M720 1660 V1705 H375 V1740" class="edge"/>
 <text x="970" y="1690" class="label" text-anchor="middle">
@@ -140,7 +140,7 @@
 <tspan x="375.0" dy="0">2,190 rows · 20 columns · numeric text formatting.</tspan>
 <tspan x="375.0" dy="25">Rust: csv Writer + Ryū; Go: escaped byte buffer.</tspan>
 <tspan x="375.0" dy="25">Buffer → flush → fsync → publish final .csv.</tspan>
-<tspan x="375.0" dy="25">CSV: Rust 0.011s · Go 0.009s</tspan>
+<tspan x="375.0" dy="25">CSV: Rust 0.012s · Go 0.010s</tspan>
 </text>
 <rect x="765" y="1740" width="600" height="185" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
 <text x="1065.0" y="1770" class="head" text-anchor="middle">
@@ -150,7 +150,7 @@
 <tspan x="1065.0" dy="0">2,190 rows · 20 typed columns · Arrow builders.</tspan>
 <tspan x="1065.0" dy="25">Rust: ArrowWriter; Go: pqarrow.FileWriter.</tspan>
 <tspan x="1065.0" dy="25">≤65,536 rows → Zstd → footer → fsync → .parquet.</tspan>
-<tspan x="1065.0" dy="25">PARQUET: Rust 0.007s · Go 0.011s</tspan>
+<tspan x="1065.0" dy="25">PARQUET: Rust 0.009s · Go 0.013s</tspan>
 </text>
 <path d="M160 1540 H35 V435 H375 V455" class="edge"/>
 <path d="M1280 1540 H1400 V435 H1065 V455" class="edge"/>

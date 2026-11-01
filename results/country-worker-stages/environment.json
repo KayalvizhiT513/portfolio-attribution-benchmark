@@ -1,0 +1,12 @@
+{
+  "threads": 4,
+  "repetitions": 3,
+  "dates": 1095,
+  "order": "Alternate format and engine order between repetitions; runs execute sequentially.",
+  "timing": "Elapsed durations per stage per worker; repeated calls sum only within that worker. Channel waits/setup are outside stage timers. Workers overlap; do not sum workers.",
+  "profiling": "CPU/allocation/read-batch diagnostics disabled",
+  "binary_sha256": {
+    "rust": "b0d8c4eb37d50b6f5779e9d1f6507726811cf02a6db9c3381018478321b2635d",
+    "go": "b14381853f599e2644c2186cf3cad3c110ad418f6088858d7a8b9797204af6aa"
+  }
+}

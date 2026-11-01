@@ -33,12 +33,12 @@ def main():
         lines[2:2] = [LATEST_NOTE, '']
         lines += [''] + country_read_split() + go_diagnostics_section()
     lines += ['', '## Elapsed time and processing steps', '',
-              'All timing columns below use elapsed clock seconds. Only whole-run elapsed time was recorded; accumulated worker times are kept in the expandable details.', '']
+              'All timing columns below use elapsed clock seconds. Stage times are shown separately for the index and portfolio workers; whole-run time is measured independently.', '']
     for fmt in ['csv', 'parquet']:
         lines += [f'### {fmt.upper()} input → {fmt.upper()} output', '']
         lines += timing_table(rows, fmt, 'country')
-        lines += ['', '<details>', f'<summary>Worker times, counts, throughput, and memory — {fmt.upper()}</summary>', '',
-                  'Steps follow the timing table. Rates use the time spent in that step.', '']
+        lines += ['', '<details>', f'<summary>Counts, throughput, and memory — {fmt.upper()}</summary>', '',
+                  'Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.', '']
         lines += metrics_table(rows, fmt, 'country')
         lines += ['', 'MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. Both engines use three-run country medians.' if updated else 'One measurement per configuration.', '', '</details>', '']
     lines += ['<details>', '<summary>View the country flow diagram</summary>', '',
@@ -47,9 +47,9 @@ def main():
               'US weights and weighted base/local returns are added into one US group separately for the portfolio and index on each date. There is no linking across dates in this scenario. With one normalized country group, allocation and interaction are zero apart from rounding; selection equals the difference between US portfolio and US index returns.', '',
               'Daily portfolio and benchmark contributions equal the corresponding US weighted returns. Active contribution is their difference. The index producer runs concurrently with one portfolio worker; stages inside the portfolio worker run in sequence. Parquet uses Arrow for reading and writing, while the calculations use the shared daily buffers.', '', '</details>', '',
               '## Checks and measurement notes', '',
-              '**Latest checks:** Rust country has 15 output comparisons and 6 profiling comparisons; Go country has 15 output comparisons and 14 diagnostic/control comparisons. All passed; original baseline checks are retained. Every output value is compared; each engine checks BF and contribution totals.' if updated else '**3/3 baseline comparisons passed.**', '',
-              'Rust and Go each use three fresh CSV/Parquet country pairs with alternating format order, measured in separate sessions. All use four configured threads and normal filesystem caching; this report reuses those completed measurements.' if updated else 'One original run per language/format; four threads configured and normal filesystem caching.', '',
-              '[Full comparison](CSV_PARQUET_REPORT.md) · [Latest Rust measurements](results/rust-date-cache/runs.csv) · [Latest Go measurements](results/go-date-cache/runs.csv) · [Original measurements](results/csv-parquet-native-output/runs.csv) · [Checks](results/csv-parquet-native-output/checks.json) · [Calculation definitions](docs/CONTRIBUTIONS.md)', '']
+              '**Latest checks:** Rust country has 15 output comparisons and 6 profiling comparisons; Go country has 15 output comparisons and 14 diagnostic/control comparisons. All passed; original baseline checks are retained. The new worker-timing country rerun adds 24 passed comparisons against the existing CSV/Parquet references. Every output value is compared; each engine checks BF and contribution totals.' if updated else '**3/3 baseline comparisons passed.**', '',
+              'The latest country rerun uses three runs per engine/format, alternating format and engine order. Runs execute sequentially with four configured threads and normal filesystem caching. CPU/allocation profiling and batch-fetch diagnostic timers are disabled for this rerun. The read-time split and Go allocation findings above remain from earlier separate diagnostic runs.' if updated else 'One original run per language/format; four threads configured and normal filesystem caching.', '',
+              '[Latest country rerun](results/country-worker-stages/runs.csv) · [Rerun checks](results/country-worker-stages/checks.json) · [Full comparison](CSV_PARQUET_REPORT.md) · [Latest Rust measurements](results/rust-date-cache/runs.csv) · [Latest Go measurements](results/go-date-cache/runs.csv) · [Original measurements](results/csv-parquet-native-output/runs.csv) · [Checks](results/csv-parquet-native-output/checks.json) · [Calculation definitions](docs/CONTRIBUTIONS.md)', '']
     REPORT.write_text('\n'.join(lines))
     print(f'Updated {REPORT}')
 

@@ -25,11 +25,17 @@ def latest_datasets():
         if path.exists():
             data = json.loads(path.read_text())
             if len(data) == 14: ready[language] = data
+    rerun = ROOT / 'results/country-worker-stages/runs.json'
+    if rerun.exists():
+        country = json.loads(rerun.read_text())
+        if len(country) == 12:
+            for language in ready:
+                ready[language] = [r for r in ready[language] if r['scenario'] != 'country'] + [r for r in country if r['language'] == language]
     return ready
 
 
 GO_UPDATED = 'go' in latest_datasets()
-LATEST_NOTE = ('Both engines use their date-cache follow-up measurements: Country is the median of three CSV/Parquet pairs per engine; each other scenario uses one pair. Rust and Go were measured in separate sessions.' if GO_UPDATED else
+LATEST_NOTE = ('Country uses the latest rerun when available: three runs per engine/format with separate index and portfolio stage timers. Other scenarios retain their date-cache follow-up runs. The latest country runs alternate format and engine order and execute sequentially.' if GO_UPDATED else
               'Rust uses the latest date-cache measurements: the median of three runs for Country and one run for each other scenario. Go uses its earlier single-run baseline; Go was not rerun for this change.')
 
 
@@ -47,6 +53,9 @@ def latest_rust_rows(runs):
             for key in row:
                 try: row[key] = statistics.median(float(r[key]) for r in samples)
                 except (ValueError, TypeError, KeyError): pass
+            for key in samples[0]:
+                if key.startswith(('index_', 'portfolio_')) and key.endswith('_seconds'):
+                    row[key] = statistics.median(float(r[key]) for r in samples)
             row['measurement_runs'] = len(samples)
             row['process_wall_seconds_min'] = min(float(r['process_wall_seconds']) for r in samples)
             row['process_wall_seconds_max'] = max(float(r['process_wall_seconds']) for r in samples)
@@ -249,11 +258,31 @@ def timing_table(rows, fmt, scenario):
         ('Write', f'Save the {fmt.upper()} report to disk.', 'write_seconds'),
         ('**Whole run**', 'Elapsed time from start to finish.', 'process_wall_seconds'),
     ]
-    lines = ['| Step | Work done | Rust elapsed seconds | Go elapsed seconds |', '|---|---|---:|---:|']
+    if all('index_read_seconds' in rows[fmt, scenario, lang] for lang in ['rust', 'go']):
+        values = [seconds(rows[fmt, scenario, lang]['process_wall_seconds']) for lang in ['rust', 'go']]
+        lines = ['| Measurement | Rust elapsed seconds | Go elapsed seconds |', '|---|---:|---:|',
+                 '| Whole run | ' + ' | '.join(values) + ' |', '',
+                 '| Step | Work done | Rust index seconds | Rust portfolio seconds | Go index seconds | Go portfolio seconds |',
+                 '|---|---|---:|---:|---:|---:|']
+        stage_fields = {'read_parse_seconds': 'read', 'filter_seconds': 'filter', 'aggregate_seconds': 'aggregate',
+                        'compute_seconds': 'compute', 'write_seconds': 'write'}
+        for stage, work, field in definitions:
+            if field == 'process_wall_seconds': continue
+            values = [seconds(rows[fmt, scenario, lang][f'{side}_{stage_fields[field]}_seconds'])
+                      for lang in ['rust', 'go'] for side in ['index', 'portfolio']]
+            lines.append(f'| {stage} | {work} | ' + ' | '.join(values) + ' |')
+        return lines + ['', 'All numbers are elapsed clock seconds; each stage adds its repeated calls within one worker only. Index and portfolio workers overlap, so do not add their columns. Channel waits and setup are outside these stage timers. The index worker does no BF calculation or report writing. Each cell is the median of three runs; whole-run values are measured independently.', '',
+                        '[Latest country measurements](results/country-worker-stages/runs.csv) · [Output checks](results/country-worker-stages/checks.json)']
+    values = [seconds(rows[fmt, scenario, lang]['process_wall_seconds']) for lang in ['rust', 'go']]
+    lines = ['| Measurement | Rust elapsed seconds | Go elapsed seconds |',
+             '|---|---:|---:|',
+             '| Whole run | ' + ' | '.join(values) + ' |', '',
+             '| Step | Work done |', '|---|---|']
     for stage, work, field in definitions:
-        values = [seconds(rows[fmt, scenario, lang][field]) for lang in ['rust', 'go']] if field == 'process_wall_seconds' else ['—', '—']
-        lines.append(f'| {stage} | {work} | ' + ' | '.join(values) + ' |')
-    return lines + ['', '— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.']
+        if field != 'process_wall_seconds':
+            lines.append(f'| {stage} | {work} |')
+    return lines + ['', 'Elapsed times for individual stages were not recorded. Accumulated worker measurements are in the expandable details.']
+
 
 
 def metrics_table(rows, fmt, scenario):
@@ -419,6 +448,8 @@ def main():
             text = text.replace('Go retains the earlier CSV-first measurements.', 'Go also uses three alternating country pairs and one fresh pair per other scenario.')
             text = text.replace('the updated Rust outputs passed 35 comparisons against the earlier Rust/Go results and fresh CSV/Parquet outputs. All 14 profiling comparisons passed. The original Go baseline also retains its 15 passed comparisons.', 'the updated Rust and Go outputs each passed 35 comparisons against the original results and fresh CSV/Parquet outputs. Rust has 14 passed profiling checks; Go has 14 passed diagnostic/control checks.')
             text = text.replace('Rust Country uses its three-run median.', 'Country uses three-run medians for both engines.')
+            text = text.replace('Latest Rust Country pairs alternate CSV/Parquet order over three pairs; other Rust scenarios have one fresh pair. Go also uses three alternating country pairs and one fresh pair per other scenario. All used normal filesystem caching.', 'Country uses the latest three-run-per-format worker-timing rerun, alternating format and engine order. Other scenarios retain one date-cache follow-up pair per engine. All used normal filesystem caching.')
+            text += '\nLatest country worker-timing rerun: 12 complete runs and 24 passed reference-output comparisons. [Measurements](results/country-worker-stages/runs.csv) · [Checks](results/country-worker-stages/checks.json).\n'
             text += '\nLatest measurements: [Rust](results/rust-date-cache/runs.csv) · [Go](results/go-date-cache/runs.csv). Detailed diagnostics: [Go read report](GO_DATE_READ_REPORT.md).\n'
         benchmark.REPORT.write_text(text + '\n'.join(country_read_split() + read_breakdown() + read_breakdown(language='go') + go_diagnostics_section()))
     sections = ['', '<details>', '<summary>How the CSV and Parquet runs work</summary>', '',
@@ -435,7 +466,7 @@ def main():
                 '</details>', '',
                 '## Elapsed time and processing steps', '',
                 'Each scenario has the same layout: a timing table, its supporting numbers, then the next input format. Read down to follow the steps; compare Rust and Go across the row.', '',
-                'All visible timing columns use elapsed clock seconds. Only whole-run elapsed time was recorded; stage rows describe the work without showing accumulated worker times.', '',
+                'Country shows separate elapsed stage times for the index and portfolio workers from the latest rerun. Whole-run elapsed time is shown separately. Other scenarios retain processing descriptions until their worker timings are rerun. Combined worker measurements remain in expandable details.', '',
                 LATEST_NOTE if updated else 'One measurement per configuration. Small timing differences need repeat runs to confirm.', '']
     for scenario, _ in benchmark.SCENARIOS:
         draw(scenario, rows)
@@ -444,10 +475,10 @@ def main():
         for fmt in ['csv', 'parquet']:
             sections += [f'#### {fmt.upper()} input → {fmt.upper()} output', '']
             sections += timing_table(rows, fmt, scenario) + ['', '<details>',
-                         f'<summary>Worker times, counts, throughput, and memory — {scenario.capitalize()}, {fmt.upper()}</summary>', '',
-                         'Steps appear in the same order as the timing table. Rates use the time spent in that step.', '']
+                         f'<summary>Counts, throughput, and memory — {scenario.capitalize()}, {fmt.upper()}</summary>', '',
+                         'Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.', '']
             sections += metrics_table(rows, fmt, scenario)
-            sections += ['', 'MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.', '', '</details>', '']
+            sections += ['', 'MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Both engines report country medians and an observed runtime range from three runs; other scenarios use one run. Memory shows the highest observed peak.', '', '</details>', '']
         sections += ['<details>', f'<summary>View the {scenario} flow diagram</summary>', '',
                      f'[![{scenario.capitalize()} — CSV/Parquet and Rust/Go flow]({path})]({path})', '', '</details>', '']
     benchmark.REPORT.write_text(benchmark.REPORT.read_text() + '\n'.join(sections))

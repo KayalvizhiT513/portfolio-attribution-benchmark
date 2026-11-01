@@ -150,3 +150,20 @@ flush/fsync and final publication are part of the successful output lifecycle.
 The write-stage clock includes typed builder appends, encoding, compression and
 footer/flush work. Failed runs can leave partial files but publish no new final
 reports. The latest benchmark is in [CSV_PARQUET_REPORT.md](../CSV_PARQUET_REPORT.md).
+
+### Separate country worker timings
+
+`python/benchmark_country_stages.py` runs the full country scenario three times
+per engine and input format, sequentially, alternating engine/format order.
+The native metrics append `index_{read,filter,aggregate,compute,write}_seconds`
+and `portfolio_{read,filter,aggregate,compute,write}_seconds`.
+Each value sums elapsed stage calls within that worker; the index and portfolio
+workers overlap. Channel waits and setup are outside these stage timers, so
+stage times do not sum to whole-run elapsed time. The index worker prepares
+benchmark data; only the portfolio worker calculates attribution and writes it.
+For this single-portfolio dataset, the portfolio columns describe one worker;
+with multiple portfolio files they sum portfolio workers and must be labeled
+accordingly. Existing combined metrics remain for backward compatibility.
+The rerun disables diagnostic profiling and checks every output field against
+the existing CSV and Parquet reference outputs. Raw evidence is saved under
+`results/country-worker-stages/`; earlier experiments are preserved.

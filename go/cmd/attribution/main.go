@@ -802,10 +802,13 @@ func run() error {
 	for _, ch := range inputs {
 		close(ch)
 	}
+	indexMetrics := mt
+	var portfolioMetrics metrics
 	var workerError error
 	for range paths {
 		r := <-results
 		mt.add(r.m)
+		portfolioMetrics.add(r.m)
 		if r.e != nil {
 			workerError = r.e
 		}
@@ -852,6 +855,13 @@ func run() error {
 	if os.Getenv("ATTRIBUTION_PROFILE_READ") == "1" {
 		header = append(header, "parquet_batch_read_decode_seconds", "parquet_to_daily_buffer_seconds", "parquet_batches")
 		values = append(values, number(mt.batchDecode), number(mt.toDailyBuffer), u(mt.parquetBatches))
+	}
+	for _, side := range []struct {
+		name string
+		m    metrics
+	}{{"index", indexMetrics}, {"portfolio", portfolioMetrics}} {
+		header = append(header, side.name+"_read_seconds", side.name+"_filter_seconds", side.name+"_aggregate_seconds", side.name+"_compute_seconds", side.name+"_write_seconds")
+		values = append(values, number(side.m.read), number(side.m.filter), number(side.m.aggregate), number(side.m.compute), number(side.m.write))
 	}
 	w.Write(header)
 	w.Write(values)

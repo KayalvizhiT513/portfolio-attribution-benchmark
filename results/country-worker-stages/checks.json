@@ -1,0 +1,218 @@
+[
+  {
+    "language": "rust",
+    "format": "csv",
+    "repetition": 1,
+    "reference_format": "csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "rust",
+    "format": "csv",
+    "repetition": 1,
+    "reference_format": "parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "go",
+    "format": "csv",
+    "repetition": 1,
+    "reference_format": "csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "go",
+    "format": "csv",
+    "repetition": 1,
+    "reference_format": "parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "rust",
+    "format": "parquet",
+    "repetition": 1,
+    "reference_format": "csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "rust",
+    "format": "parquet",
+    "repetition": 1,
+    "reference_format": "parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "go",
+    "format": "parquet",
+    "repetition": 1,
+    "reference_format": "csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "go",
+    "format": "parquet",
+    "repetition": 1,
+    "reference_format": "parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "go",
+    "format": "parquet",
+    "repetition": 2,
+    "reference_format": "csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "go",
+    "format": "parquet",
+    "repetition": 2,
+    "reference_format": "parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "rust",
+    "format": "parquet",
+    "repetition": 2,
+    "reference_format": "csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "rust",
+    "format": "parquet",
+    "repetition": 2,
+    "reference_format": "parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "go",
+    "format": "csv",
+    "repetition": 2,
+    "reference_format": "csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "go",
+    "format": "csv",
+    "repetition": 2,
+    "reference_format": "parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "rust",
+    "format": "csv",
+    "repetition": 2,
+    "reference_format": "csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "rust",
+    "format": "csv",
+    "repetition": 2,
+    "reference_format": "parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "rust",
+    "format": "csv",
+    "repetition": 3,
+    "reference_format": "csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "rust",
+    "format": "csv",
+    "repetition": 3,
+    "reference_format": "parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "go",
+    "format": "csv",
+    "repetition": 3,
+    "reference_format": "csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "go",
+    "format": "csv",
+    "repetition": 3,
+    "reference_format": "parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "rust",
+    "format": "parquet",
+    "repetition": 3,
+    "reference_format": "csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "rust",
+    "format": "parquet",
+    "repetition": 3,
+    "reference_format": "parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "go",
+    "format": "parquet",
+    "repetition": 3,
+    "reference_format": "csv",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  },
+  {
+    "language": "go",
+    "format": "parquet",
+    "repetition": 3,
+    "reference_format": "parquet",
+    "rows": 2190,
+    "max_difference": 0.0,
+    "status": "PASS"
+  }
+]

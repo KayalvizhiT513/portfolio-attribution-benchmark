@@ -69,3 +69,9 @@ benchmark-go-attribution
 !/results/compact-full-history/runs.csv
 !/results/compact-full-history/subset.csv
 !/results/compact-full-history/**/metrics-run-*.csv
+
+# Country rerun evidence; keep generated attribution outputs local.
+!/results/country-worker-stages/
+/results/country-worker-stages/**
+!/results/country-worker-stages/*.json
+!/results/country-worker-stages/*.csv

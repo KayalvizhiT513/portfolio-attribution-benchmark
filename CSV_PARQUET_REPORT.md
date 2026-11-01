@@ -1,6 +1,6 @@
 # CSV vs Parquet: Go and Rust
 
-Both engines use their date-cache follow-up measurements: Country is the median of three CSV/Parquet pairs per engine; each other scenario uses one pair. Rust and Go were measured in separate sessions.
+Country uses the latest rerun when available: three runs per engine/format with separate index and portfolio stage timers. Other scenarios retain their date-cache follow-up runs. The latest country runs alternate format and engine order and execute sequentially.
 Updated with date caches in both Rust and Go.
 
 Parquet/CSV total wall-time ratio across the five scenarios: Rust **1.15×**, Go **0.73×** (below 1 means Parquet was faster for the displayed results).
@@ -12,7 +12,7 @@ Country cells are three-run medians for both engines; other cells are single run
 | Scenario | Output rows | CSV Rust | CSV Go | Parquet Rust | Parquet Go |
 |---|---:|---:|---:|---:|---:|
 | Security | 318,000 | 14.22 | 23.91 | 16.77 | 17.47 |
-| Country | 2,190 | 13.07 | 23.22 | 14.78 | 16.77 |
+| Country | 2,190 | 13.43 | 22.98 | 14.94 | 16.64 |
 | Weekly | 316 | 14.45 | 24.16 | 16.74 | 17.42 |
 | Monthly | 72 | 14.10 | 23.75 | 16.37 | 17.46 |
 | Subset | 602 | 13.88 | 23.06 | 15.62 | 16.79 |
@@ -21,8 +21,8 @@ Country cells are three-run medians for both engines; other cells are single run
 
 | Engine | CSV CPU s¹ | Parquet CPU s¹ | CSV max memory MiB² | Parquet max memory MiB² |
 |---|---:|---:|---:|---:|
-| Rust | 120.04 | 118.47 | 70.81 | 146.95 |
-| Go | 215.30 | 180.15 | 163.36 | 261.39 |
+| Rust | 120.34 | 118.71 | 70.81 | 146.95 |
+| Go | 214.91 | 179.68 | 163.36 | 261.39 |
 
 ¹ Sum of the displayed scenario CPU values; Country uses three-run medians for both engines. ² Highest memory use observed, including repeats.
 
@@ -30,9 +30,11 @@ Checks: the updated Rust and Go outputs each passed 35 comparisons against the o
 
 Subset: 400 IDs—200 portfolio-only US, 100 index-only US, 100 shared DE; 300 held IDs × 2 + 2 residual rows = 602. Country: US-filtered, separately normalized daily attribution.
 
-Latest Rust Country pairs alternate CSV/Parquet order over three pairs; other Rust scenarios have one fresh pair. Go also uses three alternating country pairs and one fresh pair per other scenario. All used normal filesystem caching. Total runtime includes setup, reading, calculation and saving the finished output.
+Country uses the latest three-run-per-format worker-timing rerun, alternating format and engine order. Other scenarios retain one date-cache follow-up pair per engine. All used normal filesystem caching. Total runtime includes setup, reading, calculation and saving the finished output.
 
 [Raw runs and stage metrics](results/csv-parquet-native-output/runs.csv) · [Validation](results/csv-parquet-native-output/checks.json) · [Environment](results/csv-parquet-native-output/environment.json)
+
+Latest country worker-timing rerun: 12 complete runs and 24 passed reference-output comparisons. [Measurements](results/country-worker-stages/runs.csv) · [Checks](results/country-worker-stages/checks.json).
 
 Latest measurements: [Rust](results/rust-date-cache/runs.csv) · [Go](results/go-date-cache/runs.csv). Detailed diagnostics: [Go read report](GO_DATE_READ_REPORT.md).
 ## Country Parquet: read-time split
@@ -137,29 +139,32 @@ Go `pqarrow` uses `Parallel=false` only for decoding columns within each individ
 
 Each scenario has the same layout: a timing table, its supporting numbers, then the next input format. Read down to follow the steps; compare Rust and Go across the row.
 
-All visible timing columns use elapsed clock seconds. Only whole-run elapsed time was recorded; stage rows describe the work without showing accumulated worker times.
+Country shows separate elapsed stage times for the index and portfolio workers from the latest rerun. Whole-run elapsed time is shown separately. Other scenarios retain processing descriptions until their worker timings are rerun. Combined worker measurements remain in expandable details.
 
-Both engines use their date-cache follow-up measurements: Country is the median of three CSV/Parquet pairs per engine; each other scenario uses one pair. Rust and Go were measured in separate sessions.
+Country uses the latest rerun when available: three runs per engine/format with separate index and portfolio stage timers. Other scenarios retain their date-cache follow-up runs. The latest country runs alternate format and engine order and execute sequentially.
 
 ### Security
 
 #### CSV input → CSV output
 
-| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
-|---|---|---:|---:|
-| Read | Read and check CSV records. | — | — |
-| Filter | Keep all holdings; total the weights on each side. | — | — |
-| Prepare / group | Scale each side’s weights to 100%; line up matching security IDs. | — | — |
-| Calculate | Calculate BF effects and contributions for every security over the full period. | — | — |
-| Write | Save the CSV report to disk. | — | — |
-| **Whole run** | Elapsed time from start to finish. | 14.222 | 23.915 |
+| Measurement | Rust elapsed seconds | Go elapsed seconds |
+|---|---:|---:|
+| Whole run | 14.222 | 23.915 |
 
-— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+| Step | Work done |
+|---|---|
+| Read | Read and check CSV records. |
+| Filter | Keep all holdings; total the weights on each side. |
+| Prepare / group | Scale each side’s weights to 100%; line up matching security IDs. |
+| Calculate | Calculate BF effects and contributions for every security over the full period. |
+| Write | Save the CSV report to disk. |
+
+Elapsed times for individual stages were not recorded. Accumulated worker measurements are in the expandable details.
 
 <details>
-<summary>Worker times, counts, throughput, and memory — Security, CSV</summary>
+<summary>Counts, throughput, and memory — Security, CSV</summary>
 
-Steps appear in the same order as the timing table. Rates use the time spent in that step.
+Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
@@ -183,27 +188,30 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 | Whole run | Total CPU time (seconds) | 24.898769 | 44.279602 |
 | Whole run | Average CPU cores used | 1.751 | 1.852 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Both engines report country medians and an observed runtime range from three runs; other scenarios use one run. Memory shows the highest observed peak.
 
 </details>
 
 #### PARQUET input → PARQUET output
 
-| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
-|---|---|---:|---:|
-| Read | Read and decode Parquet batches. | — | — |
-| Filter | Keep all holdings; total the weights on each side. | — | — |
-| Prepare / group | Scale each side’s weights to 100%; line up matching security IDs. | — | — |
-| Calculate | Calculate BF effects and contributions for every security over the full period. | — | — |
-| Write | Save the PARQUET report to disk. | — | — |
-| **Whole run** | Elapsed time from start to finish. | 16.773 | 17.468 |
+| Measurement | Rust elapsed seconds | Go elapsed seconds |
+|---|---:|---:|
+| Whole run | 16.773 | 17.468 |
 
-— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+| Step | Work done |
+|---|---|
+| Read | Read and decode Parquet batches. |
+| Filter | Keep all holdings; total the weights on each side. |
+| Prepare / group | Scale each side’s weights to 100%; line up matching security IDs. |
+| Calculate | Calculate BF effects and contributions for every security over the full period. |
+| Write | Save the PARQUET report to disk. |
+
+Elapsed times for individual stages were not recorded. Accumulated worker measurements are in the expandable details.
 
 <details>
-<summary>Worker times, counts, throughput, and memory — Security, PARQUET</summary>
+<summary>Counts, throughput, and memory — Security, PARQUET</summary>
 
-Steps appear in the same order as the timing table. Rates use the time spent in that step.
+Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
@@ -227,7 +235,7 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 | Whole run | Total CPU time (seconds) | 24.825229 | 36.671846 |
 | Whole run | Average CPU cores used | 1.480 | 2.099 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Both engines report country medians and an observed runtime range from three runs; other scenarios use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -242,89 +250,99 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### CSV input → CSV output
 
-| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
-|---|---|---:|---:|
-| Read | Read and check CSV records. | — | — |
-| Filter | Keep US holdings in the portfolio and index. | — | — |
-| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | — | — |
-| Calculate | Calculate the US group’s BF effects and contributions for each date. | — | — |
-| Write | Save the CSV report to disk. | — | — |
-| **Whole run** | Elapsed time from start to finish. | 13.067 | 23.218 |
+| Measurement | Rust elapsed seconds | Go elapsed seconds |
+|---|---:|---:|
+| Whole run | 13.430 | 22.980 |
 
-— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+| Step | Work done | Rust index seconds | Rust portfolio seconds | Go index seconds | Go portfolio seconds |
+|---|---|---:|---:|---:|---:|
+| Read | Read and check CSV records. | 12.933 | 8.901 | 22.482 | 15.927 |
+| Filter | Keep US holdings in the portfolio and index. | 0.121 | 0.103 | 0.210 | 0.138 |
+| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | 0.092 | 0.070 | 0.195 | 0.119 |
+| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000000 | 0.000766 | 0.000000 | 0.000838 |
+| Write | Save the CSV report to disk. | 0.000000 | 0.012 | 0.000000 | 0.010 |
+
+All numbers are elapsed clock seconds; each stage adds its repeated calls within one worker only. Index and portfolio workers overlap, so do not add their columns. Channel waits and setup are outside these stage timers. The index worker does no BF calculation or report writing. Each cell is the median of three runs; whole-run values are measured independently.
+
+[Latest country measurements](results/country-worker-stages/runs.csv) · [Output checks](results/country-worker-stages/checks.json)
 
 <details>
-<summary>Worker times, counts, throughput, and memory — Country, CSV</summary>
+<summary>Counts, throughput, and memory — Country, CSV</summary>
 
-Steps appear in the same order as the timing table. Rates use the time spent in that step.
+Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
-| Read | Million rows read per second | 8.059 | 4.513 |
-| Read | CSV bytes parsed per second (MiB) | 553.706 | 310.065 |
-| Read | Stored file size / read time (MiB/sec) | 553.854 | 310.148 |
+| Read | Million rows read per second | 8.024 | 4.561 |
+| Read | CSV bytes parsed per second (MiB) | 551.294 | 313.387 |
+| Read | Stored file size / read time (MiB/sec) | 551.441 | 313.471 |
 | Filter | Rows checked | 175,200,000 | 175,200,000 |
 | Filter | Rows kept | 173,010,000 | 173,010,000 |
-| Prepare / group | Rows prepared per second | 1,026,188,197.043 | 559,628,419.409 |
+| Prepare / group | Rows prepared per second | 1,064,181,171.822 | 553,287,476.298 |
 | Prepare / group | Groups prepared across dates, counting portfolio and index separately | 2,190 | 2,190 |
 | Calculate | Daily BF effect values calculated | 6,570 | 6,570 |
-| Calculate | Daily BF effect values per second | 7,049,325.969 | 8,023,741.482 |
-| Calculate | Final BF effect values / calculation time | 7,049,325.969 | 8,023,741.482 |
+| Calculate | Daily BF effect values per second | 8,577,706.580 | 7,843,989.379 |
+| Calculate | Final BF effect values / calculation time | 8,577,706.580 | 7,843,989.379 |
 | Calculate | Report rows | 2,190 | 2,190 |
-| Write | Report rows written per second | 195,566.306 | 242,016.628 |
-| Write | Output written per second (MiB) | 60.453 | 74.291 |
+| Write | Report rows written per second | 181,655.408 | 216,898.063 |
+| Write | Output written per second (MiB) | 56.153 | 66.580 |
 | Write | Report rows written | 2,190 | 2,190 |
 | Write | Output file size (MB) | 0.709851 | 0.704911 |
-| Whole run | Runtime range across repeat runs | 12.982–13.283 | 22.114–23.246 |
-| Whole run | Highest memory use (MiB) | 40.250 | 76.344 |
-| Whole run | Total CPU time (seconds) | 22.089002 | 40.954650 |
-| Whole run | Average CPU cores used | 1.677 | 1.770 |
+| Whole run | Runtime range across repeat runs | 13.393–15.862 | 22.903–23.526 |
+| Whole run | Highest memory use (MiB) | 42.797 | 76.672 |
+| Whole run | Total CPU time (seconds) | 22.394922 | 40.567501 |
+| Whole run | Average CPU cores used | 1.672 | 1.761 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Both engines report country medians and an observed runtime range from three runs; other scenarios use one run. Memory shows the highest observed peak.
 
 </details>
 
 #### PARQUET input → PARQUET output
 
-| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
-|---|---|---:|---:|
-| Read | Read and decode Parquet batches. | — | — |
-| Filter | Keep US holdings in the portfolio and index. | — | — |
-| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | — | — |
-| Calculate | Calculate the US group’s BF effects and contributions for each date. | — | — |
-| Write | Save the PARQUET report to disk. | — | — |
-| **Whole run** | Elapsed time from start to finish. | 14.776 | 16.772 |
+| Measurement | Rust elapsed seconds | Go elapsed seconds |
+|---|---:|---:|
+| Whole run | 14.945 | 16.636 |
 
-— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+| Step | Work done | Rust index seconds | Rust portfolio seconds | Go index seconds | Go portfolio seconds |
+|---|---|---:|---:|---:|---:|
+| Read | Read and decode Parquet batches. | 14.646 | 9.055 | 16.176 | 10.363 |
+| Filter | Keep US holdings in the portfolio and index. | 0.121 | 0.103 | 0.212 | 0.141 |
+| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | 0.124 | 0.061 | 0.197 | 0.119 |
+| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000000 | 0.000734 | 0.000000 | 0.000834 |
+| Write | Save the PARQUET report to disk. | 0.000000 | 0.009 | 0.000000 | 0.013 |
+
+All numbers are elapsed clock seconds; each stage adds its repeated calls within one worker only. Index and portfolio workers overlap, so do not add their columns. Channel waits and setup are outside these stage timers. The index worker does no BF calculation or report writing. Each cell is the median of three runs; whole-run values are measured independently.
+
+[Latest country measurements](results/country-worker-stages/runs.csv) · [Output checks](results/country-worker-stages/checks.json)
 
 <details>
-<summary>Worker times, counts, throughput, and memory — Country, PARQUET</summary>
+<summary>Counts, throughput, and memory — Country, PARQUET</summary>
 
-Steps appear in the same order as the timing table. Rates use the time spent in that step.
+Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
-| Read | Million rows read per second | 7.461 | 6.507 |
+| Read | Million rows read per second | 7.392 | 6.602 |
 | Read | CSV bytes parsed per second (MiB) | N/A (no parsed-byte counter) | N/A (no parsed-byte counter) |
-| Read | Stored file size / read time (MiB/sec) | 215.844 | 188.235 |
+| Read | Stored file size / read time (MiB/sec) | 213.841 | 190.975 |
 | Filter | Rows checked | 175,200,000 | 175,200,000 |
 | Filter | Rows kept | 173,010,000 | 173,010,000 |
-| Prepare / group | Rows prepared per second | 1,073,595,961.924 | 552,975,327.200 |
+| Prepare / group | Rows prepared per second | 938,202,462.215 | 549,213,398.071 |
 | Prepare / group | Groups prepared across dates, counting portfolio and index separately | 2,190 | 2,190 |
 | Calculate | Daily BF effect values calculated | 6,570 | 6,570 |
-| Calculate | Daily BF effect values per second | 8,170,656.028 | 8,093,186.202 |
-| Calculate | Final BF effect values / calculation time | 8,170,656.028 | 8,093,186.202 |
+| Calculate | Daily BF effect values per second | 8,955,699.955 | 7,878,434.674 |
+| Calculate | Final BF effect values / calculation time | 8,955,699.955 | 7,878,434.674 |
 | Calculate | Report rows | 2,190 | 2,190 |
-| Write | Report rows written per second | 293,929.589 | 191,744.867 |
-| Write | Output written per second (MiB) | 26.560 | 17.704 |
+| Write | Report rows written per second | 242,054.318 | 175,071.316 |
+| Write | Output written per second (MiB) | 21.873 | 16.164 |
 | Write | Report rows written | 2,190 | 2,190 |
 | Write | Output file size (MB) | 0.207507 | 0.212026 |
-| Whole run | Runtime range across repeat runs | 12.868–15.090 | 16.637–17.046 |
-| Whole run | Highest memory use (MiB) | 110.000 | 206.281 |
-| Whole run | Total CPU time (seconds) | 21.285223 | 34.304759 |
-| Whole run | Average CPU cores used | 1.447 | 2.043 |
+| Whole run | Runtime range across repeat runs | 13.181–15.069 | 16.475–16.750 |
+| Whole run | Highest memory use (MiB) | 105.812 | 205.578 |
+| Whole run | Total CPU time (seconds) | 21.528375 | 33.832283 |
+| Whole run | Average CPU cores used | 1.446 | 2.034 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Both engines report country medians and an observed runtime range from three runs; other scenarios use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -339,21 +357,24 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### CSV input → CSV output
 
-| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
-|---|---|---:|---:|
-| Read | Read and check CSV records. | — | — |
-| Filter | Keep all holdings; total the weights on each side. | — | — |
-| Prepare / group | Prepare weights and matching security IDs for each day. | — | — |
-| Calculate | Add security results to portfolio totals, then combine them by week. | — | — |
-| Write | Save the CSV report to disk. | — | — |
-| **Whole run** | Elapsed time from start to finish. | 14.446 | 24.163 |
+| Measurement | Rust elapsed seconds | Go elapsed seconds |
+|---|---:|---:|
+| Whole run | 14.446 | 24.163 |
 
-— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+| Step | Work done |
+|---|---|
+| Read | Read and check CSV records. |
+| Filter | Keep all holdings; total the weights on each side. |
+| Prepare / group | Prepare weights and matching security IDs for each day. |
+| Calculate | Add security results to portfolio totals, then combine them by week. |
+| Write | Save the CSV report to disk. |
+
+Elapsed times for individual stages were not recorded. Accumulated worker measurements are in the expandable details.
 
 <details>
-<summary>Worker times, counts, throughput, and memory — Weekly, CSV</summary>
+<summary>Counts, throughput, and memory — Weekly, CSV</summary>
 
-Steps appear in the same order as the timing table. Rates use the time spent in that step.
+Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
@@ -377,27 +398,30 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 | Whole run | Total CPU time (seconds) | 25.424049 | 45.031998 |
 | Whole run | Average CPU cores used | 1.760 | 1.864 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Both engines report country medians and an observed runtime range from three runs; other scenarios use one run. Memory shows the highest observed peak.
 
 </details>
 
 #### PARQUET input → PARQUET output
 
-| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
-|---|---|---:|---:|
-| Read | Read and decode Parquet batches. | — | — |
-| Filter | Keep all holdings; total the weights on each side. | — | — |
-| Prepare / group | Prepare weights and matching security IDs for each day. | — | — |
-| Calculate | Add security results to portfolio totals, then combine them by week. | — | — |
-| Write | Save the PARQUET report to disk. | — | — |
-| **Whole run** | Elapsed time from start to finish. | 16.744 | 17.420 |
+| Measurement | Rust elapsed seconds | Go elapsed seconds |
+|---|---:|---:|
+| Whole run | 16.744 | 17.420 |
 
-— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+| Step | Work done |
+|---|---|
+| Read | Read and decode Parquet batches. |
+| Filter | Keep all holdings; total the weights on each side. |
+| Prepare / group | Prepare weights and matching security IDs for each day. |
+| Calculate | Add security results to portfolio totals, then combine them by week. |
+| Write | Save the PARQUET report to disk. |
+
+Elapsed times for individual stages were not recorded. Accumulated worker measurements are in the expandable details.
 
 <details>
-<summary>Worker times, counts, throughput, and memory — Weekly, PARQUET</summary>
+<summary>Counts, throughput, and memory — Weekly, PARQUET</summary>
 
-Steps appear in the same order as the timing table. Rates use the time spent in that step.
+Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
@@ -421,7 +445,7 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 | Whole run | Total CPU time (seconds) | 25.186351 | 37.510574 |
 | Whole run | Average CPU cores used | 1.504 | 2.153 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Both engines report country medians and an observed runtime range from three runs; other scenarios use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -436,21 +460,24 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### CSV input → CSV output
 
-| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
-|---|---|---:|---:|
-| Read | Read and check CSV records. | — | — |
-| Filter | Keep all holdings; total the weights on each side. | — | — |
-| Prepare / group | Prepare weights and matching security IDs for each day. | — | — |
-| Calculate | Add security results to portfolio totals, then combine them by month. | — | — |
-| Write | Save the CSV report to disk. | — | — |
-| **Whole run** | Elapsed time from start to finish. | 14.096 | 23.751 |
+| Measurement | Rust elapsed seconds | Go elapsed seconds |
+|---|---:|---:|
+| Whole run | 14.096 | 23.751 |
 
-— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+| Step | Work done |
+|---|---|
+| Read | Read and check CSV records. |
+| Filter | Keep all holdings; total the weights on each side. |
+| Prepare / group | Prepare weights and matching security IDs for each day. |
+| Calculate | Add security results to portfolio totals, then combine them by month. |
+| Write | Save the CSV report to disk. |
+
+Elapsed times for individual stages were not recorded. Accumulated worker measurements are in the expandable details.
 
 <details>
-<summary>Worker times, counts, throughput, and memory — Monthly, CSV</summary>
+<summary>Counts, throughput, and memory — Monthly, CSV</summary>
 
-Steps appear in the same order as the timing table. Rates use the time spent in that step.
+Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
@@ -474,27 +501,30 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 | Whole run | Total CPU time (seconds) | 24.406038 | 44.377285 |
 | Whole run | Average CPU cores used | 1.731 | 1.868 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Both engines report country medians and an observed runtime range from three runs; other scenarios use one run. Memory shows the highest observed peak.
 
 </details>
 
 #### PARQUET input → PARQUET output
 
-| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
-|---|---|---:|---:|
-| Read | Read and decode Parquet batches. | — | — |
-| Filter | Keep all holdings; total the weights on each side. | — | — |
-| Prepare / group | Prepare weights and matching security IDs for each day. | — | — |
-| Calculate | Add security results to portfolio totals, then combine them by month. | — | — |
-| Write | Save the PARQUET report to disk. | — | — |
-| **Whole run** | Elapsed time from start to finish. | 16.366 | 17.464 |
+| Measurement | Rust elapsed seconds | Go elapsed seconds |
+|---|---:|---:|
+| Whole run | 16.366 | 17.464 |
 
-— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+| Step | Work done |
+|---|---|
+| Read | Read and decode Parquet batches. |
+| Filter | Keep all holdings; total the weights on each side. |
+| Prepare / group | Prepare weights and matching security IDs for each day. |
+| Calculate | Add security results to portfolio totals, then combine them by month. |
+| Write | Save the PARQUET report to disk. |
+
+Elapsed times for individual stages were not recorded. Accumulated worker measurements are in the expandable details.
 
 <details>
-<summary>Worker times, counts, throughput, and memory — Monthly, PARQUET</summary>
+<summary>Counts, throughput, and memory — Monthly, PARQUET</summary>
 
-Steps appear in the same order as the timing table. Rates use the time spent in that step.
+Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
@@ -518,7 +548,7 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 | Whole run | Total CPU time (seconds) | 24.672630 | 37.537981 |
 | Whole run | Average CPU cores used | 1.508 | 2.149 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Both engines report country medians and an observed runtime range from three runs; other scenarios use one run. Memory shows the highest observed peak.
 
 </details>
 
@@ -533,21 +563,24 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### CSV input → CSV output
 
-| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
-|---|---|---:|---:|
-| Read | Read and check CSV records. | — | — |
-| Filter | Keep the 400 selected IDs on both sides. | — | — |
-| Prepare / group | Scale selected weights to 100% on each side; line up selected IDs. | — | — |
-| Calculate | Calculate selected-security results; combine index-only results into one summary. | — | — |
-| Write | Save the CSV report to disk. | — | — |
-| **Whole run** | Elapsed time from start to finish. | 13.883 | 23.058 |
+| Measurement | Rust elapsed seconds | Go elapsed seconds |
+|---|---:|---:|
+| Whole run | 13.883 | 23.058 |
 
-— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+| Step | Work done |
+|---|---|
+| Read | Read and check CSV records. |
+| Filter | Keep the 400 selected IDs on both sides. |
+| Prepare / group | Scale selected weights to 100% on each side; line up selected IDs. |
+| Calculate | Calculate selected-security results; combine index-only results into one summary. |
+| Write | Save the CSV report to disk. |
+
+Elapsed times for individual stages were not recorded. Accumulated worker measurements are in the expandable details.
 
 <details>
-<summary>Worker times, counts, throughput, and memory — Subset, CSV</summary>
+<summary>Counts, throughput, and memory — Subset, CSV</summary>
 
-Steps appear in the same order as the timing table. Rates use the time spent in that step.
+Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
@@ -571,27 +604,30 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 | Whole run | Total CPU time (seconds) | 23.218193 | 40.652325 |
 | Whole run | Average CPU cores used | 1.672 | 1.763 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Both engines report country medians and an observed runtime range from three runs; other scenarios use one run. Memory shows the highest observed peak.
 
 </details>
 
 #### PARQUET input → PARQUET output
 
-| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
-|---|---|---:|---:|
-| Read | Read and decode Parquet batches. | — | — |
-| Filter | Keep the 400 selected IDs on both sides. | — | — |
-| Prepare / group | Scale selected weights to 100% on each side; line up selected IDs. | — | — |
-| Calculate | Calculate selected-security results; combine index-only results into one summary. | — | — |
-| Write | Save the PARQUET report to disk. | — | — |
-| **Whole run** | Elapsed time from start to finish. | 15.618 | 16.787 |
+| Measurement | Rust elapsed seconds | Go elapsed seconds |
+|---|---:|---:|
+| Whole run | 15.618 | 16.787 |
 
-— = elapsed stage time was not recorded. Existing stage measurements add worker times and are available in the expandable details; they cannot be converted into elapsed stage times.
+| Step | Work done |
+|---|---|
+| Read | Read and decode Parquet batches. |
+| Filter | Keep the 400 selected IDs on both sides. |
+| Prepare / group | Scale selected weights to 100% on each side; line up selected IDs. |
+| Calculate | Calculate selected-security results; combine index-only results into one summary. |
+| Write | Save the PARQUET report to disk. |
+
+Elapsed times for individual stages were not recorded. Accumulated worker measurements are in the expandable details.
 
 <details>
-<summary>Worker times, counts, throughput, and memory — Subset, PARQUET</summary>
+<summary>Counts, throughput, and memory — Subset, PARQUET</summary>
 
-Steps appear in the same order as the timing table. Rates use the time spent in that step.
+Steps follow the timing table. Throughput rates use combined index and portfolio stage time; this denominator counts overlapping worker time.
 
 | Step | Supporting metric | Rust | Go |
 |---|---|---:|---:|
@@ -615,7 +651,7 @@ Steps appear in the same order as the timing table. Rates use the time spent in 
 | Whole run | Total CPU time (seconds) | 22.498215 | 34.127748 |
 | Whole run | Average CPU cores used | 1.441 | 2.033 |
 
-MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Rust Country reports medians and an observed runtime range from three runs; other cells use one run. Memory shows the highest observed peak.
+MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size, not measured disk traffic. Parquet has no parsed-text byte count. BF value counts exclude contribution columns. Both engines report country medians and an observed runtime range from three runs; other scenarios use one run. Memory shows the highest observed peak.
 
 </details>
 
