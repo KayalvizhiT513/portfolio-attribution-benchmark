@@ -6,6 +6,8 @@ Both implementations stream CSV or Parquet inputs, calculate and link attributio
 history with the 60,000-security portfolio, security outer-join detail, US daily
 country attribution and contribution columns. Updated as the measurements finish.
 
+[Country-only report](COUNTRY_REPORT.md) — daily US results, stage times, supporting metrics and flow diagram.
+
 Historical benchmark counts below describe the original four-portfolio fixture.
 Current CSV and Parquet inputs both use the merged portfolio described below.
 See [current scenario row counts](docs/OUTPUT_ROW_COUNTS.md), including daily

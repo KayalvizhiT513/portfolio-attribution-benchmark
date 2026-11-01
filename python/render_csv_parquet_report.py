@@ -306,6 +306,8 @@ def main():
         sections += ['<details>', f'<summary>View the {scenario} flow diagram</summary>', '',
                      f'[![{scenario.capitalize()} — CSV/Parquet and Rust/Go flow]({path})]({path})', '', '</details>', '']
     benchmark.REPORT.write_text(benchmark.REPORT.read_text() + '\n'.join(sections))
+    from render_country_report import main as render_country
+    render_country()
     print(f'Updated {benchmark.REPORT}; generated 5 scenario flow SVGs with separate input paths and Rust/Go timings in {DEST}')
 
 
