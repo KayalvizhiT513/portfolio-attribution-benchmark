@@ -1,4 +1,4 @@
-"""Update COUNTRY_REPORT.md from recorded runs without creating per-run reports.
+"""Update COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md from recorded runs without creating per-run reports.
 
 The existing report embeds its four selected metrics paths. A partial-format
 benchmark replaces only that format after both engines finish successfully.
@@ -11,7 +11,7 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-REPORT = ROOT/'COUNTRY_REPORT.md'
+REPORT = ROOT/'COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md'
 BOOTSTRAP = {
     'csv/rust':'results/country-runtime-2026-11-02/csv/rust/metrics.csv',
     'csv/go':'results/country-runtime-2026-11-02/csv/go/metrics.csv',
@@ -72,7 +72,7 @@ def update_report(root=None,runs=None,report_path=REPORT):
                 raise ValueError('Update the country report only after both engines finish for each requested format')
         for row in runs:
             if row['format'] not in {'csv','parquet'} or row['scenario']!='country':
-                raise ValueError('Only daily country CSV/Parquet runs belong in COUNTRY_REPORT.md')
+                raise ValueError('Only daily country CSV/Parquet runs belong in COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md')
             sources[f"{row['format']}/{row['language']}"]=relative(Path(root)/row['format']/row['language']/'metrics.csv')
     columns=[(fmt,lang) for fmt in ['csv','parquet'] for lang in ['rust','go']]
     rows={key:read_run(sources['/'.join(key)],*key) for key in columns}
@@ -88,7 +88,7 @@ def update_report(root=None,runs=None,report_path=REPORT):
             lines.append('| '+label+' | '+' | '.join(format(value(rows[key]),pattern) for key in columns)+' |')
         return lines+['']
 
-    lines=['# Country attribution performance: optimized CSV and Parquet in Rust and Go','',
+    lines=['# Country attribution with an effective-dated SMF: optimized CSV and Parquet in Rust and Go','',
         '**Current report for the daily US-only country scenario, updated 2 November 2026.** This file contains the results, optimization history, timing definitions, calculation flow and evidence links. Per-run folders retain raw metrics and validation records, not separate narrative reports.','',
         '## Latest recorded optimized runtimes','',
         '| Input → output | Rust elapsed seconds | Go elapsed seconds | Output rows per engine |',
@@ -97,6 +97,11 @@ def update_report(root=None,runs=None,report_path=REPORT):
         lines.append(f"| {fmt.upper()} → {fmt.upper()} | {float(rows[fmt,'rust']['wall_seconds']):.3f} | {float(rows[fmt,'go']['wall_seconds']):.3f} | 2,190 |")
     lines+=['',
         'CSV values are the latest fully instrumented CSV range runs; Parquet values are the later row-group range runs. The formats were measured in separate batches. Each value is one complete release-build run with normal filesystem caching, not a repeated-run median or a controlled cold-cache measurement. All selected runs omit `--threads`; detected parallelism, worker counts and task counts are recorded below.','',
+        '## Main optimization after adding the effective-dated SMF','',
+        '**SMF means security master file.** This report measures the workload after adding `EffectiveDate` to `security_master.csv`: 36 monthly records per instrument, with the latest record effective on or before each holding date used for classification. The master is loaded once and shared read-only; SMF loading itself has not been parallelized.','',
+        '**The largest demonstrated optimization in this workload is concurrent processing of independent complete-date ranges.** Merely allowing more CPU cores did not create more parallel work in the original index/portfolio pipeline. The date-range pool parallelizes holdings reading/decoding, effective-date country lookup, filtering and aggregation. Ordered collection and writing preserve daily calculation results.','',
+        'The confirmed CSV range runs improved Rust by **1.70×** and Go by **2.43×** against their automatic-setting streaming baselines. The fully instrumented Parquet range runs improved Rust by **4.61×** and Go by **3.92×**. CSV confirmation timings and later instrumented timings are recorded separately below. These are combined pipeline changes, not isolated measurements of concurrency alone or of the cost of adding the SMF.','',
+        'Parquet also benefits from metadata-only range planning; CSV still scans holdings to discover date boundaries. Concurrency uses more buffers and raises peak memory. These conclusions apply to the recorded workload; other possible optimizations have not all been evaluated.','',
         '## Dataset and calculation scope','',
         '- 1,095 dates: 1 January 2023 through 30 December 2025.',
         '- One 60,000-security portfolio and a 100,000-security index per date: 175,200,000 total holdings rows.',
@@ -199,7 +204,7 @@ def update_report(root=None,runs=None,report_path=REPORT):
     lines+=['',
         '## Reproduce or refresh this report','',
         '```sh\ncargo build --release --manifest-path rust/Cargo.toml\ngo -C go build -trimpath -ldflags=\'-s -w\' -o ../benchmark-go-attribution ./cmd/attribution\n.venv/bin/python python/benchmark_country_runtime.py --output-dir results/new-country-run\n```','',
-        'Choose a new raw-results directory. The benchmark records metrics/usage/checks, then updates **this existing `COUNTRY_REPORT.md` only after both engines complete and validate for every requested format**. A Parquet-only run (`--formats parquet`) replaces the two Parquet selections and retains the recorded CSV selections. It does not generate another Markdown report.','',
+        'Choose a new raw-results directory. The benchmark records metrics/usage/checks, then updates **this existing `COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md` only after both engines complete and validate for every requested format**. A Parquet-only run (`--formats parquet`) replaces the two Parquet selections and retains the recorded CSV selections. It does not generate another Markdown report.','',
         'To rebuild the report from its selected evidence without rerunning benchmarks:','',
         '```sh\npython3 python/render_country_report.py\n```','',
         '## Archived experiments with different scope','',

@@ -4,7 +4,7 @@ Go and Rust implement attribution from CSV or typed Arrow/Parquet inputs. Python
 
 ## Reports
 
-- [Current country attribution performance: optimized CSV and Parquet in Rust and Go](COUNTRY_REPORT.md) — the single country report, including latest runtimes, whole-run phases, worker stages, memory, calculation flow, optimization history and raw evidence links. Future country runs update this file in place.
+- [Current country attribution with an effective-dated SMF: optimized CSV and Parquet](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md) — the single country report, including latest runtimes, whole-run phases, worker stages, memory, calculation flow, optimization history and raw evidence links. Future country runs update this file in place.
 - [Historical CSV/Parquet benchmarks across five attribution scenarios](CSV_PARQUET_REPORT.md) — earlier measurements before the effective-dated master and complete-date worker pools.
 - [Historical attribution stage benchmarks with four portfolios](ATTRIBUTION_STAGE_COMPARISON.md) — a different fixture and output contract.
 - [Archived Go date-cache, decoding and memory profiling](GO_DATE_READ_REPORT.md).
@@ -55,7 +55,7 @@ Omit `--threads` to use the machine's available parallelism. Go uses its runtime
 
 For daily country attribution, CSV files whose records fit on one physical line are partitioned at complete date boundaries. Parquet files with single-date row-group statistics are partitioned by row group, keeping adjacent groups for the same date together. A worker pool sized from available parallelism reads and aggregates independent ranges, then daily reports are reconciled and written in date order. Each date preserves its original instrument order. Metrics record `date_range_workers`, `date_range_tasks`, and `boundary_scan_seconds`; boundary discovery (CSV scanning or Parquet footer inspection) is included in read time and total runtime. The pool shares the immutable effective-dated master and retains only daily country aggregates.
 
-Multiline CSV, Parquet without metadata-proven single-date groups, and other scenarios use the streaming pipeline. In that path the setting controls Go's CPU parallelism and Rust's maximum concurrent portfolio workers, with a separate index producer. `--threads 1` selects streaming country execution for comparison. See [country optimization history and current results](COUNTRY_REPORT.md#optimization-history-and-baseline-comparisons). The [end-to-end SVG flowchart](docs/flows/country-parallel-end-to-end.svg) shows read units, filtering, aggregation, benchmark return selection, BF formulas and ordered output. Whole-run and worker-stage timings are in [COUNTRY_REPORT.md](COUNTRY_REPORT.md#whole-run-elapsed-phases-in-seconds).
+Multiline CSV, Parquet without metadata-proven single-date groups, and other scenarios use the streaming pipeline. In that path the setting controls Go's CPU parallelism and Rust's maximum concurrent portfolio workers, with a separate index producer. `--threads 1` selects streaming country execution for comparison. See [country optimization history and current results](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md#optimization-history-and-baseline-comparisons). The [end-to-end SVG flowchart](docs/flows/country-parallel-end-to-end.svg) shows read units, filtering, aggregation, benchmark return selection, BF formulas and ordered output. Whole-run and worker-stage timings are in [COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md#whole-run-elapsed-phases-in-seconds).
 
 Use a fresh `--output-dir` for another benchmark execution. Generated attribution CSVs remain local; metrics and reports are retained separately. Sources are in `python/`, `go/` and `rust/`; inputs are in `attribution_data/`.
 
@@ -136,12 +136,12 @@ To measure country runtime phases for both formats with the updated master:
 Use a new output directory. The script prepares and verifies an effective-dated
 Parquet master from CSV, links the existing Parquet holdings, runs each engine
 and format once without a thread override, and validates every report value.
-The benchmark updates the existing `COUNTRY_REPORT.md` after all requested runs
+The benchmark updates the existing `COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md` after all requested runs
 validate. It retains the other format’s selected measurements when using
 `--formats parquet` or `--formats csv`. Per-run directories contain raw metrics,
 usage and checks only; no additional Markdown report is created.
 
-To refresh `COUNTRY_REPORT.md` from recorded evidence without rerunning benchmarks:
+To refresh `COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md` from recorded evidence without rerunning benchmarks:
 
 ```sh
 python3 python/render_country_report.py

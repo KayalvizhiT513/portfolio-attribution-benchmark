@@ -30,7 +30,7 @@ def save(runs, checks, environment):
         values = [float(r[field]) for r in samples(scenario, fmt)]
         return statistics.median(values) if values else None
     def number(value): return '—' if value is None else f'{value:.3f}'
-    lines = ['# Archived Rust profiling: date caching and Parquet reads', '', 'Archived experiment; see [COUNTRY_REPORT.md](COUNTRY_REPORT.md) for the current optimized country measurements.', '',
+    lines = ['# Archived Rust profiling: date caching and Parquet reads', '', 'Archived experiment; see [COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md) for the current optimized country measurements.', '',
              f'Completed {len(runs)}/14 full-history runs. Only the Rust input date adapter changed; calculation, native output, batch size and worker settings are unchanged.', '',
              '## Fresh CSV vs Parquet', '',
              'Times below are medians. Country has three runs per format; other scenarios have one. Each run processes all 1,095 dates and 175,200,000 return records.', '',

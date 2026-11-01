@@ -1,6 +1,6 @@
 # Historical attribution stage benchmarks: five scenarios and four portfolios
 
-Archived experiment with a different dataset or execution path. See the [current country attribution performance report](COUNTRY_REPORT.md) for optimized CSV and Parquet results.
+Archived experiment with a different dataset or execution path. See the [current country attribution performance report](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md) for optimized CSV and Parquet results.
 
 All five scenarios process all **1,095 effective dates**, all four portfolios, and separate base/local returns. Calculation granularity is independent of report granularity. The report contains one section per scenario, comparing Rust and Go.
 

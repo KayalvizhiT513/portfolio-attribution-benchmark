@@ -1,6 +1,6 @@
 # Archived Rust profiling: date caching and Parquet reads
 
-Archived experiment with a different dataset or execution path. See the [current country attribution performance report](COUNTRY_REPORT.md) for optimized CSV and Parquet results.
+Archived experiment with a different dataset or execution path. See the [current country attribution performance report](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md) for optimized CSV and Parquet results.
 
 Completed 14/14 full-history runs. Only the Rust input date adapter changed; calculation, native output, batch size and worker settings are unchanged.
 

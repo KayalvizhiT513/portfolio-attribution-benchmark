@@ -1,4 +1,4 @@
-# Country attribution performance: optimized CSV and Parquet in Rust and Go
+# Country attribution with an effective-dated SMF: optimized CSV and Parquet in Rust and Go
 
 **Current report for the daily US-only country scenario, updated 2 November 2026.** This file contains the results, optimization history, timing definitions, calculation flow and evidence links. Per-run folders retain raw metrics and validation records, not separate narrative reports.
 
@@ -10,6 +10,16 @@
 | PARQUET → PARQUET | 7.894 | 10.575 | 2,190 |
 
 CSV values are the latest fully instrumented CSV range runs; Parquet values are the later row-group range runs. The formats were measured in separate batches. Each value is one complete release-build run with normal filesystem caching, not a repeated-run median or a controlled cold-cache measurement. All selected runs omit `--threads`; detected parallelism, worker counts and task counts are recorded below.
+
+## Main optimization after adding the effective-dated SMF
+
+**SMF means security master file.** This report measures the workload after adding `EffectiveDate` to `security_master.csv`: 36 monthly records per instrument, with the latest record effective on or before each holding date used for classification. The master is loaded once and shared read-only; SMF loading itself has not been parallelized.
+
+**The largest demonstrated optimization in this workload is concurrent processing of independent complete-date ranges.** Merely allowing more CPU cores did not create more parallel work in the original index/portfolio pipeline. The date-range pool parallelizes holdings reading/decoding, effective-date country lookup, filtering and aggregation. Ordered collection and writing preserve daily calculation results.
+
+The confirmed CSV range runs improved Rust by **1.70×** and Go by **2.43×** against their automatic-setting streaming baselines. The fully instrumented Parquet range runs improved Rust by **4.61×** and Go by **3.92×**. CSV confirmation timings and later instrumented timings are recorded separately below. These are combined pipeline changes, not isolated measurements of concurrency alone or of the cost of adding the SMF.
+
+Parquet also benefits from metadata-only range planning; CSV still scans holdings to discover date boundaries. Concurrency uses more buffers and raises peak memory. These conclusions apply to the recorded workload; other possible optimizations have not all been evaluated.
 
 ## Dataset and calculation scope
 
@@ -155,7 +165,7 @@ go -C go build -trimpath -ldflags='-s -w' -o ../benchmark-go-attribution ./cmd/a
 .venv/bin/python python/benchmark_country_runtime.py --output-dir results/new-country-run
 ```
 
-Choose a new raw-results directory. The benchmark records metrics/usage/checks, then updates **this existing `COUNTRY_REPORT.md` only after both engines complete and validate for every requested format**. A Parquet-only run (`--formats parquet`) replaces the two Parquet selections and retains the recorded CSV selections. It does not generate another Markdown report.
+Choose a new raw-results directory. The benchmark records metrics/usage/checks, then updates **this existing `COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md` only after both engines complete and validate for every requested format**. A Parquet-only run (`--formats parquet`) replaces the two Parquet selections and retains the recorded CSV selections. It does not generate another Markdown report.
 
 To rebuild the report from its selected evidence without rerunning benchmarks:
 

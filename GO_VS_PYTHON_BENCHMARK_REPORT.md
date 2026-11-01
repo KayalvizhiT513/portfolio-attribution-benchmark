@@ -1,6 +1,6 @@
 # Historical Go and Python benchmark: daily security attribution
 
-Archived experiment with a different dataset or execution path. See the [current country attribution performance report](COUNTRY_REPORT.md) for optimized CSV and Parquet results.
+Archived experiment with a different dataset or execution path. See the [current country attribution performance report](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md) for optimized CSV and Parquet results.
 ### Python / NumPy / Numba vs Go / Goroutines
 
 **Experiment:** security-level, daily synthetic allocation and selection effects  

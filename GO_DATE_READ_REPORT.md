@@ -1,6 +1,6 @@
 # Archived Go profiling: date caching, Arrow decoding and memory
 
-Archived experiment with a different dataset or execution path. See the [current country attribution performance report](COUNTRY_REPORT.md) for optimized CSV and Parquet results.
+Archived experiment with a different dataset or execution path. See the [current country attribution performance report](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md) for optimized CSV and Parquet results.
 
 Complete: 14/14 normal runs; 7/7 diagnostic runs. All use all 1,095 dates and four configured threads.
 
