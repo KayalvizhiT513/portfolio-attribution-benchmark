@@ -33,7 +33,7 @@ def main():
         lines[2:2] = [LATEST_NOTE, '']
         lines += [''] + country_read_split() + go_diagnostics_section()
     lines += ['', '## Elapsed time and processing steps', '',
-              'All timing columns below use elapsed clock seconds. Stage times are shown separately for the index and portfolio workers; whole-run time is measured independently.', '']
+              'Each timing column below sums to whole-run elapsed time. Overlapping index work is not counted twice.', '']
     for fmt in ['csv', 'parquet']:
         lines += [f'### {fmt.upper()} input → {fmt.upper()} output', '']
         lines += timing_table(rows, fmt, 'country')

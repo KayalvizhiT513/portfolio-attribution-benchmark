@@ -1,6 +1,6 @@
 # CSV vs Parquet: Go and Rust
 
-Country uses the latest rerun when available: three runs per engine/format with separate index and portfolio stage timers. Other scenarios retain their date-cache follow-up runs. The latest country runs alternate format and engine order and execute sequentially.
+Country uses the latest rerun: three runs per engine/format. Its elapsed-time breakdown uses one complete run per column, selected by the middle whole-run time; supporting metrics use medians. Other scenarios retain their date-cache follow-up runs. The latest country runs alternate format and engine order and execute sequentially.
 Updated with date caches in both Rust and Go.
 
 Parquet/CSV total wall-time ratio across the five scenarios: Rust **1.15×**, Go **0.73×** (below 1 means Parquet was faster for the displayed results).
@@ -139,9 +139,9 @@ Go `pqarrow` uses `Parallel=false` only for decoding columns within each individ
 
 Each scenario has the same layout: a timing table, its supporting numbers, then the next input format. Read down to follow the steps; compare Rust and Go across the row.
 
-Country shows separate elapsed stage times for the index and portfolio workers from the latest rerun. Whole-run elapsed time is shown separately. Other scenarios retain processing descriptions until their worker timings are rerun. Combined worker measurements remain in expandable details.
+Country shows an elapsed-time breakdown that sums to whole-run time, including setup, waiting and remaining work. Other scenarios retain processing descriptions until their worker timings are rerun. Combined worker measurements remain in expandable details.
 
-Country uses the latest rerun when available: three runs per engine/format with separate index and portfolio stage timers. Other scenarios retain their date-cache follow-up runs. The latest country runs alternate format and engine order and execute sequentially.
+Country uses the latest rerun: three runs per engine/format. Its elapsed-time breakdown uses one complete run per column, selected by the middle whole-run time; supporting metrics use medians. Other scenarios retain their date-cache follow-up runs. The latest country runs alternate format and engine order and execute sequentially.
 
 ### Security
 
@@ -250,19 +250,17 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### CSV input → CSV output
 
-| Measurement | Rust elapsed seconds | Go elapsed seconds |
-|---|---:|---:|
-| Whole run | 13.430 | 22.980 |
+| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
+|---|---|---:|---:|
+| Read | Read and check portfolio CSV records. | 9.245057 | 15.927452 |
+| Filter | Keep US portfolio holdings. | 0.103318 | 0.138032 |
+| Prepare / group | Scale portfolio US weights to 100% and combine their weighted returns into one US group. | 0.070083 | 0.116835 |
+| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000766 | 0.000832 |
+| Write | Save the CSV report to disk. | 0.011830 | 0.010097 |
+| Setup, waiting, and remaining work | Everything outside the timed portfolio stages, including waiting for index data, setup and shutdown; calculated as whole run minus the five stages. | 3.998659 | 6.786590 |
+| **Whole run** | **Sum of the six rows above.** | 13.429713 | 22.979838 |
 
-| Step | Work done | Rust index seconds | Rust portfolio seconds | Go index seconds | Go portfolio seconds |
-|---|---|---:|---:|---:|---:|
-| Read | Read and check CSV records. | 12.933 | 8.901 | 22.482 | 15.927 |
-| Filter | Keep US holdings in the portfolio and index. | 0.121 | 0.103 | 0.210 | 0.138 |
-| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | 0.092 | 0.070 | 0.195 | 0.119 |
-| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000000 | 0.000766 | 0.000000 | 0.000838 |
-| Write | Save the CSV report to disk. | 0.000000 | 0.012 | 0.000000 | 0.010 |
-
-All numbers are elapsed clock seconds; each stage adds its repeated calls within one worker only. Index and portfolio workers overlap, so do not add their columns. Channel waits and setup are outside these stage timers. The index worker does no BF calculation or report writing. Each cell is the median of three runs; whole-run values are measured independently.
+Each column sums to whole-run elapsed time. All values in a column come from the same run: the middle whole-run time of three repetitions. The five timed stages follow the portfolio worker; index preparation runs concurrently and is not added again. The remaining-time row is a subtraction, not a separately measured index-reading or waiting timer. Other supporting metrics retain three-run medians.
 
 [Latest country measurements](results/country-worker-stages/runs.csv) · [Output checks](results/country-worker-stages/checks.json)
 
@@ -299,19 +297,17 @@ MiB = 1,048,576 bytes; MB = 1,000,000 bytes. The stored-file rate uses file size
 
 #### PARQUET input → PARQUET output
 
-| Measurement | Rust elapsed seconds | Go elapsed seconds |
-|---|---:|---:|
-| Whole run | 14.945 | 16.636 |
+| Step | Work done | Rust elapsed seconds | Go elapsed seconds |
+|---|---|---:|---:|
+| Read | Read and decode portfolio Parquet batches. | 9.055367 | 10.362680 |
+| Filter | Keep US portfolio holdings. | 0.102618 | 0.137314 |
+| Prepare / group | Scale portfolio US weights to 100% and combine their weighted returns into one US group. | 0.061585 | 0.119112 |
+| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000734 | 0.000815 |
+| Write | Save the PARQUET report to disk. | 0.010223 | 0.011689 |
+| Setup, waiting, and remaining work | Everything outside the timed portfolio stages, including waiting for index data, setup and shutdown; calculated as whole run minus the five stages. | 5.714021 | 6.004804 |
+| **Whole run** | **Sum of the six rows above.** | 14.944548 | 16.636414 |
 
-| Step | Work done | Rust index seconds | Rust portfolio seconds | Go index seconds | Go portfolio seconds |
-|---|---|---:|---:|---:|---:|
-| Read | Read and decode Parquet batches. | 14.646 | 9.055 | 16.176 | 10.363 |
-| Filter | Keep US holdings in the portfolio and index. | 0.121 | 0.103 | 0.212 | 0.141 |
-| Prepare / group | Scale US weights to 100% on each side; add weighted returns into one US group. | 0.124 | 0.061 | 0.197 | 0.119 |
-| Calculate | Calculate the US group’s BF effects and contributions for each date. | 0.000000 | 0.000734 | 0.000000 | 0.000834 |
-| Write | Save the PARQUET report to disk. | 0.000000 | 0.009 | 0.000000 | 0.013 |
-
-All numbers are elapsed clock seconds; each stage adds its repeated calls within one worker only. Index and portfolio workers overlap, so do not add their columns. Channel waits and setup are outside these stage timers. The index worker does no BF calculation or report writing. Each cell is the median of three runs; whole-run values are measured independently.
+Each column sums to whole-run elapsed time. All values in a column come from the same run: the middle whole-run time of three repetitions. The five timed stages follow the portfolio worker; index preparation runs concurrently and is not added again. The remaining-time row is a subtraction, not a separately measured index-reading or waiting timer. Other supporting metrics retain three-run medians.
 
 [Latest country measurements](results/country-worker-stages/runs.csv) · [Output checks](results/country-worker-stages/checks.json)
 

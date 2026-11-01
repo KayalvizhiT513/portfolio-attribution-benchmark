@@ -1,6 +1,7 @@
 """Add measured detailed stage tables and five consolidated scenario flow SVGs to the report."""
 import json
 import statistics
+from decimal import Decimal
 from pathlib import Path
 
 import benchmark_csv_parquet as benchmark
@@ -35,7 +36,7 @@ def latest_datasets():
 
 
 GO_UPDATED = 'go' in latest_datasets()
-LATEST_NOTE = ('Country uses the latest rerun when available: three runs per engine/format with separate index and portfolio stage timers. Other scenarios retain their date-cache follow-up runs. The latest country runs alternate format and engine order and execute sequentially.' if GO_UPDATED else
+LATEST_NOTE = ('Country uses the latest rerun: three runs per engine/format. Its elapsed-time breakdown uses one complete run per column, selected by the middle whole-run time; supporting metrics use medians. Other scenarios retain their date-cache follow-up runs. The latest country runs alternate format and engine order and execute sequentially.' if GO_UPDATED else
               'Rust uses the latest date-cache measurements: the median of three runs for Country and one run for each other scenario. Go uses its earlier single-run baseline; Go was not rerun for this change.')
 
 
@@ -249,6 +250,21 @@ OPERATIONS = {
 }
 
 
+def elapsed_budget(fmt, language):
+    samples = [r for r in json.loads((ROOT / 'results/country-worker-stages/runs.json').read_text())
+               if r['format'] == fmt and r['language'] == language]
+    assert len(samples) == 3
+    row = sorted(samples, key=lambda r: float(r['process_wall_seconds']))[1]
+    precision = Decimal('0.000001')
+    parts = {stage: Decimal(str(row[f'portfolio_{stage}_seconds'])).quantize(precision)
+             for stage in ['read', 'filter', 'aggregate', 'compute', 'write']}
+    whole = Decimal(str(row['process_wall_seconds'])).quantize(precision)
+    remaining = whole - sum(parts.values())
+    assert remaining >= 0
+    parts.update(other=remaining, whole=whole)
+    return {key: f'{value:.6f}' for key, value in parts.items()}
+
+
 def timing_table(rows, fmt, scenario):
     definitions = [
         ('Read', 'Read and check CSV records.' if fmt == 'csv' else 'Read and decode Parquet batches.', 'read_parse_seconds'),
@@ -259,19 +275,18 @@ def timing_table(rows, fmt, scenario):
         ('**Whole run**', 'Elapsed time from start to finish.', 'process_wall_seconds'),
     ]
     if all('index_read_seconds' in rows[fmt, scenario, lang] for lang in ['rust', 'go']):
-        values = [seconds(rows[fmt, scenario, lang]['process_wall_seconds']) for lang in ['rust', 'go']]
-        lines = ['| Measurement | Rust elapsed seconds | Go elapsed seconds |', '|---|---:|---:|',
-                 '| Whole run | ' + ' | '.join(values) + ' |', '',
-                 '| Step | Work done | Rust index seconds | Rust portfolio seconds | Go index seconds | Go portfolio seconds |',
-                 '|---|---|---:|---:|---:|---:|']
-        stage_fields = {'read_parse_seconds': 'read', 'filter_seconds': 'filter', 'aggregate_seconds': 'aggregate',
-                        'compute_seconds': 'compute', 'write_seconds': 'write'}
-        for stage, work, field in definitions:
-            if field == 'process_wall_seconds': continue
-            values = [seconds(rows[fmt, scenario, lang][f'{side}_{stage_fields[field]}_seconds'])
-                      for lang in ['rust', 'go'] for side in ['index', 'portfolio']]
-            lines.append(f'| {stage} | {work} | ' + ' | '.join(values) + ' |')
-        return lines + ['', 'All numbers are elapsed clock seconds; each stage adds its repeated calls within one worker only. Index and portfolio workers overlap, so do not add their columns. Channel waits and setup are outside these stage timers. The index worker does no BF calculation or report writing. Each cell is the median of three runs; whole-run values are measured independently.', '',
+        budgets = {lang: elapsed_budget(fmt, lang) for lang in ['rust', 'go']}
+        lines = ['| Step | Work done | Rust elapsed seconds | Go elapsed seconds |', '|---|---|---:|---:|']
+        fields = ['read', 'filter', 'aggregate', 'compute', 'write']
+        for (stage, work, _), field in zip(definitions, fields):
+            if field == 'read': work = 'Read and check portfolio CSV records.' if fmt == 'csv' else 'Read and decode portfolio Parquet batches.'
+            elif field == 'filter': work = 'Keep US portfolio holdings.'
+            elif field == 'aggregate': work = 'Scale portfolio US weights to 100% and combine their weighted returns into one US group.'
+            lines.append(f'| {stage} | {work} | {budgets["rust"][field]} | {budgets["go"][field]} |')
+        lines.append('| Setup, waiting, and remaining work | Everything outside the timed portfolio stages, including waiting for index data, setup and shutdown; calculated as whole run minus the five stages. | '
+                     + budgets['rust']['other'] + ' | ' + budgets['go']['other'] + ' |')
+        lines.append('| **Whole run** | **Sum of the six rows above.** | ' + budgets['rust']['whole'] + ' | ' + budgets['go']['whole'] + ' |')
+        return lines + ['', 'Each column sums to whole-run elapsed time. All values in a column come from the same run: the middle whole-run time of three repetitions. The five timed stages follow the portfolio worker; index preparation runs concurrently and is not added again. The remaining-time row is a subtraction, not a separately measured index-reading or waiting timer. Other supporting metrics retain three-run medians.', '',
                         '[Latest country measurements](results/country-worker-stages/runs.csv) · [Output checks](results/country-worker-stages/checks.json)']
     values = [seconds(rows[fmt, scenario, lang]['process_wall_seconds']) for lang in ['rust', 'go']]
     lines = ['| Measurement | Rust elapsed seconds | Go elapsed seconds |',
@@ -466,7 +481,7 @@ def main():
                 '</details>', '',
                 '## Elapsed time and processing steps', '',
                 'Each scenario has the same layout: a timing table, its supporting numbers, then the next input format. Read down to follow the steps; compare Rust and Go across the row.', '',
-                'Country shows separate elapsed stage times for the index and portfolio workers from the latest rerun. Whole-run elapsed time is shown separately. Other scenarios retain processing descriptions until their worker timings are rerun. Combined worker measurements remain in expandable details.', '',
+                'Country shows an elapsed-time breakdown that sums to whole-run time, including setup, waiting and remaining work. Other scenarios retain processing descriptions until their worker timings are rerun. Combined worker measurements remain in expandable details.', '',
                 LATEST_NOTE if updated else 'One measurement per configuration. Small timing differences need repeat runs to confirm.', '']
     for scenario, _ in benchmark.SCENARIOS:
         draw(scenario, rows)
