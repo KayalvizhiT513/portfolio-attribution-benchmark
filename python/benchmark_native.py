@@ -5,7 +5,10 @@ import subprocess
 import sys
 import time
 
+from input_cache import prepare_input_cache
+
 def measured(command, log):
+    cache = prepare_input_cache(command)
     started = time.perf_counter()
     with log.open('w') as f:
         process = subprocess.Popen(command, stdout=f, stderr=subprocess.STDOUT)
@@ -16,7 +19,7 @@ def measured(command, log):
     elapsed = time.perf_counter() - started
     rss = usage.ru_maxrss / (1024 ** 2 if sys.platform == 'darwin' else 1024)
     cpu = usage.ru_utime + usage.ru_stime
-    return {'process_wall_seconds': elapsed, 'cpu_seconds': cpu, 'peak_rss_mib': rss, 'average_cores': cpu / elapsed}
+    return {**cache, 'process_wall_seconds': elapsed, 'cpu_seconds': cpu, 'peak_rss_mib': rss, 'average_cores': cpu / elapsed}
 
 
 def subset_file(data, target):
