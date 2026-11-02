@@ -1,109 +1,104 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1240" viewBox="0 0 1440 1240" role="img" aria-labelledby="title desc">
-<title id="title">03  Country: many securities collapse into country aggregates</title>
-<desc id="desc">Group weighted contributions first • country effects are not sums of security effects</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1930" viewBox="0 0 1440 1930" role="img" aria-labelledby="title desc">
+<title id="title">Country: security attribution before country aggregation</title>
+<desc id="desc">Daily US reports • Rust and Go • paired complete-date tasks • CSV and Parquet</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#475569"/></marker></defs>
-<rect width="1440" height="1240" fill="white"/>
+<rect width="1440" height="1930" fill="white"/>
 <style>text{font-family:Arial,Helvetica,sans-serif;fill:#0f172a}.title{font-size:32px;font-weight:700}.sub{font-size:18px;fill:#475569}.head{font-size:20px;font-weight:700}.body{font-size:17px}.label{font-size:16px;fill:#475569}.edge{fill:none;stroke:#475569;stroke-width:2.2;marker-end:url(#arrow)}</style>
 <text x="65" y="58" class="title" text-anchor="start">
-<tspan x="65" dy="0">03  Country: many securities collapse into country aggregates</tspan>
+<tspan x="65" dy="0">Country: security attribution before country aggregation</tspan>
 </text>
 <text x="65" y="94" class="sub" text-anchor="start">
-<tspan x="65" dy="0">Group weighted contributions first • country effects are not sums of security effects</tspan>
+<tspan x="65" dy="0">Daily US reports • Rust and Go • paired complete-date tasks • CSV and Parquet</tspan>
 </text>
-<rect x="300" y="140" width="840" height="95" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
-<text x="720.0" y="170" class="head" text-anchor="middle">
-<tspan x="720.0" dy="0">PRECOMPUTE MASTER LOOKUPS</tspan>
+<rect x="100" y="145" width="1240" height="120" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="720.0" y="175" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">LOAD THE MASTER ONCE</tspan>
 </text>
-<text x="720.0" y="201" class="body" text-anchor="middle">
-<tspan x="720.0" dy="0">A → US; B → US; C → DE; D → DE (illustrative holdings).</tspan>
+<text x="720.0" y="206" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">160,000 instruments: 36 historical versions each, or one undated record.</tspan>
+<tspan x="720.0" dy="25">Share immutable ID and effective-date lookups across workers.</tspan>
 </text>
-<path d="M720 235 V290" class="edge"/>
-<rect x="160" y="290" width="1120" height="100" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
-<text x="720.0" y="320" class="head" text-anchor="middle">
-<tspan x="720.0" dy="0">STREAM ONE DATE FOR INDEX AND EACH PORTFOLIO</tspan>
+<path d="M720 265 V330" class="edge"/>
+<rect x="100" y="330" width="1240" height="120" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="720.0" y="360" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">PLAN 24 PAIRED DATE RANGES / 12 WORKERS</tspan>
 </text>
-<text x="720.0" y="351" class="body" text-anchor="middle">
-<tspan x="720.0" dy="0">Parse IDs, weights and base/local returns; validate; normalize each side.</tspan>
+<text x="720.0" y="391" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">CSV: scan date boundaries. Parquet: inspect row-group date statistics.</tspan>
+<tspan x="720.0" dy="25">Each task reads matching dates from the index and every portfolio.</tspan>
 </text>
-<rect x="100" y="450" width="280" height="70" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
-<text x="240.0" y="480" class="head" text-anchor="middle">
-<tspan x="240.0" dy="0">A • US</tspan>
+<path d="M720 450 V515" class="edge"/>
+<rect x="100" y="515" width="1240" height="120" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+<text x="720.0" y="545" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">READ ALL 175,200,000 HOLDINGS ROWS; CHECK INPUT FIELDS</tspan>
 </text>
-<text x="240.0" y="511" class="body" text-anchor="middle">
+<text x="720.0" y="576" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">1,095 dates: 100,000 index + 60,000 portfolio holdings per date.</tspan>
+<tspan x="720.0" dy="25">Check dates, known IDs, duplicates, finite returns, nonnegative weights and daily weight sums.</tspan>
 </text>
-<rect x="420" y="450" width="280" height="70" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
-<text x="560.0" y="480" class="head" text-anchor="middle">
-<tspan x="560.0" dy="0">B • US</tspan>
+<path d="M720 635 V700" class="edge"/>
+<rect x="100" y="700" width="1240" height="120" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+<text x="720.0" y="730" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">LOOK UP COUNTRY ON EACH DATE; RETAIN US</tspan>
 </text>
-<text x="560.0" y="511" class="body" text-anchor="middle">
+<text x="720.0" y="761" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Keep 99,000 index + 59,000 portfolio securities per date.</tspan>
+<tspan x="720.0" dy="25">173,010,000 retained rows; non-US holdings are excluded.</tspan>
 </text>
-<rect x="740" y="450" width="280" height="70" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
-<text x="880.0" y="480" class="head" text-anchor="middle">
-<tspan x="880.0" dy="0">C • DE</tspan>
+<path d="M720 820 V885" class="edge"/>
+<rect x="100" y="885" width="1240" height="145" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+<text x="720.0" y="915" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">NORMALIZE EACH SIDE; PRESERVE SECURITY IDs</tspan>
 </text>
-<text x="880.0" y="511" class="body" text-anchor="middle">
+<text x="720.0" y="946" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Divide weights and contributions by the respective total US weight.</tspan>
+<tspan x="720.0" dy="25">Contribution = normalized security weight × security return, separately on each side.</tspan>
+<tspan x="720.0" dy="25">Build aligned per-security slots; retain one date per side per worker.</tspan>
 </text>
-<rect x="1060" y="450" width="280" height="70" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
-<text x="1200.0" y="480" class="head" text-anchor="middle">
-<tspan x="1200.0" dy="0">D • DE</tspan>
+<path d="M720 1030 V1070" class="edge"/>
+<rect x="100" y="1070" width="1240" height="170" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="720.0" y="1100" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">MISSING SIDE: COPY THE RETURN; KEEP ITS WEIGHT AT ZERO</tspan>
 </text>
-<text x="1200.0" y="511" class="body" text-anchor="middle">
+<text x="720.0" y="1131" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Portfolio-only A: Wp = 2%, rp = 5%; Wb = 0%, set rb = 5%. Total US benchmark RB = 3%.</tspan>
+<tspan x="720.0" dy="25">Allocation = (0.02 − 0) × (0.05 − 0.03) = 0.0004 = 4 basis points; selection = interaction = 0.</tspan>
+<tspan x="720.0" dy="25">Benchmark-only: Wp = 0%, set rp = rb. The same rule applies to zero-weight sides.</tspan>
+<tspan x="720.0" dy="25">Copied return is a formula input only: missing-side contribution remains zero.</tspan>
 </text>
-<path d="M720 390 V420 H240 V450" class="edge"/>
-<path d="M720 420 H560 V450" class="edge"/>
-<path d="M720 420 H880 V450" class="edge"/>
-<path d="M720 420 H1200 V450" class="edge"/>
-<rect x="145" y="610" width="500" height="135" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
-<text x="395.0" y="640" class="head" text-anchor="middle">
-<tspan x="395.0" dy="0">US ACCUMULATOR</tspan>
+<path d="M720 1240 V1255" class="edge"/>
+<rect x="100" y="1255" width="1240" height="145" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="720.0" y="1285" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">COMPUTE BF EFFECTS FOR EVERY SECURITY IN THE UNION</tspan>
 </text>
-<text x="395.0" y="671" class="body" text-anchor="middle">
-<tspan x="395.0" dy="0">W_US = w_A + w_B</tspan>
-<tspan x="395.0" dy="25">C_US = w_A × r_A + w_B × r_B</tspan>
-<tspan x="395.0" dy="25">R_US = C_US / W_US</tspan>
+<text x="720.0" y="1316" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">A = (Wp-Wb) × (rb-RB); S = Wb × (rp-rb); I = (Wp-Wb) × (rp-rb).</tspan>
+<tspan x="720.0" dy="25">RB is the total US benchmark return. Include securities absent on either side.</tspan>
+<tspan x="720.0" dy="25">158,000 securities/date × 1,095 dates × 2 returns × 3 effects = 1,038,060,000 values.</tspan>
 </text>
-<rect x="795" y="610" width="500" height="135" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
-<text x="1045.0" y="640" class="head" text-anchor="middle">
-<tspan x="1045.0" dy="0">DE ACCUMULATOR</tspan>
+<path d="M720 1400 V1440" class="edge"/>
+<rect x="100" y="1440" width="1240" height="120" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+<text x="720.0" y="1470" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">SUM COMPUTED SECURITY EFFECTS INTO COUNTRY REPORTS</tspan>
 </text>
-<text x="1045.0" y="671" class="body" text-anchor="middle">
-<tspan x="1045.0" dy="0">W_DE = w_C + w_D</tspan>
-<tspan x="1045.0" dy="25">C_DE = w_C × r_C + w_D × r_D</tspan>
-<tspan x="1045.0" dy="25">R_DE = C_DE / W_DE</tspan>
+<text x="720.0" y="1501" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">Sum allocation, selection, interaction, weights and contributions by country.</tspan>
+<tspan x="720.0" dy="25">Reconcile effects to active return. Retain compact daily reports, discard security buffers.</tspan>
 </text>
-<path d="M240 520 V565 H395 V610" class="edge"/>
-<path d="M560 520 V565 H395" class="edge"/>
-<path d="M880 520 V565 H1045 V610" class="edge"/>
-<path d="M1200 520 V565 H1045" class="edge"/>
-<path d="M395 745 V790 H720 V835" class="edge"/>
-<path d="M1045 745 V790 H720" class="edge"/>
-<rect x="200" y="835" width="1040" height="110" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
-<text x="720.0" y="865" class="head" text-anchor="middle">
-<tspan x="720.0" dy="0">DAILY COUNTRY EFFECTS → FULL-HISTORY LINKING</tspan>
+<path d="M720 1560 V1625" class="edge"/>
+<rect x="100" y="1625" width="1240" height="120" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="720.0" y="1655" class="head" text-anchor="middle">
+<tspan x="720.0" dy="0">COLLECT IN DATE ORDER AND WRITE 2,190 REPORT ROWS</tspan>
 </text>
-<text x="720.0" y="896" class="body" text-anchor="middle">
-<tspan x="720.0" dy="0">Aggregate each side independently; calculate country effects, then link across dates.</tspan>
-<tspan x="720.0" dy="25">At EOF, reconcile linked country effects to compounded active return.</tspan>
+<text x="720.0" y="1686" class="body" text-anchor="middle">
+<tspan x="720.0" dy="0">One US row per date and return type; 20 columns including contributions.</tspan>
+<tspan x="720.0" dy="25">No cross-date linking. Finalize CSV or typed Zstd Parquet after successful processing.</tspan>
 </text>
-<path d="M200 890 H40 V270 H720 V290" class="edge"/>
-<text x="100" y="960" class="label" text-anchor="middle">
-<tspan x="100" dy="0">Next date</tspan>
+<text x="720" y="1845" class="sub" text-anchor="middle">
+<tspan x="720" dy="0">Full-data US IDs are disjoint: existing missing-side convention assigns active return to allocation.</tspan>
+<tspan x="720" dy="25">Shared-ID regression fixtures verify nonzero selection and interaction.</tspan>
 </text>
-<path d="M720 945 V1000" class="edge"/>
-<text x="760" y="980" class="label" text-anchor="middle">
-<tspan x="760" dy="0">EOF</tspan>
-</text>
-<rect x="200" y="1000" width="1040" height="100" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
-<text x="720.0" y="1030" class="head" text-anchor="middle">
-<tspan x="720.0" dy="0">AT EOF: WRITE COUNTRY SUMMARIES, NOT DAILY ROWS</tspan>
-</text>
-<text x="720.0" y="1061" class="body" text-anchor="middle">
-<tspan x="720.0" dy="0">One row per country / portfolio / return type over the full date range.</tspan>
-</text>
-<text x="720" y="1160" class="sub" text-anchor="middle">
-<tspan x="720" dy="0">Actual supplied holdings are US-only; US/DE above illustrates the many-to-one transformation.</tspan>
-</text>
-<text x="65" y="1222" class="label" text-anchor="start">
-<tspan x="65" dy="0">Every execution validates attribution and writes the final CSV report.</tspan>
+<text x="65" y="1912" class="label" text-anchor="start">
+<tspan x="65" dy="0">Every execution validates attribution and writes the final CSV or Parquet report.</tspan>
 </text>
 </svg>

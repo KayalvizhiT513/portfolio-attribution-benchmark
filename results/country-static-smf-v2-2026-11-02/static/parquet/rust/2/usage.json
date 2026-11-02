@@ -1,0 +1,17 @@
+{
+  "command": [
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/rust/target/release/portfolio-attribution",
+    "--data",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-static-smf-v2-2026-11-02/inputs/static/parquet",
+    "--scenario",
+    "country",
+    "--output-dir",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-static-smf-v2-2026-11-02/static/parquet/rust/2",
+    "--metrics",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-static-smf-v2-2026-11-02/static/parquet/rust/2/metrics.csv"
+  ],
+  "process_wall_seconds": 2.7247205840001243,
+  "cpu_seconds": 29.721062,
+  "peak_rss_mib": 347.09375,
+  "average_cores": 10.907930220267549
+}

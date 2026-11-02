@@ -14,6 +14,18 @@ benchmark-go-attribution
 # Generated benchmark executables and attribution outputs
 /benchmark-*
 /results/*
+!/results/country-security-first-v2-2026-11-02/
+/results/country-security-first-v2-2026-11-02/**
+!/results/country-security-first-v2-2026-11-02/**/
+!/results/country-security-first-v2-2026-11-02/*.json
+!/results/country-security-first-v2-2026-11-02/**/metrics.csv
+!/results/country-security-first-v2-2026-11-02/**/usage.json
+!/results/country-static-smf-v2-2026-11-02/
+/results/country-static-smf-v2-2026-11-02/**
+!/results/country-static-smf-v2-2026-11-02/**/
+!/results/country-static-smf-v2-2026-11-02/*.json
+!/results/country-static-smf-v2-2026-11-02/**/metrics.csv
+!/results/country-static-smf-v2-2026-11-02/**/usage.json
 !/results/csv-parquet-native-output/
 /results/csv-parquet-native-output/**
 !/results/csv-parquet-native-output/*.json

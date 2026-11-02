@@ -1,0 +1,17 @@
+{
+  "command": [
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/benchmark-go-attribution",
+    "--data",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-static-smf-v2-2026-11-02/inputs/history/parquet",
+    "--scenario",
+    "country",
+    "--output-dir",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-static-smf-v2-2026-11-02/history/parquet/go/1",
+    "--metrics",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-static-smf-v2-2026-11-02/history/parquet/go/1/metrics.csv"
+  ],
+  "process_wall_seconds": 9.846574832999977,
+  "cpu_seconds": 94.451559,
+  "peak_rss_mib": 1898.671875,
+  "average_cores": 9.592326326861748
+}

@@ -1,0 +1,17 @@
+{
+  "command": [
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/benchmark-go-attribution",
+    "--data",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-security-first-v2-2026-11-02/inputs/history/parquet",
+    "--scenario",
+    "country",
+    "--output-dir",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-security-first-v2-2026-11-02/history/parquet/go/3",
+    "--metrics",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-security-first-v2-2026-11-02/history/parquet/go/3/metrics.csv"
+  ],
+  "process_wall_seconds": 10.7369081249999,
+  "cpu_seconds": 100.893316,
+  "peak_rss_mib": 2828.453125,
+  "average_cores": 9.396868709817793
+}

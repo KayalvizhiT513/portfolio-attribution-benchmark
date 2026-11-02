@@ -53,7 +53,7 @@ python3 python/render_attribution_flows.py
 
 Omit `--threads` to use the machine's available parallelism. Go uses its runtime CPU limit, including `GOMAXPROCS` and supported container CPU limits; Rust detects available CPU parallelism. Pass `--threads N` only to override the default. Benchmark scripts leave this setting automatic and record the resolved value in each run's metrics.
 
-For daily country attribution, CSV files whose records fit on one physical line are partitioned at complete date boundaries. Parquet files with single-date row-group statistics are partitioned by row group, keeping adjacent groups for the same date together. A worker pool sized from available parallelism reads and aggregates independent ranges, then daily reports are reconciled and written in date order. Each date preserves its original instrument order. Metrics record `date_range_workers`, `date_range_tasks`, and `boundary_scan_seconds`; boundary discovery (CSV scanning or Parquet footer inspection) is included in read time and total runtime. The pool shares the immutable effective-dated master and retains only daily country aggregates.
+For daily country attribution, CSV files whose records fit on one physical line are partitioned at complete date boundaries. Parquet files with single-date row-group statistics are partitioned by row group, keeping adjacent groups for the same date together. Each task reads matching index and portfolio ranges, filters US, normalizes each side, aligns instruments, computes security-level BF effects, and then sums effects and contributions by country. A pool sized from available parallelism processes these date ranges concurrently. Workers retain one date of security data per side and compact completed country reports; reports are written in date order. Metrics record `date_range_workers`, `date_range_tasks`, and `boundary_scan_seconds`. Boundary discovery is included in read time and total runtime.
 
 Multiline CSV, Parquet without metadata-proven single-date groups, and other scenarios use the streaming pipeline. In that path the setting controls Go's CPU parallelism and Rust's maximum concurrent portfolio workers, with a separate index producer. `--threads 1` selects streaming country execution for comparison. See [country optimization history and current results](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md#optimization-history-and-baseline-comparisons). The [end-to-end SVG flowchart](docs/flows/country-parallel-end-to-end.svg) shows read units, filtering, aggregation, benchmark return selection, BF formulas and ordered output. Whole-run and worker-stage timings are in [COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md#whole-run-elapsed-phases-in-seconds).
 
@@ -127,22 +127,16 @@ preserves daily total weight and weighted returns. Split provenance is recorded
 in `attribution_data_parquet/expansion_provenance.parquet`. The expansion and
 CSV/Parquet verification are implemented in `python/expand_portfolio_us.py`.
 
-To measure country runtime phases for both formats with the updated master:
+To compare historical and undated SMFs using security effects before country aggregation:
 
 ```sh
-.venv/bin/python python/benchmark_country_runtime.py --output-dir results/new-country-runtime
+.venv/bin/python python/benchmark_static_smf.py --output-dir results/new-security-country --runs 3
 ```
 
-Use a new output directory. The script prepares and verifies an effective-dated
-Parquet master from CSV, links the existing Parquet holdings, runs each engine
-and format once without a thread override, and validates every report value.
-The benchmark updates the existing `COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md` after all requested runs
-validate. It retains the other format’s selected measurements when using
-`--formats parquet` or `--formats csv`. Per-run directories contain raw metrics,
-usage and checks only; no additional Markdown report is created.
+Use a new output directory. The script verifies that every historical classification is constant before generating an equivalent undated master, links the original holdings, runs both engines and formats, checks full-data security-effect counts and exact output parity, and updates `COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md` only after all runs pass. Each run retains raw metrics, process resources and output checks. Earlier country-first timings measure a different calculation order.
 
-To refresh `COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md` from recorded evidence without rerunning benchmarks:
+To refresh the report from its recorded evidence without rerunning benchmarks:
 
 ```sh
-python3 python/render_country_report.py
+.venv/bin/python python/render_country_report.py
 ```

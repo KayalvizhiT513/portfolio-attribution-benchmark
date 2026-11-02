@@ -213,6 +213,8 @@ func (m *master) countryOn(id int, date string) (int, error) {
 type day struct {
 	date, entity string
 	stats        []stat
+	countries    []int
+	countryCount int
 }
 type stream struct {
 	r                inputReader
@@ -359,17 +361,13 @@ func (s *stream) next(m *master, c config, mt *metrics) (*day, error) {
 	mt.filter += seconds(start)
 	start = time.Now()
 	n := len(m.names)
-	if c.scenario == "country" {
-		n = len(m.countryNames)
-	} else if c.scenario == "subset" {
+	if c.scenario == "subset" {
 		n = len(m.subsetNames)
 	}
 	stats := make([]stat, n)
 	for _, r := range retained {
 		k := r.id
-		if c.scenario == "country" {
-			k = datedCountries[k]
-		} else if c.scenario == "subset" {
+		if c.scenario == "subset" {
 			k = m.subsetSlots[k]
 		}
 		a := &stats[k]
@@ -385,7 +383,11 @@ func (s *stream) next(m *master, c config, mt *metrics) (*day, error) {
 		}
 	}
 	mt.aggregate += seconds(start)
-	return &day{date, s.entity, stats}, nil
+	d := &day{date: date, entity: s.entity, stats: stats}
+	if c.scenario == "country" {
+		d.countries, d.countryCount = datedCountries, len(m.countryNames)
+	}
+	return d, nil
 }
 func parseDate(s string) (time.Time, error) {
 	t, e := time.Parse("2006-01-02", s)
@@ -488,6 +490,9 @@ type period struct {
 func newPeriod(d *day, key string, c config) *period {
 	portfolioOnly := c.scenario == "weekly" || c.scenario == "monthly"
 	n := len(d.stats)
+	if d.countryCount > 0 {
+		n = d.countryCount
+	}
 	if portfolioOnly {
 		n = 1
 	}
@@ -509,6 +514,14 @@ func (p *period) add(pd, bd *day, mt *metrics) error {
 	var daily [2][3]float64
 	for k := range pd.stats {
 		ps, bs := pd.stats[k], bd.stats[k]
+		slot := k
+		if pd.countryCount > 0 {
+			if ps.present {
+				slot = pd.countries[k]
+			} else {
+				slot = bd.countries[k]
+			}
+		}
 		if ps.present || bs.present {
 			mt.effects += 6
 		}
@@ -517,12 +530,16 @@ func (p *period) add(pd, bd *day, mt *metrics) error {
 			for j := 0; j < 3; j++ {
 				daily[t][j] += e[j]
 				if !p.portfolioOnly {
-					p.acc[k].e[t][j] = p.acc[k].e[t][j]*(1+totals[1][t]) + e[j]*p.growth[0][t]
+					if pd.countryCount > 0 {
+						p.acc[slot].e[t][j] += e[j]
+					} else {
+						p.acc[slot].e[t][j] = p.acc[slot].e[t][j]*(1+totals[1][t]) + e[j]*p.growth[0][t]
+					}
 				}
 			}
 		}
 		if !p.portfolioOnly {
-			a := &p.acc[k]
+			a := &p.acc[slot]
 			a.present = a.present || ps.present || bs.present
 			a.held = a.held || ps.present
 			a.w[0] += ps.w

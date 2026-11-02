@@ -30,7 +30,7 @@ benchmark measurements.
 
 Only the security output contract changed to full-union detail. Subset still
 uses its compact report; weekly/monthly still aggregate the daily security
-union, and country still operates on normalized US country groups.
+union, and country computes effects on the normalized US security union before summing by country.
 
 For subset, H is the number of selected IDs present in the portfolio. B is
 one if at least one selected ID is benchmark-only, otherwise zero. The subset
@@ -50,11 +50,14 @@ calculated within that US universe and emitted daily. `PeriodStart` equals
 Zero US weight on either side fails. Country defaults to `--period day` and
 rejects other periods so an explicit flag cannot silently change daily output.
 
-Because the filtered country universe has only one group, its portfolio and
-benchmark group weights are both one. Allocation and interaction are therefore
-zero up to floating-point rounding; selection equals the daily difference
-between the normalized US portfolio and US index returns. This is standalone
-US attribution, rather than the US contribution to the unfiltered portfolio.
+Country effects are sums of security-level BF effects, calculated before country
+aggregation. Include both portfolio-only and benchmark-only securities. For this
+fixture the US ID sets are disjoint: 158,000 security pairs per date, with three
+effects for each of base/local returns, or 1,038,060,000 effect values across all
+dates. Under the existing missing-side-return convention, selection and
+interaction are zero and allocation carries active return up to rounding.
+Shared-ID fixtures can have nonzero selection and interaction. This is standalone
+US attribution within separately normalized US universes.
 
 For example:
 

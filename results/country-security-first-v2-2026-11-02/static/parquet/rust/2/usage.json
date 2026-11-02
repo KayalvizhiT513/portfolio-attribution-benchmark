@@ -1,0 +1,17 @@
+{
+  "command": [
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/rust/target/release/portfolio-attribution",
+    "--data",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-security-first-v2-2026-11-02/inputs/static/parquet",
+    "--scenario",
+    "country",
+    "--output-dir",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-security-first-v2-2026-11-02/static/parquet/rust/2",
+    "--metrics",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-security-first-v2-2026-11-02/static/parquet/rust/2/metrics.csv"
+  ],
+  "process_wall_seconds": 2.815828292000333,
+  "cpu_seconds": 30.405567,
+  "peak_rss_mib": 604.078125,
+  "average_cores": 10.798089885800609
+}

@@ -30,7 +30,7 @@ class Canvas:
         self.parts.append(f'<path d="M{cx} {cy-h/2} L{cx+w/2} {cy} L{cx} {cy+h/2} L{cx-w/2} {cy} Z" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>')
         self.text(cx, cy-8 if len(lines)>1 else cy+6, lines)
     def finish(self, name):
-        self.text(65, self.height-18, ['Every execution validates attribution and writes the final CSV report.'], 'label', 'start')
+        self.text(65, self.height-18, ['Every execution validates attribution and writes the final CSV or Parquet report.'], 'label', 'start')
         self.parts.append('</svg>')
         svg='\n'.join(self.parts)
         ET.fromstring(svg)
@@ -82,25 +82,43 @@ def subset():
     c.finish('02-subset.svg')
 
 
-def country():
-    c=Canvas('03  Country: many securities collapse into country aggregates', 'Group weighted contributions first • country effects are not sums of security effects', 1240)
-    c.box(300,140,840,95,'note','PRECOMPUTE MASTER LOOKUPS',['A → US; B → US; C → DE; D → DE (illustrative holdings).'])
-    c.edge('M720 235 V290')
-    c.box(160,290,1120,100,'read','STREAM ONE DATE FOR INDEX AND EACH PORTFOLIO',['Parse IDs, weights and base/local returns; validate; normalize each side.'])
-    for x,sid in [(100,'A • US'),(420,'B • US'),(740,'C • DE'),(1060,'D • DE')]:
-        c.box(x,450,280,70,'read',sid)
-    c.edge('M720 390 V420 H240 V450');c.edge('M720 420 H560 V450');c.edge('M720 420 H880 V450');c.edge('M720 420 H1200 V450')
-    c.box(145,610,500,135,'aggregate','US ACCUMULATOR',['W_US = w_A + w_B','C_US = w_A × r_A + w_B × r_B','R_US = C_US / W_US'])
-    c.box(795,610,500,135,'aggregate','DE ACCUMULATOR',['W_DE = w_C + w_D','C_DE = w_C × r_C + w_D × r_D','R_DE = C_DE / W_DE'])
-    c.edge('M240 520 V565 H395 V610');c.edge('M560 520 V565 H395')
-    c.edge('M880 520 V565 H1045 V610');c.edge('M1200 520 V565 H1045')
-    c.edge('M395 745 V790 H720 V835');c.edge('M1045 745 V790 H720')
-    c.box(200,835,1040,110,'compute','DAILY COUNTRY EFFECTS → FULL-HISTORY LINKING',['Aggregate each side independently; calculate country effects, then link across dates.','At EOF, reconcile linked country effects to compounded active return.'])
-    c.edge('M200 890 H40 V270 H720 V290','Next date',(100,960))
-    c.edge('M720 945 V1000','EOF',(760,980))
-    c.box(200,1000,1040,100,'write','AT EOF: WRITE COUNTRY SUMMARIES, NOT DAILY ROWS',['One row per country / portfolio / return type over the full date range.'])
-    c.text(720,1160,['Actual supplied holdings are US-only; US/DE above illustrates the many-to-one transformation.'],'sub')
-    c.finish('03-country.svg')
+def country(filename='03-country.svg'):
+    c = Canvas('Country: security attribution before country aggregation',
+               'Daily US reports • Rust and Go • paired complete-date tasks • CSV and Parquet', 1930)
+    steps = [
+        ('read', 'LOAD THE MASTER ONCE', ['160,000 instruments: 36 historical versions each, or one undated record.',
+                                        'Share immutable ID and effective-date lookups across workers.']),
+        ('note', 'PLAN 24 PAIRED DATE RANGES / 12 WORKERS', ['CSV: scan date boundaries. Parquet: inspect row-group date statistics.',
+                                                            'Each task reads matching dates from the index and every portfolio.']),
+        ('read', 'READ ALL 175,200,000 HOLDINGS ROWS; CHECK INPUT FIELDS', ['1,095 dates: 100,000 index + 60,000 portfolio holdings per date.',
+                                                                   'Check dates, known IDs, duplicates, finite returns, nonnegative weights and daily weight sums.']),
+        ('filter', 'LOOK UP COUNTRY ON EACH DATE; RETAIN US', ['Keep 99,000 index + 59,000 portfolio securities per date.',
+                                                             '173,010,000 retained rows; non-US holdings are excluded.']),
+        ('aggregate', 'NORMALIZE EACH SIDE; PRESERVE SECURITY IDs', ['Divide weights and contributions by the respective total US weight.',
+                                                                     'Contribution = normalized security weight × security return, separately on each side.',
+                                                                     'Build aligned per-security slots; retain one date per side per worker.']),
+        ('note', 'MISSING SIDE: COPY THE RETURN; KEEP ITS WEIGHT AT ZERO', [
+            'Portfolio-only A: Wp = 2%, rp = 5%; Wb = 0%, set rb = 5%. Total US benchmark RB = 3%.',
+            'Allocation = (0.02 − 0) × (0.05 − 0.03) = 0.0004 = 4 basis points; selection = interaction = 0.',
+            'Benchmark-only: Wp = 0%, set rp = rb. The same rule applies to zero-weight sides.',
+            'Copied return is a formula input only: missing-side contribution remains zero.']),
+        ('compute', 'COMPUTE BF EFFECTS FOR EVERY SECURITY IN THE UNION', ['A = (Wp-Wb) × (rb-RB); S = Wb × (rp-rb); I = (Wp-Wb) × (rp-rb).',
+                                                                         'RB is the total US benchmark return. Include securities absent on either side.',
+                                                                         '158,000 securities/date × 1,095 dates × 2 returns × 3 effects = 1,038,060,000 values.']),
+        ('aggregate', 'SUM COMPUTED SECURITY EFFECTS INTO COUNTRY REPORTS', ['Sum allocation, selection, interaction, weights and contributions by country.',
+                                                                            'Reconcile effects to active return. Retain compact daily reports, discard security buffers.']),
+        ('write', 'COLLECT IN DATE ORDER AND WRITE 2,190 REPORT ROWS', ['One US row per date and return type; 20 columns including contributions.',
+                                                                      'No cross-date linking. Finalize CSV or typed Zstd Parquet after successful processing.'])]
+    y = 145
+    for i, (color, title, lines) in enumerate(steps):
+        h = 95 + 25 * (len(lines) - 1)
+        c.box(100, y, 1240, h, color, title, lines)
+        if i < len(steps)-1:
+            c.edge(f'M720 {y+h} V{y+185}')
+        y += 185
+    c.text(720, 1845, ['Full-data US IDs are disjoint: existing missing-side convention assigns active return to allocation.',
+                       'Shared-ID regression fixtures verify nonzero selection and interaction.'], 'sub')
+    c.finish(filename)
 
 
 def weekly():

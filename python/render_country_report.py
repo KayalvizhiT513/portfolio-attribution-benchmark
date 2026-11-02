@@ -1,8 +1,8 @@
 """Update COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md from recorded runs without creating per-run reports.
 
-The existing report embeds its four selected metrics paths. A partial-format
-benchmark replaces only that format after both engines finish successfully.
-Historical report renderers can rerun this module without resetting those paths.
+Security-first reports embed their evidence directory and use the current
+renderer. Legacy country-first reports retain their four selected metrics paths
+and historical rendering for archived evidence.
 """
 import csv
 import json
@@ -64,6 +64,16 @@ def read_run(source,fmt,language):
 
 
 def update_report(root=None,runs=None,report_path=REPORT):
+    # The corrected contract has its own renderer; never label its security
+    # effects with the old country-first narrative or compare old components.
+    if runs is not None and any(int(r['effect_values']) > 6570 for r in runs):
+        from render_security_country_report import render
+        return render(root, report_path)
+    if runs is None and report_path.exists():
+        current = re.search(r'<!-- security-country-results: (.*?) -->', report_path.read_text())
+        if current:
+            from render_security_country_report import render
+            return render(ROOT/current.group(1), report_path)
     sources=selected_sources(report_path)
     if runs is not None:
         for fmt in {r['format'] for r in runs}:

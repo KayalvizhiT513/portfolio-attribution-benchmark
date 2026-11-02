@@ -291,6 +291,8 @@ struct Day {
     date: String,
     entity: String,
     stats: Vec<Stat>,
+    countries: Vec<usize>,
+    country_count: usize,
 }
 struct Stream {
     r: Input,
@@ -415,9 +417,7 @@ impl Stream {
         metrics.retained += raw.len() as u64;
         metrics.filter += start.elapsed().as_secs_f64();
         let start = Instant::now();
-        let n = if c.scenario == "country" {
-            m.country_names.len()
-        } else if c.scenario == "subset" {
+        let n = if c.scenario == "subset" {
             m.subset_names.len()
         } else {
             m.names.len()
@@ -425,9 +425,7 @@ impl Stream {
         let mut stats = vec![Stat::default(); n];
         // Normalize even full weights to remove source rounding and make daily reconciliation exact.
         for &(id, s) in raw.iter() {
-            let k = if c.scenario == "country" {
-                dated_countries[id]
-            } else if c.scenario == "subset" {
+            let k = if c.scenario == "subset" {
                 m.subset_slots[id]
             } else {
                 id
@@ -445,6 +443,16 @@ impl Stream {
             date,
             entity: self.entity.clone(),
             stats,
+            countries: if c.scenario == "country" {
+                dated_countries
+            } else {
+                vec![]
+            },
+            country_count: if c.scenario == "country" {
+                m.country_names.len()
+            } else {
+                0
+            },
         }))
     }
 }
@@ -543,7 +551,16 @@ impl Period {
             end: day.date.clone(),
             days: 0,
             growth: [[1.0; 2]; 2],
-            acc: vec![Acc::default(); if portfolio_only { 1 } else { day.stats.len() }],
+            acc: vec![
+                Acc::default();
+                if portfolio_only {
+                    1
+                } else if day.country_count > 0 {
+                    day.country_count
+                } else {
+                    day.stats.len()
+                }
+            ],
             portfolio_only,
         }
     }
@@ -564,6 +581,15 @@ impl Period {
         for k in 0..p.stats.len() {
             let ps = p.stats[k];
             let bs = b.stats[k];
+            let slot = if p.country_count > 0 {
+                if ps.present {
+                    p.countries[k]
+                } else {
+                    b.countries[k]
+                }
+            } else {
+                k
+            };
             if ps.present || bs.present {
                 metrics.effects += 6;
             }
@@ -572,13 +598,18 @@ impl Period {
                 for j in 0..3 {
                     daily[t][j] += e[j];
                     if !self.portfolio_only {
-                        self.acc[k].e[t][j] =
-                            self.acc[k].e[t][j] * (1.0 + totals[1][t]) + e[j] * self.growth[0][t];
+                        if p.country_count > 0 {
+                            // Country reports are daily: sum security effects only after computing them.
+                            self.acc[slot].e[t][j] += e[j];
+                        } else {
+                            self.acc[slot].e[t][j] = self.acc[slot].e[t][j] * (1.0 + totals[1][t])
+                                + e[j] * self.growth[0][t];
+                        }
                     }
                 }
             }
             if !self.portfolio_only {
-                let a = &mut self.acc[k];
+                let a = &mut self.acc[slot];
                 a.present |= ps.present || bs.present;
                 a.held |= ps.present;
                 a.w[0] += ps.w;

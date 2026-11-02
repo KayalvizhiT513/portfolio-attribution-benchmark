@@ -101,7 +101,8 @@ def main():
     prepared=prepare_parquet(csv_data,args.parquet_source.resolve(),parquet_data)
     binaries={'rust':ROOT/'rust/target/release/portfolio-attribution','go':ROOT/'benchmark-go-attribution'}
     order=[(fmt,lang) for fmt,lang in [('csv','rust'),('csv','go'),('parquet','go'),('parquet','rust')] if fmt in args.formats]
-    environment={'platform':platform.platform(),'logical_cpus':os.cpu_count(),
+    environment={'calculation_contract':'security-level BF effects before country aggregation',
+                 'platform':platform.platform(),'logical_cpus':os.cpu_count(),
                  'thread_policy':'Native runtime automatic; no --threads flag',
                  'read_profile':'ATTRIBUTION_PROFILE_READ=1', 'prepared_parquet':prepared,
                  'order':[f'{lang} {fmt.upper()}' for fmt,lang in order],

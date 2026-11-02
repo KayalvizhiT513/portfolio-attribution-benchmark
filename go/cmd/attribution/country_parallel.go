@@ -22,7 +22,6 @@ type dateRange struct {
 type countryFile struct {
 	path    string
 	ranges  []dateRange
-	days    []*day
 	metrics metrics
 }
 
@@ -148,7 +147,7 @@ func countryParallel(c config, m *master, paths []string, indexPath string) (mt,
 		if !ok {
 			return
 		}
-		files[i] = countryFile{path: path, ranges: ranges, days: make([]*day, len(ranges))}
+		files[i] = countryFile{path: path, ranges: ranges}
 		files[i].metrics.read = seconds(start)
 		files[i].metrics.boundary = files[i].metrics.read
 	}
@@ -172,91 +171,123 @@ func countryParallel(c config, m *master, paths []string, indexPath string) (mt,
 	}
 	planSeconds := seconds(planStart)
 	poolStart := time.Now()
-	type task struct{ file, first, last int }
+	type task struct{ first, last int }
 	type result struct {
-		task task
-		days []*day
-		mt   metrics
-		err  error
+		task     task
+		reports  [][]*period
+		metrics  []metrics
+		entities []string
+		err      error
 	}
+	size := (days + c.threads*2 - 1) / (c.threads * 2)
+	taskCount := (days + size - 1) / size
+	workers := min(c.threads, taskCount)
 	jobs := make(chan task)
-	workers := min(c.threads, days*len(files))
 	results := make(chan result, workers)
 	var wg sync.WaitGroup
-	for w := 0; w < workers; w++ {
+	for worker := 0; worker < workers; worker++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				file := &files[job.file]
-				r := result{task: job}
-				input, e := openCountryRange(file.path, file.ranges[job.first], file.ranges[job.last-1])
-				if e == nil {
-					s := stream{r: input}
-					for j := job.first; j < job.last; j++ {
-						var d *day
-						d, e = s.next(m, c, &r.mt)
+				r := result{task: job, reports: make([][]*period, len(paths)), metrics: make([]metrics, len(files)), entities: make([]string, len(files))}
+				r.err = func() (runErr error) {
+					streams := make([]*stream, len(files))
+					defer func() {
+						for _, s := range streams {
+							if s != nil {
+								if closeErr := s.r.Close(); runErr == nil {
+									runErr = closeErr
+								}
+							}
+						}
+					}()
+					for i, file := range files {
+						input, e := openCountryRange(file.path, file.ranges[job.first], file.ranges[job.last-1])
 						if e != nil {
-							break
+							return e
 						}
-						if d == nil || d.date != file.ranges[j].date {
-							e = errors.New("date range mismatch")
-							break
+						streams[i] = &stream{r: input}
+					}
+					for j := job.first; j < job.last; j++ {
+						benchmark, e := streams[0].next(m, c, &r.metrics[0])
+						if e != nil {
+							return e
 						}
-						r.days = append(r.days, d)
-					}
-					if e == nil {
-						var extra *day
-						extra, e = s.next(m, c, &r.mt)
-						if e == nil && extra != nil {
-							e = errors.New("extra dates in range")
+						if benchmark == nil || benchmark.date != files[0].ranges[j].date {
+							return errors.New("date range mismatch")
+						}
+						for i := 1; i < len(files); i++ {
+							portfolio, e := streams[i].next(m, c, &r.metrics[i])
+							if e != nil {
+								return e
+							}
+							if portfolio == nil || portfolio.date != benchmark.date {
+								return errors.New("date range mismatch")
+							}
+							p := newPeriod(portfolio, portfolio.date, c)
+							if e = p.add(portfolio, benchmark, &r.metrics[i]); e != nil {
+								return e
+							}
+							r.reports[i-1] = append(r.reports[i-1], p)
 						}
 					}
-					closeErr := input.Close()
-					if e == nil {
-						e = closeErr
+					for i, s := range streams {
+						extra, e := s.next(m, c, &r.metrics[i])
+						if e != nil {
+							return e
+						}
+						if extra != nil {
+							return errors.New("extra dates in range")
+						}
+						r.entities[i] = s.entity
 					}
-				}
-				r.err = e
+					return nil
+				}()
 				results <- r
 			}
 		}()
 	}
 	go func() {
-		for i, file := range files {
-			size := (len(file.ranges) + c.threads - 1) / c.threads
-			for first := 0; first < len(file.ranges); first += size {
-				last := first + size
-				if last > len(file.ranges) {
-					last = len(file.ranges)
-				}
-				jobs <- task{i, first, last}
-			}
+		for first := 0; first < days; first += size {
+			jobs <- task{first, min(first+size, days)}
 		}
 		close(jobs)
 		wg.Wait()
 		close(results)
 	}()
+	reports := make([][]*period, len(paths))
+	for i := range reports {
+		reports[i] = make([]*period, days)
+	}
+	entities := make([]string, len(files))
+	// Workers read file descriptors while results arrive. Keep collected metrics
+	// separate until all workers finish, avoiding concurrent struct reads/writes.
+	collected := make([]metrics, len(files))
 	for r := range results {
 		if r.err != nil {
 			if err == nil {
-				err = fmt.Errorf("%s: %w", files[r.task.file].path, r.err)
+				err = fmt.Errorf("dates %d-%d: %w", r.task.first, r.task.last, r.err)
 			}
 			continue
 		}
-		copy(files[r.task.file].days[r.task.first:r.task.last], r.days)
-		files[r.task.file].metrics.add(r.mt)
+		for i, name := range r.entities {
+			if entities[i] == "" {
+				entities[i] = name
+			} else if entities[i] != name {
+				err = errors.New("mixed entities across ranges")
+			}
+			collected[i].add(r.metrics[i])
+		}
+		for i, periods := range r.reports {
+			copy(reports[i][r.task.first:r.task.last], periods)
+		}
 	}
 	if err != nil {
 		return
 	}
-	for _, file := range files {
-		for _, d := range file.days {
-			if d == nil || d.entity != file.days[0].entity {
-				err = errors.New("mixed entities across ranges")
-				return
-			}
-		}
+	for i := range files {
+		files[i].metrics.add(collected[i])
 	}
 	poolSeconds := seconds(poolStart)
 	orderedStart := time.Now()
@@ -271,12 +302,12 @@ func countryParallel(c config, m *master, paths []string, indexPath string) (mt,
 			return
 		}
 		file.metrics.write += seconds(start)
-		for j, d := range file.days {
-			p := newPeriod(d, d.date, c)
-			if err = p.add(d, files[0].days[j], &file.metrics); err != nil {
+		for _, p := range reports[i-1] {
+			if p == nil {
+				err = errors.New("missing date report")
 				break
 			}
-			if err = p.write(c, d.entity, m.countryNames, w, &file.metrics); err != nil {
+			if err = p.write(c, entities[i], m.countryNames, w, &file.metrics); err != nil {
 				break
 			}
 		}
@@ -296,10 +327,7 @@ func countryParallel(c config, m *master, paths []string, indexPath string) (mt,
 	mt.phaseParallel = poolSeconds
 	mt.phaseOrdered = seconds(orderedStart)
 	mt.rangeWorkers = uint64(workers)
-	for _, file := range files {
-		size := (days + c.threads - 1) / c.threads
-		mt.rangeTasks += uint64((len(file.ranges) + size - 1) / size)
-	}
+	mt.rangeTasks = uint64(taskCount)
 	return
 }
 

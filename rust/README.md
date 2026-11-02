@@ -15,8 +15,8 @@ Rust and Go implement the same attribution contracts with native CSV or Arrow/Pa
 Calculation granularity and output granularity are independent. Security,
 subset and weekly/monthly calculations include the full applicable portfolio/
 index union through aligned master-ID slots (full outer-join semantics), with
-zero weight on a missing side. Country aligns the filtered, normalized US
-country groups instead.
+zero weight on a missing side. Country also aligns the filtered, normalized US security union, computes
+security effects, then sums effects, weights and contributions into daily country rows.
 
 Security writes an individual `RowType=detail` row for every instrument present
 on either side during the reporting period, including portfolio-only and
@@ -65,7 +65,7 @@ dense arrays, formulas and concurrency are retained. Country now filters both si
 
 ## Calculation and validation
 
-For each day/group and return type, normalize weights and compute weighted return contributions. Divide each group contribution by its weight to obtain its return. With portfolio/index group weights Wp/Wb, group returns Rp/Rb, and whole applicable index return B:
+For each day/security and return type, normalize weights and compute weighted return contributions. Country reports sum the resulting security effects after this calculation. Divide each group contribution by its weight to obtain its return. With portfolio/index group weights Wp/Wb, group returns Rp/Rb, and whole applicable index return B:
 
 ```
 allocation  = (Wp - Wb) * (Rb - B)
@@ -110,7 +110,8 @@ Rust uses `csv` reusable records, `Arc` index sharing, native portfolio workers,
 
 Go uses `encoding/csv` with `ReuseRecord`, buffered readers, dense slices, immutable shared day pointers and goroutines. `--threads` sets GOMAXPROCS, not the number of I/O goroutines. Output reuses an escaped byte buffer and `strconv.AppendFloat`.
 
-Subset arrays use compact selected-ID slots. Country arrays use country slots. Full-history security/subset keep linked per-ID accumulators; weekly/monthly keep only portfolio period accumulators. The optimization reduces output and period state without discarding benchmark-only effects or changing the daily model.
+Subset arrays use compact selected-ID slots. Country daily arrays use master-ID slots until security effects are computed;
+only completed country accumulators use country slots. Full-history security/subset keep linked per-ID accumulators; weekly/monthly keep only portfolio period accumulators. The optimization reduces output and period state without discarding benchmark-only effects or changing the daily model.
 
 ## Correctness and full-history comparison
 

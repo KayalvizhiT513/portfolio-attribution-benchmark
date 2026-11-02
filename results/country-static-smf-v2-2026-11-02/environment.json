@@ -1,0 +1,24 @@
+{
+  "historical_master_rows": 5760000,
+  "static_master_rows": 160000,
+  "classification_constant_across_history": true,
+  "runs_per_cell": 3,
+  "logical_cpus": 12,
+  "threads": "automatic",
+  "profile_read": true,
+  "cache_policy": "normal filesystem cache; no cache flushing",
+  "historical_parquet": {
+    "master_source": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data/security_master.csv",
+    "master_source_sha256": "b06e23b417797d5fcf6540de0f23b68b58bc4b9524e6c52cdf246d5268782c2e",
+    "master_rows": 5760000,
+    "master_verification": "Every typed field and row matches updated CSV, in order",
+    "holdings_symlinks": [
+      "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data_parquet/index.parquet",
+      "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data_parquet/portfolio_PF.parquet"
+    ]
+  },
+  "binary_sha256": {
+    "rust": "dbe5ce067b60cf71c9b130c932d84767c1283c1d7486fc4749f9aa0bf2946f72",
+    "go": "9df2fcd4dfe161a0f8ccaabf02513f0dd379e0dc08fcd8946889a0f6f7ef8386"
+  }
+}

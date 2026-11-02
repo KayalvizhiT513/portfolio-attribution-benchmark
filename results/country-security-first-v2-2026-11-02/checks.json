@@ -1,0 +1,146 @@
+[
+  {
+    "path": "history/csv/rust/1/country-portfolio_PF.csv",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "static/csv/rust/1/country-portfolio_PF.csv",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "history/csv/go/1/country-portfolio_PF.csv",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "static/csv/go/1/country-portfolio_PF.csv",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "history/parquet/go/1/country-portfolio_PF.parquet",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "static/parquet/go/1/country-portfolio_PF.parquet",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "history/parquet/rust/1/country-portfolio_PF.parquet",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "static/parquet/rust/1/country-portfolio_PF.parquet",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "static/parquet/rust/2/country-portfolio_PF.parquet",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "history/parquet/rust/2/country-portfolio_PF.parquet",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "static/parquet/go/2/country-portfolio_PF.parquet",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "history/parquet/go/2/country-portfolio_PF.parquet",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "static/csv/go/2/country-portfolio_PF.csv",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "history/csv/go/2/country-portfolio_PF.csv",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "static/csv/rust/2/country-portfolio_PF.csv",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "history/csv/rust/2/country-portfolio_PF.csv",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "history/csv/rust/3/country-portfolio_PF.csv",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "static/csv/rust/3/country-portfolio_PF.csv",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "history/csv/go/3/country-portfolio_PF.csv",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "static/csv/go/3/country-portfolio_PF.csv",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "history/parquet/go/3/country-portfolio_PF.parquet",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "static/parquet/go/3/country-portfolio_PF.parquet",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "history/parquet/rust/3/country-portfolio_PF.parquet",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "path": "static/parquet/rust/3/country-portfolio_PF.parquet",
+    "rows": 2190,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  }
+]

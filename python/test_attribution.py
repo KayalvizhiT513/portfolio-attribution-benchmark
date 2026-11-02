@@ -106,7 +106,7 @@ def reference(countries, data, entity, scenario, period):
             denominator = sum(v[0] for v in filtered.values())
             groups = defaultdict(lambda: [0., 0., 0.])
             for sid, (w, base, local) in filtered.items():
-                g = countries[sid] if scenario == 'country' else sid
+                g = sid
                 groups[g][0] += w / denominator
                 groups[g][1] += w * base / denominator
                 groups[g][2] += w * local / denominator
@@ -126,6 +126,20 @@ def reference(countries, data, entity, scenario, period):
                     rb = rp
                 effects.append([(ps[0] - bs[0]) * (rb - returns[1][t]), bs[0] * (rp - rb), (ps[0] - bs[0]) * (rp - rb)])
             daily[g] = (ps[0], bs[0], effects, [ps[1:], bs[1:]])
+        if scenario == 'country':
+            # Compute security effects first, then reduce to country reports.
+            grouped = {}
+            for sid, (pw, bw, effects, contribution) in daily.items():
+                country = countries[sid]
+                a = grouped.setdefault(country, [0., 0., [[0.]*3 for _ in range(2)], [[0.]*2 for _ in range(2)]])
+                a[0] += pw
+                a[1] += bw
+                for t in range(2):
+                    for j in range(3):
+                        a[2][t][j] += effects[t][j]
+                    for side in range(2):
+                        a[3][side][t] += contribution[side][t]
+            daily = grouped
         buckets[period_key(d, period)].append((d, daily, returns))
     expected = {}
     for days in buckets.values():

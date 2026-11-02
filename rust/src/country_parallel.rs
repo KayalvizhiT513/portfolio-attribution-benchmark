@@ -1,7 +1,6 @@
 //! Whole-date CSV byte ranges and Parquet row-group ranges share the immutable master; daily reports are written in order.
 use crate::{
-    civil, input::Input, output, reader, Config, Day, Master, Metrics, Period, Result, Stream,
-    HEADER,
+    civil, input::Input, output, reader, Config, Master, Metrics, Period, Result, Stream, HEADER,
 };
 use std::{
     fs::File,
@@ -19,7 +18,6 @@ struct DateRange {
 struct CountryFile {
     path: PathBuf,
     ranges: Vec<DateRange>,
-    days: Vec<Option<Day>>,
     metrics: Metrics,
 }
 
@@ -152,12 +150,10 @@ pub fn run(
         let Some(ranges) = planned else {
             return Ok(None);
         };
-        let days = (0..ranges.len()).map(|_| None).collect();
         let boundary = start.elapsed().as_secs_f64();
         files.push(CountryFile {
             path: path.into(),
             ranges,
-            days,
             metrics: Metrics {
                 read: boundary,
                 boundary,
@@ -182,82 +178,106 @@ pub fn run(
     }
     let plan_seconds = plan_start.elapsed().as_secs_f64();
     let pool_start = Instant::now();
-    let size = days.div_ceil(c.threads);
-    let tasks: Vec<_> = (0..files.len())
-        .flat_map(|i| {
-            (0..days)
-                .step_by(size)
-                .map(move |first| (i, first, (first + size).min(days)))
-        })
+    // Pair all sides within a date range; retain only completed country reports.
+    let size = days.div_ceil(c.threads * 2);
+    let tasks: Vec<_> = (0..days)
+        .step_by(size)
+        .map(|first| (first, (first + size).min(days)))
         .collect();
+    let workers = c.threads.min(tasks.len());
     let results = thread::scope(|scope| -> Result<Vec<_>> {
-        let mut workers = Vec::new();
-        for w in 0..c.threads.min(tasks.len()) {
+        let mut handles = Vec::new();
+        for worker in 0..workers {
             let (tasks, files) = (&tasks, &files);
-            workers.push(scope.spawn(move || -> Result<Vec<_>> {
-                let mut results = Vec::new();
-                for &(i, first, last) in tasks.iter().skip(w).step_by(c.threads.min(tasks.len())) {
-                    let file = &files[i];
-                    let mut stream = Stream {
-                        r: if file.path.extension().is_some_and(|e| e == "parquet") {
-                            Input::open_groups(
-                                &file.path,
-                                &HEADER,
-                                Some(
-                                    (file.ranges[first].start as usize
-                                        ..file.ranges[last - 1].end as usize)
-                                        .collect(),
-                                ),
-                            )?
-                        } else {
-                            Input::csv_range(
-                                &file.path,
-                                file.ranges[first].start,
-                                file.ranges[last - 1].end,
-                            )?
-                        },
-                        pending: false,
-                        previous: String::new(),
-                        entity: String::new(),
-                        raw: Vec::new(),
-                        seen: Vec::new(),
-                    };
-                    let mut metrics = Metrics::default();
-                    let mut output = Vec::new();
+            handles.push(scope.spawn(move || -> Result<Vec<_>> {
+                let mut completed = Vec::new();
+                for &(first, last) in tasks.iter().skip(worker).step_by(workers) {
+                    let mut streams: Vec<_> = files
+                        .iter()
+                        .map(|file| {
+                            let r = if file.path.extension().is_some_and(|e| e == "parquet") {
+                                Input::open_groups(
+                                    &file.path,
+                                    &HEADER,
+                                    Some(
+                                        (file.ranges[first].start as usize
+                                            ..file.ranges[last - 1].end as usize)
+                                            .collect(),
+                                    ),
+                                )?
+                            } else {
+                                Input::csv_range(
+                                    &file.path,
+                                    file.ranges[first].start,
+                                    file.ranges[last - 1].end,
+                                )?
+                            };
+                            Ok(Stream {
+                                r,
+                                pending: false,
+                                previous: String::new(),
+                                entity: String::new(),
+                                raw: Vec::new(),
+                                seen: Vec::new(),
+                            })
+                        })
+                        .collect::<Result<_>>()?;
+                    let mut metrics = vec![Metrics::default(); files.len()];
+                    let mut reports: Vec<Vec<Period>> =
+                        (1..files.len()).map(|_| Vec::new()).collect();
                     for j in first..last {
-                        let day = stream
-                            .next(m, c, &mut metrics)?
-                            .ok_or("date range mismatch")?;
-                        if day.date != file.ranges[j].date {
+                        let benchmark = streams[0]
+                            .next(m, c, &mut metrics[0])?
+                            .ok_or("missing index date")?;
+                        if benchmark.date != files[0].ranges[j].date {
                             return Err("date range mismatch".into());
                         }
-                        output.push(day);
+                        for i in 1..files.len() {
+                            let portfolio = streams[i]
+                                .next(m, c, &mut metrics[i])?
+                                .ok_or("missing portfolio date")?;
+                            if portfolio.date != benchmark.date {
+                                return Err("date range mismatch".into());
+                            }
+                            let mut period = Period::new(&portfolio, portfolio.date.clone(), c);
+                            period.add(&portfolio, &benchmark, &mut metrics[i])?;
+                            reports[i - 1].push(period);
+                        }
                     }
-                    if stream.next(m, c, &mut metrics)?.is_some() {
-                        return Err("extra dates in range".into());
+                    let mut entities = Vec::new();
+                    for (i, stream) in streams.iter_mut().enumerate() {
+                        if stream.next(m, c, &mut metrics[i])?.is_some() {
+                            return Err("extra dates in range".into());
+                        }
+                        entities.push(stream.entity.clone());
                     }
-                    results.push((i, first, output, metrics));
+                    completed.push((first, reports, metrics, entities));
                 }
-                Ok(results)
+                Ok(completed)
             }));
         }
         let mut results = Vec::new();
-        for worker in workers {
-            results.extend(worker.join().map_err(|_| "date worker panicked")??);
+        for handle in handles {
+            results.extend(handle.join().map_err(|_| "date worker panicked")??);
         }
         Ok(results)
     })?;
-    for (i, first, days, metrics) in results {
-        for (j, day) in days.into_iter().enumerate() {
-            files[i].days[first + j] = Some(day);
-        }
-        files[i].metrics.add(&metrics);
-    }
-    for file in &files {
-        let first = file.days[0].as_ref().ok_or("missing date range")?;
-        for day in &file.days {
-            if day.as_ref().ok_or("missing date range")?.entity != first.entity {
+    let mut reports: Vec<Vec<Option<Period>>> = (1..files.len())
+        .map(|_| (0..days).map(|_| None).collect())
+        .collect();
+    let mut entities = vec![String::new(); files.len()];
+    for (first, completed, metrics, names) in results {
+        for (i, name) in names.into_iter().enumerate() {
+            if entities[i].is_empty() {
+                entities[i] = name;
+            } else if entities[i] != name {
                 return Err("mixed entities across ranges".into());
+            }
+            files[i].metrics.add(&metrics[i]);
+        }
+        for (i, periods) in completed.into_iter().enumerate() {
+            for (j, period) in periods.into_iter().enumerate() {
+                reports[i][first + j] = Some(period);
             }
         }
     }
@@ -266,31 +286,33 @@ pub fn run(
     let index_metrics = files[0].metrics.clone();
     let mut portfolio_metrics = Metrics::default();
     for i in 1..files.len() {
-        let file = &files[i];
         let start = Instant::now();
         let mut writer = output::Writer::new(
-            &output::partial(&output::path(c, &file.path)),
-            file.path.extension().is_some_and(|e| e == "parquet"),
+            &output::partial(&output::path(c, &files[i].path)),
+            files[i].path.extension().is_some_and(|e| e == "parquet"),
         )?;
-        let mut metrics = file.metrics.clone();
+        let metrics = &mut files[i].metrics;
         metrics.write += start.elapsed().as_secs_f64();
-        for j in 0..days {
-            let day = file.days[j].as_ref().unwrap();
-            let mut period = Period::new(day, day.date.clone(), c);
-            period.add(day, files[0].days[j].as_ref().unwrap(), &mut metrics)?;
-            period.write(c, &day.entity, &m.country_names, &mut writer, &mut metrics)?;
+        for period in &reports[i - 1] {
+            period.as_ref().ok_or("missing date report")?.write(
+                c,
+                &entities[i],
+                &m.country_names,
+                &mut writer,
+                metrics,
+            )?;
         }
         let start = Instant::now();
         writer.finish()?;
         metrics.write += start.elapsed().as_secs_f64();
-        portfolio_metrics.add(&metrics);
+        portfolio_metrics.add(metrics);
     }
     let mut metrics = index_metrics.clone();
     metrics.add(&portfolio_metrics);
     metrics.phase_boundary = plan_seconds;
     metrics.phase_parallel = pool_seconds;
     metrics.phase_ordered = ordered_start.elapsed().as_secs_f64();
-    metrics.range_workers = c.threads.min(tasks.len());
+    metrics.range_workers = workers;
     metrics.range_tasks = tasks.len();
     Ok(Some((metrics, index_metrics, portfolio_metrics, days)))
 }

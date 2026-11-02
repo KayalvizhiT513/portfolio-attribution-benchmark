@@ -52,7 +52,11 @@ func TestEffectiveMaster(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := day.stats[m.history[m.ids["B"]][0].country]
+			got := stat{}
+			for _, security := range day.stats {
+				got.w += security.w
+				got.r[0] += security.r[0]
+			}
 			if got.w != 1 || math.Abs(got.r[0]-want) > 1e-12 {
 				t.Fatalf("got %+v, want return %g", got, want)
 			}
