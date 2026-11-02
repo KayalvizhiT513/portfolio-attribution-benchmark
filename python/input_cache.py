@@ -58,7 +58,19 @@ def prepare_input_cache(command, mode=None):
             if sys.platform != 'darwin':
                 raise RuntimeError('macos-purge requires macOS')
             # Noninteractive sudo: authenticate separately; never run the benchmark as root.
-            subprocess.run(['/usr/bin/sudo', '-n', '/usr/sbin/purge'], check=True)
+            label = Path(command[0]).name
+            print(f'[cache] {label}: clearing system-wide disk cache (macos-purge)...',
+                  file=sys.stderr, flush=True)
+            purge_started = time.perf_counter()
+            try:
+                subprocess.run(['/usr/bin/sudo', '-n', '/usr/sbin/purge'], check=True)
+            except (OSError, subprocess.CalledProcessError):
+                print(f'[cache] {label}: purge FAILED; benchmark will not start.',
+                      file=sys.stderr, flush=True)
+                raise
+            print(f'[cache] {label}: purge succeeded in '
+                  f'{time.perf_counter() - purge_started:.3f}s; starting benchmark '
+                  '(purge excluded from benchmark timing).', file=sys.stderr, flush=True)
     return {'input_cache_mode': mode, 'cache_prepare_seconds': time.perf_counter() - started,
             'cache_input_files': [str(p) for p in paths],
             'cache_eviction_verified': False}

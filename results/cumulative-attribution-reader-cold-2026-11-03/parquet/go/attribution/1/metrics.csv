@@ -1,0 +1,2 @@
+language,scenario,threads,days,input_file_bytes,rows_read,output_rows,read_tasks,read_workers,date_range_tasks,date_range_workers,effective_date_workers,effective_date_tasks,cumulative_reader,read_pipeline_wall_seconds,master_load_seconds,boundary_scan_seconds,read_filter_aggregate_seconds,compute_seconds,write_seconds,wall_seconds
+go,cumulative,12,1095,5314684673,175200000,36,24,12,24,12,12,36,attribution,8.912770458,1.402637834,0.011839208,104.947654375,0.000326959,0.005797084,10.333949291

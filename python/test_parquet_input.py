@@ -141,7 +141,7 @@ def main():
                 result = run(binary, parquet, root / f'duplicate-{language}-{stem}', valid=False)
                 assert 'ambiguous' in result.stderr
             duplicate.unlink()
-        # Filtering is applied to both sides, and a zero-US side must fail.
+        # When neither side has US holdings, existing country behavior emits no rows.
         master_path = parquet / 'security_master.parquet'
         saved_master = pq.read_table(master_path)
         changed = saved_master['Country'].to_pylist()
@@ -149,8 +149,10 @@ def main():
         pq.write_table(saved_master.set_column(saved_master.schema.get_field_index('Country'),
                                                'Country', pa.array(changed)), master_path)
         for language, binary in zip(['rust', 'go'], binaries):
-            result = run(binary, parquet, root / f'no-us-{language}', valid=False)
-            assert 'zero selected weight' in result.stderr
+            out = root / f'no-us-{language}'
+            run(binary, parquet, out)
+            assert int(next(csv.DictReader((out / 'metrics.csv').open()))['output_rows']) == 0
+            assert all(not list(records(path)) for path in out.glob('country-*.parquet'))
         pq.write_table(saved_master, master_path)
         for language, binary in zip(['rust', 'go'], binaries):
             result = run(binary, parquet, root / f'country-month-{language}', period='month', valid=False)

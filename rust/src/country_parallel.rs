@@ -10,10 +10,11 @@ use std::{
     time::Instant,
 };
 
-struct DateRange {
-    date: String,
-    start: u64,
-    end: u64,
+#[derive(Clone)]
+pub(crate) struct DateRange {
+    pub(crate) date: String,
+    pub(crate) start: u64,
+    pub(crate) end: u64,
 }
 struct CountryFile {
     path: PathBuf,
@@ -21,7 +22,7 @@ struct CountryFile {
     metrics: Metrics,
 }
 
-fn ranges(path: &Path, limit: usize) -> Result<Option<Vec<DateRange>>> {
+pub(crate) fn ranges(path: &Path, limit: usize) -> Result<Option<Vec<DateRange>>> {
     reader(path, &HEADER)?;
     let file = File::open(path)?;
     let mut input = BufReader::with_capacity(1024 * 1024, file);
@@ -319,7 +320,7 @@ pub fn run(
 
 // Only metadata-proven complete-date boundaries are used. Adjacent groups for
 // the same date stay together; missing stats or mixed-date groups stream.
-fn parquet_ranges(path: &Path, limit: usize) -> Result<Option<Vec<DateRange>>> {
+pub(crate) fn parquet_ranges(path: &Path, limit: usize) -> Result<Option<Vec<DateRange>>> {
     use arrow_schema::DataType;
     use parquet::{
         arrow::arrow_reader::ParquetRecordBatchReaderBuilder, file::statistics::Statistics,

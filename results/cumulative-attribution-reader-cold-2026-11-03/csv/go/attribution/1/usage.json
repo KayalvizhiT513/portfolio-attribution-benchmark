@@ -1,0 +1,27 @@
+{
+  "command": [
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/benchmark-go-attribution",
+    "--scenario",
+    "cumulative",
+    "--data",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data",
+    "--output-dir",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/cumulative-attribution-reader-cold-2026-11-03/csv/go/attribution/1",
+    "--metrics",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/cumulative-attribution-reader-cold-2026-11-03/csv/go/attribution/1/metrics.csv",
+    "--cumulative-reader",
+    "attribution"
+  ],
+  "input_cache_mode": "macos-purge",
+  "cache_prepare_seconds": 0.2477037919961731,
+  "cache_input_files": [
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data/index.csv",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data/portfolio_PF.csv",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data/security_master.csv"
+  ],
+  "cache_eviction_verified": false,
+  "process_wall_seconds": 19.388926249994256,
+  "cpu_seconds": 112.05926000000001,
+  "peak_rss_mib": 964.9375,
+  "average_cores": 5.779549550869699
+}

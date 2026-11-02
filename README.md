@@ -140,3 +140,10 @@ To refresh the report from its recorded evidence without rerunning benchmarks:
 ```sh
 .venv/bin/python python/render_country_report.py
 ```
+
+## Cumulative Total statistics
+
+The existing Go and Rust engines expose `--scenario cumulative` for 36 month-end
+expanding-window statistics on US-filtered, renormalized daily returns, with
+the shared attribution daily reader and parallel effective-date calculations. See
+[build, run, formulas and validation](docs/CUMULATIVE_STATS.md).

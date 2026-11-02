@@ -1,0 +1,38 @@
+[
+  {
+    "format": "csv",
+    "language": "go",
+    "reader": "attribution",
+    "repetition": 1,
+    "rows": 36,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "format": "csv",
+    "language": "rust",
+    "reader": "attribution",
+    "repetition": 1,
+    "rows": 36,
+    "max_absolute_difference": 5.551115123125783e-17,
+    "passed": true
+  },
+  {
+    "format": "parquet",
+    "language": "go",
+    "reader": "attribution",
+    "repetition": 1,
+    "rows": 36,
+    "max_absolute_difference": 0.0,
+    "passed": true
+  },
+  {
+    "format": "parquet",
+    "language": "rust",
+    "reader": "attribution",
+    "repetition": 1,
+    "rows": 36,
+    "max_absolute_difference": 5.551115123125783e-17,
+    "passed": true
+  }
+]

@@ -1,0 +1,27 @@
+{
+  "calculation_contract": "security-level BF effects before country aggregation",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "logical_cpus": 12,
+  "thread_policy": "Native runtime automatic; no --threads flag",
+  "read_profile": "ATTRIBUTION_PROFILE_READ=1",
+  "prepared_parquet": {
+    "master_source": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data/security_master.csv",
+    "master_source_sha256": "b06e23b417797d5fcf6540de0f23b68b58bc4b9524e6c52cdf246d5268782c2e",
+    "master_rows": 5760000,
+    "master_verification": "Every typed field and row matches updated CSV, in order",
+    "holdings_symlinks": [
+      "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data_parquet/index.parquet",
+      "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data_parquet/portfolio_PF.parquet"
+    ]
+  },
+  "order": [
+    "rust CSV",
+    "go CSV",
+    "go PARQUET",
+    "rust PARQUET"
+  ],
+  "binary_sha256": {
+    "rust": "50076e373d0bdbf0b507ffd5a06d04223ba6bb148b87a077e73402721eaba6e1",
+    "go": "5cf3315889fa2a7b520d26c2156f655377dfab3e458281ec27c9a4ab0a3495c9"
+  }
+}

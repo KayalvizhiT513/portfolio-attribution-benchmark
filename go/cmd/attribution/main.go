@@ -23,6 +23,7 @@ var outputHeader = []string{"Scenario", "Entity", "PeriodStart", "PeriodEnd", "D
 type config struct {
 	data, output, metrics, scenario, period, subset string
 	threads, maxDays                                int
+	effectiveWorkers                                int
 }
 type stat struct {
 	w       float64
@@ -354,7 +355,7 @@ func (s *stream) next(m *master, c config, mt *metrics) (*day, error) {
 			selected += r.s.w
 		}
 	}
-	if selected <= 0 {
+	if selected <= 0 && !(c.scenario == "country" && len(retained) == 0) {
 		return nil, fmt.Errorf("zero selected weight: %s/%s", s.entity, date)
 	}
 	mt.retained += uint64(len(retained))
@@ -500,6 +501,23 @@ func newPeriod(d *day, key string, c config) *period {
 }
 func (p *period) add(pd, bd *day, mt *metrics) error {
 	start := time.Now()
+	if pd.countryCount > 0 {
+		portfolioEmpty, benchmarkEmpty := true, true
+		for _, s := range pd.stats {
+			portfolioEmpty = portfolioEmpty && !s.present
+		}
+		for _, s := range bd.stats {
+			benchmarkEmpty = benchmarkEmpty && !s.present
+		}
+		if portfolioEmpty || benchmarkEmpty {
+			mt.compute += seconds(start)
+			if portfolioEmpty && benchmarkEmpty {
+				// Preserve input dates while emitting no attribution for empty dates.
+				return nil
+			}
+			return fmt.Errorf("US holdings missing on only one side: %s", pd.date)
+		}
+	}
 	var totals [2][2]float64
 	for _, s := range pd.stats {
 		for t := 0; t < 2; t++ {
@@ -759,17 +777,18 @@ func run() error {
 	flag.StringVar(&c.data, "data", "attribution_data", "CSV and/or Parquet input directory")
 	flag.StringVar(&c.output, "output-dir", "results/go", "CSV output directory")
 	flag.StringVar(&c.metrics, "metrics", "results/go-metrics.csv", "metrics CSV")
-	flag.StringVar(&c.scenario, "scenario", "country", "security|subset|country|weekly|monthly")
+	flag.StringVar(&c.scenario, "scenario", "country", "security|subset|country|weekly|monthly|cumulative")
 	flag.StringVar(&c.period, "period", "", "all|day|week|month|quarter|year")
 	flag.StringVar(&c.subset, "instruments-file", "", "one-column InstrumentId CSV or Parquet")
 	flag.IntVar(&c.threads, "threads", runtime.GOMAXPROCS(0), "CPU parallelism (default: Go runtime limit; respects GOMAXPROCS)")
 	flag.IntVar(&c.maxDays, "max-days", 0, "0 reads all dates")
+	flag.IntVar(&c.effectiveWorkers, "effective-date-workers", runtime.GOMAXPROCS(0), "parallel cumulative month-end calculations")
 	flag.Parse()
 	if c.threads < 1 || c.maxDays < 0 {
 		return errors.New("invalid threads/max-days")
 	}
 	switch c.scenario {
-	case "security", "subset", "country", "weekly", "monthly":
+	case "security", "subset", "country", "weekly", "monthly", "cumulative":
 	default:
 		return errors.New("invalid scenario")
 	}
@@ -795,6 +814,13 @@ func run() error {
 	}
 	if c.scenario == "subset" && c.subset == "" {
 		return errors.New("subset requires --instruments-file")
+	}
+	if c.scenario == "cumulative" {
+		if c.effectiveWorkers < 1 || c.period != "all" || c.subset != "" {
+			return errors.New("cumulative requires positive effective-date-workers, period all, and no instrument filter")
+		}
+		runtime.GOMAXPROCS(c.threads)
+		return runCumulative(c)
 	}
 	runtime.GOMAXPROCS(c.threads)
 	masterStart := time.Now()

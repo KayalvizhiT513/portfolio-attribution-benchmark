@@ -1,5 +1,6 @@
 """Cache preparation must cover every input and happen before process timing."""
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -18,7 +19,7 @@ class CacheTests(unittest.TestCase):
             (root / 'portfolio_PF.parquet').symlink_to(root / 'holdings.parquet')
             command = ['engine', '--data', str(root), '--instruments-file=' + str(root / 'subset.csv')]
             self.assertEqual(len(input_paths(command)), 4)
-            with patch('input_cache.sys.platform', 'linux'), patch('input_cache.os.posix_fadvise', create=True) as advise:
+            with patch('input_cache.sys.platform', 'linux'), patch('input_cache.os.posix_fadvise', create=True) as advise, patch('input_cache.os.POSIX_FADV_DONTNEED', 4, create=True):
                 result = prepare_input_cache(command, 'evict')
             self.assertEqual(advise.call_count, 4)
             self.assertFalse(result['cache_eviction_verified'])
@@ -39,6 +40,15 @@ class CacheTests(unittest.TestCase):
         with patch('input_cache.input_paths', return_value=[]), patch('input_cache.sys.platform', 'darwin'), patch('input_cache.subprocess.run') as run:
             prepare_input_cache(['engine'], 'macos-purge')
             run.assert_called_once_with(['/usr/bin/sudo', '-n', '/usr/sbin/purge'], check=True)
+
+    def test_macos_purge_failure_is_logged_and_stops_run(self):
+        with patch('input_cache.input_paths', return_value=[]), patch('input_cache.sys.platform', 'darwin'), patch('input_cache.subprocess.run', side_effect=subprocess.CalledProcessError(1, 'purge')), patch('builtins.print') as log:
+            with self.assertRaises(subprocess.CalledProcessError):
+                prepare_input_cache(['engine'], 'macos-purge')
+            messages = [call.args[0] for call in log.call_args_list]
+            self.assertIn('clearing system-wide disk cache', messages[0])
+            self.assertIn('purge FAILED', messages[1])
+            self.assertFalse(any('purge succeeded' in message for message in messages))
 
     def test_actual_linux_eviction(self):
         if not hasattr(os, 'posix_fadvise'):

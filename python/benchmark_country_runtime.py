@@ -93,6 +93,7 @@ def main():
     parser.add_argument('--csv-data',type=Path,default=ROOT/'attribution_data')
     parser.add_argument('--parquet-source',type=Path,default=ROOT/'attribution_data_parquet')
     parser.add_argument('--reference-dir',type=Path)
+    parser.add_argument('--skip-report',action='store_true',help='Save raw evidence without updating the standard full-US report')
     parser.add_argument('--formats',nargs='+',choices=['csv','parquet'],default=['csv','parquet'])
     args=parser.parse_args()
     root=args.output_dir.resolve();root.mkdir(parents=True,exist_ok=False)
@@ -150,8 +151,11 @@ def main():
             print(f"PASS {lang} {fmt}: {float(metrics['wall_seconds']):.3f}s; {metrics['output_rows']} output rows",flush=True)
     finally:
         os.environ.clear();os.environ.update(saved)
-    updated=report(root,runs)
-    print(f'Complete: raw evidence in {root}; updated {updated}',flush=True)
+    if args.skip_report:
+        print(f'Complete: raw evidence in {root}',flush=True)
+    else:
+        updated=report(root,runs)
+        print(f'Complete: raw evidence in {root}; updated {updated}',flush=True)
 
 
 if __name__=='__main__': main()

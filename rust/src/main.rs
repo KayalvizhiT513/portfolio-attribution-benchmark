@@ -9,6 +9,7 @@ use std::{
     time::Instant,
 };
 mod country_parallel;
+mod cumulative;
 mod input;
 mod output;
 use input::Input;
@@ -53,6 +54,7 @@ struct Config {
     subset: Option<PathBuf>,
     threads: usize,
     max_days: usize,
+    effective_workers: usize,
 }
 fn config() -> Result<Config> {
     let mut c = Config {
@@ -64,11 +66,12 @@ fn config() -> Result<Config> {
         subset: None,
         threads: thread::available_parallelism()?.get(),
         max_days: 0,
+        effective_workers: thread::available_parallelism()?.get(),
     };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         if a == "--help" {
-            println!("--scenario security|subset|country|weekly|monthly --data DIR (CSV and/or Parquet) --output-dir DIR --metrics FILE --threads N --max-days N --instruments-file CSV_OR_PARQUET --period all|day|week|month|quarter|year");
+            println!("--scenario security|subset|country|weekly|monthly|cumulative --effective-date-workers N --data DIR (CSV and/or Parquet) --output-dir DIR --metrics FILE --threads N --max-days N --instruments-file CSV_OR_PARQUET --period all|day|week|month|quarter|year");
             println!("--threads defaults to available CPU parallelism; caps country date-range workers or streaming portfolio workers.");
             std::process::exit(0);
         }
@@ -81,11 +84,20 @@ fn config() -> Result<Config> {
             "--period" => c.period = v,
             "--instruments-file" => c.subset = Some(v.into()),
             "--threads" => c.threads = v.parse()?,
+            "--effective-date-workers" => c.effective_workers = v.parse()?,
             "--max-days" => c.max_days = v.parse()?,
             _ => return Err(format!("unknown option {a}").into()),
         }
     }
-    if !["security", "subset", "country", "weekly", "monthly"].contains(&c.scenario.as_str())
+    if ![
+        "security",
+        "subset",
+        "country",
+        "weekly",
+        "monthly",
+        "cumulative",
+    ]
+    .contains(&c.scenario.as_str())
         || c.threads == 0
     {
         return Err("invalid scenario or threads".into());
@@ -107,6 +119,11 @@ fn config() -> Result<Config> {
     }
     if c.scenario == "subset" && c.subset.is_none() {
         return Err("subset requires --instruments-file".into());
+    }
+    if c.scenario == "cumulative"
+        && (c.effective_workers == 0 || c.period != "all" || c.subset.is_some())
+    {
+        return Err("cumulative requires positive effective-date-workers, period all, and no instrument filter".into());
     }
     Ok(c)
 }
@@ -411,7 +428,7 @@ impl Stream {
             raw.retain(|(id, _)| m.country_names[dated_countries[*id]] == "US");
         }
         let selected: f64 = raw.iter().map(|(_, s)| s.w).sum();
-        if selected <= 0.0 {
+        if selected <= 0.0 && !(c.scenario == "country" && raw.is_empty()) {
             return Err(format!("zero selected weight: {}/{date}", self.entity).into());
         }
         metrics.retained += raw.len() as u64;
@@ -566,6 +583,18 @@ impl Period {
     }
     fn add(&mut self, p: &Day, b: &Day, metrics: &mut Metrics) -> Result<()> {
         let start = Instant::now();
+        if p.country_count > 0 {
+            let portfolio_empty = !p.stats.iter().any(|s| s.present);
+            let benchmark_empty = !b.stats.iter().any(|s| s.present);
+            if portfolio_empty || benchmark_empty {
+                metrics.compute += start.elapsed().as_secs_f64();
+                if portfolio_empty && benchmark_empty {
+                    // Keep the date in the input stream, but emit no attribution.
+                    return Ok(());
+                }
+                return Err(format!("US holdings missing on only one side: {}", p.date).into());
+            }
+        }
         let mut totals = [[0.0; 2]; 2];
         for s in &p.stats {
             for t in 0..2 {
@@ -884,6 +913,9 @@ fn worker(path: &Path, c: &Config, m: &Master, rx: mpsc::Receiver<Arc<Day>>) -> 
 fn run() -> Result<()> {
     let wall = Instant::now();
     let c = config()?;
+    if c.scenario == "cumulative" {
+        return cumulative::run(&c);
+    }
     let master_start = Instant::now();
     let m = master(&c)?;
     let master_seconds = master_start.elapsed().as_secs_f64();

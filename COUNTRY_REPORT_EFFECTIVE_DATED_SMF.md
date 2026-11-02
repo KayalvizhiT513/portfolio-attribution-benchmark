@@ -8,19 +8,11 @@ The previous implementation grouped returns by country before calculating attrib
 
 | Master | Input → output | Rust seconds | Go seconds | Repetitions per engine |
 |---|---|---:|---:|---:|
-| History | CSV → CSV | 14.113 | 20.255 | 3 |
-| History | PARQUET → PARQUET | 5.738 | 10.585 | 3 |
-| Static | CSV → CSV | 12.010 | 15.579 | 3 |
-| Static | PARQUET → PARQUET | 2.803 | 5.019 | 3 |
+| History | CSV → CSV | 14.524 | 19.873 | 1 |
+| History | PARQUET → PARQUET | 6.122 | 10.101 | 1 |
 
-Values are medians of complete release-build runs. No thread override; 12 workers and 24 paired date-range tasks. The benchmark alternates historical/static order and reverses engine/format order in the second repetition. Runs use normal filesystem caching without flushing; file sizes do not establish physical disk traffic. Native elapsed time includes master loading, input planning, processing and report finalization. Process timing additionally includes startup, metrics serialization and exit.
+Values are single complete release-build runs with the historical SMF. No thread override; 12 workers and 24 paired date-range tasks. macOS purge runs before each native invocation, outside measured runtime. These measurements do not independently verify eviction; file sizes do not establish physical disk traffic. Native elapsed time includes master loading, input planning, processing and report finalization. Process timing additionally includes startup, metrics serialization and exit.
 
-| Engine / format | Less runtime without history | History / static speedup |
-|---|---:|---:|
-| Rust CSV | 14.9% | 1.18× |
-| Go CSV | 23.1% | 1.30× |
-| Rust PARQUET | 51.1% | 2.05× |
-| Go PARQUET | 52.6% | 2.11× |
 
 ## Input volume and actual calculation work
 
@@ -122,24 +114,20 @@ The current disjoint US fixture therefore has zero selection and interaction, wi
 
 ## Phase timing and memory
 
-All values below are per-cell medians. Worker-stage timers overlap and do not add to whole-run elapsed time. Parallel processing now includes security attribution, country accumulation and daily reconciliation. The legacy metric key `parallel_read_filter_aggregate_wall_seconds` covers that full interval; `ordered_compute_write_wall_seconds` now covers ordered report checks and writing.
+All values below are from the recorded single runs. Worker-stage timers overlap and do not add to whole-run elapsed time. Parallel processing now includes security attribution, country accumulation and daily reconciliation. The legacy metric key `parallel_read_filter_aggregate_wall_seconds` covers that full interval; `ordered_compute_write_wall_seconds` now covers ordered report checks and writing.
 
 | Master / engine / format | Master load s | Plan s | Parallel processing s | Ordered output s | Peak RSS MiB |
 |---|---:|---:|---:|---:|---:|
-| history / rust / csv | 0.614 | 8.412 | 5.216 | 0.006 | 686.719 |
-| history / go / csv | 1.214 | 9.161 | 9.876 | 0.007 | 1128.906 |
-| history / rust / parquet | 1.034 | 0.004 | 4.691 | 0.008 | 1010.578 |
-| history / go / parquet | 1.408 | 0.012 | 9.141 | 0.010 | 2828.453 |
-| static / rust / csv | 0.025 | 8.406 | 3.641 | 0.007 | 309.484 |
-| static / go / csv | 0.034 | 9.175 | 6.323 | 0.010 | 499.656 |
-| static / rust / parquet | 0.025 | 0.004 | 2.767 | 0.008 | 604.078 |
-| static / go / parquet | 0.032 | 0.010 | 4.966 | 0.010 | 2066.984 |
+| history / rust / csv | 0.622 | 8.371 | 5.524 | 0.007 | 695.875 |
+| history / go / csv | 1.212 | 9.075 | 9.580 | 0.007 | 1152.734 |
+| history / rust / parquet | 1.076 | 0.005 | 5.031 | 0.009 | 1056.922 |
+| history / go / parquet | 1.404 | 0.011 | 8.673 | 0.012 | 2737.359 |
 
 `groups` now counts present normalized security slots before attribution (173,010,000), rather than the old country aggregates. `effect_values` counts security effects, including all unmatched securities. `aggregate_seconds` measures normalization and security buffer preparation; `compute_seconds` includes security BF evaluation, country reduction and reconciliation. These counters are not directly comparable with the old country-first counters.
 
 ## Validation
 
-- All 24 recorded runs process the documented rows and effect counts. Every output field matches across engines, formats and SMF variants with zero numeric difference.
+- All 4 recorded runs process the documented rows and effect counts. Every output field matches across engines and formats with zero numeric difference.
 - The independent Python oracle computes effects per security before country reduction across nine scenario/period cases; all pass in both engines.
 - A hand-calculated regression checks overlapping and unmatched IDs, differently ordered holdings and an effective-dated US-to-DE transition, in both engines, both formats and streaming/parallel execution.
 - 78 exact CSV and 156 exact Parquet serial/parallel comparisons pass, including multiple portfolios, limits, layout fallbacks and invalid inputs.
@@ -148,10 +136,10 @@ All values below are per-cell medians. Worker-stage timers overlap and do not ad
 
 ## Evidence and reproduction
 
-- [All run metrics and process resources](results/country-security-first-v2-2026-11-02/runs.json)
-- [Summary medians](results/country-security-first-v2-2026-11-02/summary.json)
-- [Exact output comparisons](results/country-security-first-v2-2026-11-02/checks.json)
-- [Environment, binary hashes and master verification](results/country-security-first-v2-2026-11-02/environment.json)
+- [All run metrics and process resources](results/country-cold-20261102-192052-rep3/runs.json)
+- [Recorded measurements](results/country-cold-20261102-192052-rep3/runs.json)
+- [Exact output comparisons](results/country-cold-20261102-192052-rep3/checks.json)
+- [Environment, binary hashes and master verification](results/country-cold-20261102-192052-rep3/environment.json)
 
 ```sh
 cargo build --release --locked --manifest-path rust/Cargo.toml
@@ -166,4 +154,4 @@ Choose a new results directory. The benchmark refreshes this report after all ru
 
 The preceding country-first experiment recorded median Rust/Go CSV times of 12.505s/15.320s without history and 15.934s/19.504s with history; Parquet times were 2.750s/4.529s without history and 6.435s/9.757s with history. Those runs reduced securities into country returns before calculating effects. They are retained as [historical evidence](results/country-static-smf-v2-2026-11-02/summary.json), not as performance or output parity claims for this corrected calculation.
 
-<!-- security-country-results: results/country-security-first-v2-2026-11-02 -->
+<!-- security-country-results: results/country-cold-20261102-192052-rep3 -->
