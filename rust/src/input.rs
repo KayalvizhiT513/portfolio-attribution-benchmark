@@ -4,10 +4,7 @@ use arrow_array::{
     Array, Date32Array, Float64Array, LargeStringArray, RecordBatch, StringArray, StringViewArray,
 };
 use arrow_schema::DataType;
-use parquet::arrow::{
-    arrow_reader::{ParquetRecordBatchReader, ParquetRecordBatchReaderBuilder},
-    ProjectionMask,
-};
+use parquet::arrow::{arrow_reader::ParquetRecordBatchReaderBuilder, ProjectionMask};
 use std::{
     borrow::Cow,
     collections::BTreeMap,
@@ -60,7 +57,9 @@ pub enum Input {
         expected_fields: usize,
     },
     Parquet {
-        reader: ParquetRecordBatchReader,
+        reader: Box<
+            dyn Iterator<Item = std::result::Result<RecordBatch, arrow_schema::ArrowError>> + Send,
+        >,
         batch: Option<RecordBatch>,
         row: usize,
         columns: Vec<usize>,
@@ -133,6 +132,23 @@ fn is_string(t: &DataType) -> bool {
 }
 
 impl Input {
+    // Already decoded complete dates reuse the existing validation/daily engine.
+    pub(crate) fn from_batches(batches: Vec<RecordBatch>, header: &[&str]) -> Result<Self> {
+        let schema = batches.first().ok_or("empty date")?.schema();
+        let columns = header
+            .iter()
+            .map(|n| schema.index_of(n))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        let date_cache = schema.index_of("EffectiveDate").ok().map(DateCache::new);
+        Ok(Self::Parquet {
+            reader: Box::new(batches.into_iter().map(Ok)),
+            batch: None,
+            row: 0,
+            columns,
+            date_cache,
+            profile: ReadProfile::new(),
+        })
+    }
     pub fn open(path: &Path, header: &[&str]) -> Result<Self> {
         Self::open_groups(path, header, None)
     }
@@ -199,7 +215,7 @@ impl Input {
                     .filter(|&i| reader.schema().field(i).data_type() == &DataType::Date32)
                     .map(DateCache::new);
                 Ok(Self::Parquet {
-                    reader,
+                    reader: Box::new(reader),
                     batch: None,
                     row: 0,
                     columns,

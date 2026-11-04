@@ -22,6 +22,7 @@ var outputHeader = []string{"Scenario", "Entity", "PeriodStart", "PeriodEnd", "D
 
 type config struct {
 	data, output, metrics, scenario, period, subset string
+	startDate, endDate                              string
 	threads, maxDays                                int
 	effectiveWorkers                                int
 }
@@ -777,24 +778,26 @@ func run() error {
 	flag.StringVar(&c.data, "data", "attribution_data", "CSV and/or Parquet input directory")
 	flag.StringVar(&c.output, "output-dir", "results/go", "CSV output directory")
 	flag.StringVar(&c.metrics, "metrics", "results/go-metrics.csv", "metrics CSV")
-	flag.StringVar(&c.scenario, "scenario", "country", "security|subset|country|weekly|monthly|cumulative")
+	flag.StringVar(&c.scenario, "scenario", "country", "security|subset|country|weekly|monthly|cumulative|six-input")
 	flag.StringVar(&c.period, "period", "", "all|day|week|month|quarter|year")
 	flag.StringVar(&c.subset, "instruments-file", "", "one-column InstrumentId CSV or Parquet")
 	flag.IntVar(&c.threads, "threads", runtime.GOMAXPROCS(0), "CPU parallelism (default: Go runtime limit; respects GOMAXPROCS)")
 	flag.IntVar(&c.maxDays, "max-days", 0, "0 reads all dates")
 	flag.IntVar(&c.effectiveWorkers, "effective-date-workers", runtime.GOMAXPROCS(0), "parallel cumulative month-end calculations")
+	flag.StringVar(&c.startDate, "start-date", "", "six-input inclusive calculation start YYYY-MM-DD")
+	flag.StringVar(&c.endDate, "end-date", "", "six-input inclusive calculation end YYYY-MM-DD")
 	flag.Parse()
 	if c.threads < 1 || c.maxDays < 0 {
 		return errors.New("invalid threads/max-days")
 	}
 	switch c.scenario {
-	case "security", "subset", "country", "weekly", "monthly", "cumulative":
+	case "security", "subset", "country", "weekly", "monthly", "cumulative", "six-input":
 	default:
 		return errors.New("invalid scenario")
 	}
 	if c.period == "" {
 		c.period = "all"
-		if c.scenario == "country" {
+		if c.scenario == "country" || c.scenario == "six-input" {
 			c.period = "day"
 		}
 		if c.scenario == "weekly" {
@@ -814,6 +817,13 @@ func run() error {
 	}
 	if c.scenario == "subset" && c.subset == "" {
 		return errors.New("subset requires --instruments-file")
+	}
+	if (c.startDate != "" || c.endDate != "") && c.scenario != "six-input" {
+		return errors.New("start-date/end-date currently apply to six-input only")
+	}
+	if c.scenario == "six-input" {
+		runtime.GOMAXPROCS(c.threads)
+		return runSixInput(c)
 	}
 	if c.scenario == "cumulative" {
 		if c.effectiveWorkers < 1 || c.period != "all" || c.subset != "" {

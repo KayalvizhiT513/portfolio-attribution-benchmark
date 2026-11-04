@@ -12,6 +12,7 @@ mod country_parallel;
 mod cumulative;
 mod input;
 mod output;
+mod six_input;
 use input::Input;
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 const HEADER: [&str; 6] = [
@@ -55,6 +56,8 @@ struct Config {
     threads: usize,
     max_days: usize,
     effective_workers: usize,
+    start_date: Option<String>,
+    end_date: Option<String>,
 }
 fn config() -> Result<Config> {
     let mut c = Config {
@@ -67,11 +70,13 @@ fn config() -> Result<Config> {
         threads: thread::available_parallelism()?.get(),
         max_days: 0,
         effective_workers: thread::available_parallelism()?.get(),
+        start_date: None,
+        end_date: None,
     };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         if a == "--help" {
-            println!("--scenario security|subset|country|weekly|monthly|cumulative --effective-date-workers N --data DIR (CSV and/or Parquet) --output-dir DIR --metrics FILE --threads N --max-days N --instruments-file CSV_OR_PARQUET --period all|day|week|month|quarter|year");
+            println!("--scenario security|subset|country|weekly|monthly|cumulative|six-input --start-date YYYY-MM-DD --end-date YYYY-MM-DD --effective-date-workers N --data DIR (CSV and/or Parquet) --output-dir DIR --metrics FILE --threads N --max-days N --instruments-file CSV_OR_PARQUET --period all|day|week|month|quarter|year");
             println!("--threads defaults to available CPU parallelism; caps country date-range workers or streaming portfolio workers.");
             std::process::exit(0);
         }
@@ -86,6 +91,8 @@ fn config() -> Result<Config> {
             "--threads" => c.threads = v.parse()?,
             "--effective-date-workers" => c.effective_workers = v.parse()?,
             "--max-days" => c.max_days = v.parse()?,
+            "--start-date" => c.start_date = Some(v),
+            "--end-date" => c.end_date = Some(v),
             _ => return Err(format!("unknown option {a}").into()),
         }
     }
@@ -96,6 +103,7 @@ fn config() -> Result<Config> {
         "weekly",
         "monthly",
         "cumulative",
+        "six-input",
     ]
     .contains(&c.scenario.as_str())
         || c.threads == 0
@@ -104,7 +112,7 @@ fn config() -> Result<Config> {
     }
     if c.period.is_empty() {
         c.period = match c.scenario.as_str() {
-            "country" => "day",
+            "country" | "six-input" => "day",
             "weekly" => "week",
             "monthly" => "month",
             _ => "all",
@@ -124,6 +132,9 @@ fn config() -> Result<Config> {
         && (c.effective_workers == 0 || c.period != "all" || c.subset.is_some())
     {
         return Err("cumulative requires positive effective-date-workers, period all, and no instrument filter".into());
+    }
+    if (c.start_date.is_some() || c.end_date.is_some()) && c.scenario != "six-input" {
+        return Err("start-date/end-date currently apply to six-input only".into());
     }
     Ok(c)
 }
@@ -913,6 +924,9 @@ fn worker(path: &Path, c: &Config, m: &Master, rx: mpsc::Receiver<Arc<Day>>) -> 
 fn run() -> Result<()> {
     let wall = Instant::now();
     let c = config()?;
+    if c.scenario == "six-input" {
+        return six_input::run(&c);
+    }
     if c.scenario == "cumulative" {
         return cumulative::run(&c);
     }

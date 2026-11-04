@@ -102,7 +102,7 @@ func (r *csvInput) Close() error                  { return r.f.Close() }
 
 type parquetInput struct {
 	f            *file.Reader
-	r            pqarrow.RecordReader
+	r            array.RecordReader
 	batch        arrow.RecordBatch
 	row          int
 	columns      []int
@@ -208,7 +208,13 @@ func (r *parquetInput) number(i int) (float64, error) {
 // There is no CSV parser offset for compressed Parquet; physical sizes remain
 // available in input_file_bytes. Do not confuse decoded bytes with disk I/O.
 func (r *parquetInput) parsedBytes() int64 { return 0 }
-func (r *parquetInput) Close() error       { r.r.Release(); return r.f.Close() }
+func (r *parquetInput) Close() error {
+	r.r.Release()
+	if r.f != nil {
+		return r.f.Close()
+	}
+	return nil
+}
 
 func openInput(path string, header []string) (inputReader, error) {
 	return openInputGroups(path, header, nil)

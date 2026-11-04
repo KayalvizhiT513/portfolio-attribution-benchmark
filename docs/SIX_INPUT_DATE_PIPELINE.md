@@ -1,0 +1,271 @@
+# Six-input effective-date attribution
+
+The Rust and Go attribution CLIs accept `--scenario six-input`. This is an
+explicit benchmark mode; the existing scenarios and calculation formulas stay
+available. There is no HTTP API in this repository. `--start-date` and
+`--end-date` are the inclusive request parameters for an eventual API adapter.
+
+## Input contract
+
+Exactly these six Parquet files are opened by each worker. All dates are
+Arrow `date32`, numbers are `float64` unless otherwise stated, and required
+values must be non-null. Column names are matched by name; order may differ.
+
+| File | Columns | Key |
+|---|---|---|
+| `accounts.parquet` | AccountId string, EffectiveDate date32, PortfolioEntity string, BaseCurrency string, IsActive bool | AccountId + EffectiveDate; one account per portfolio entity/date |
+| `forex.parquet` | EffectiveDate date32, FromCurrency string, ToCurrency string, Rate float64 | EffectiveDate + FromCurrency + ToCurrency |
+| `security_master.parquet` | InstrumentId string, EffectiveDate date32, Currency string, Country string, AnalyticsSecId int64 | InstrumentId + snapshot EffectiveDate |
+| `analytics.parquet` | SecId int64, **Effective Date** date32, Float01 through Float15 float64 | SecId + Effective Date |
+| `portfolio_PF.parquet` | Entity string, EffectiveDate date32, InstrumentId string, Weight float64, BaseReturn float64, LocalReturn float64 | Entity + EffectiveDate + InstrumentId |
+| `index.parquet` | Same columns as portfolio returns | Entity + EffectiveDate + InstrumentId |
+
+FX quotes mean ToCurrency units for one FromCurrency unit. Rates must be finite
+and positive; same-currency rates equal one. Every retained instrument needs a
+quote from its SMF currency to the account's base currency. Accounts must be
+active. Both security and analytics keys must be unique within a loaded date.
+
+SMF versions are **complete snapshots**, not sparse per-instrument changes. For
+calculation date D, the SMF reader decodes the latest snapshot effective on or
+before D, including when that snapshot precedes the requested start date. The
+preparation script verifies that every historical version contains the complete
+instrument universe. A future sparse-history input requires snapshot resolution
+before using this mode; selecting the latest global date would be incorrect
+for sparse per-security updates.
+
+Every row group must contain one effective date, proven by min/max statistics.
+Dates must be grouped in ascending order. One date can span several adjacent
+row groups. Mixed-date groups are rejected in this mode, rather than silently
+falling back to the old streaming path.
+
+## Fixture preparation
+
+```sh
+.venv/bin/python python/prepare_six_inputs.py
+```
+
+Default destination: `results/six-input/inputs` (must be fresh).
+
+The script generates Accounts and Forex daily snapshots, reads the existing
+historical SMF, and writes its 36 monthly snapshots grouped by effective date.
+It preserves the original classifications and adds `AnalyticsSecId`. Portfolio,
+index, and analytics files are symlinks to existing files; the 42.25 GiB analytics
+file is not regenerated or copied. A manifest records paths, schemas, mapping,
+coverage, and excluded return dates.
+
+**Synthetic analytics mapping:**
+
+```
+AnalyticsSecId = ((numeric suffix of InstrumentId - 1) % 100000) + 1
+```
+
+The existing analytics universe is 1–100000, while SMF contains 160000
+instruments. This deliberate many-to-one alias lets the existing analytics
+fixture join to every instrument. Distinct instruments can share analytics
+values; these aliases are not economic security identities. Production inputs
+must provide their actual mapping or complete analytics coverage.
+
+The analytics file has 3650 daily groups from 2016-01-01 to 2025-12-28. Returns
+cover 2023-01-01 to 2025-12-30. The prepared daily Accounts/Forex cover their
+1093-date intersection. Supply the computation window explicitly; the physical
+files need not have identical coverage outside that window.
+
+## Execution
+
+```sh
+cargo build --release --manifest-path rust/Cargo.toml --bin portfolio-attribution
+go -C go build -o ../results/six-input/benchmark-go ./cmd/attribution
+
+rust/target/release/portfolio-attribution \
+  --scenario six-input --data results/six-input/inputs \
+  --start-date 2023-01-01 --end-date 2025-12-28 --threads 12 \
+  --output-dir results/six-input/rust --metrics results/six-input/rust/metrics.csv
+
+results/six-input/benchmark-go \
+  --scenario six-input --data results/six-input/inputs \
+  --start-date 2023-01-01 --end-date 2025-12-28 --threads 12 \
+  --output-dir results/six-input/go --metrics results/six-input/go/metrics.csv
+```
+
+Both date parameters must be provided together. If neither is supplied, this
+benchmark defaults to the shared coverage bounds. The selected window contains
+every calendar date, including weekends, matching the current fixture. Missing
+daily data within the window fails. Files may contain extra dates outside the
+window. `--max-days N` limits the selected dates for smoke tests. Other scenarios
+do not accept these date-window parameters yet.
+
+1. Plan date-to-row-group mappings from six file footers. Metadata is shared
+   across workers; each worker opens six independent persistent file handles.
+2. Distribute consecutive date ranges across up to `--threads` workers. A worker processes one
+   complete date at a time. No date is assigned to two workers.
+3. For each date, read/decode the five daily inputs concurrently. On a worker's
+   first date or when the applicable SMF snapshot changes, decode SMF concurrently
+   as the sixth input. Otherwise reuse that worker's cached snapshot and parsed
+   security/country/currency/analytics lookups without reading or decoding SMF.
+4. Each reader requests a batch size equal to **the complete selected date's
+   row count**, and collects all its row groups. There is no fixed 65536 input
+   boundary in this path. All six decoded inputs remain available for the join.
+5. Validate dates, nulls, keys, finite values, and return/weight constraints.
+   Build the dated SMF lookup; independently filter both returns files to US
+   and normalize their selected weights. Align by InstrumentId.
+6. Join the retained portfolio/index security union to analytics through
+   AnalyticsSecId, and to Forex through SMF Currency and account BaseCurrency.
+   Decode and validate all 15 analytics values and retain their joined checksum.
+7. Run the existing security-level Brinson–Fachler and contribution calculations,
+   then sum results by country. Release daily input data before the next date;
+   retain the SMF cache until its applicable snapshot changes or the worker exits.
+8. Retain compact daily reports and publish them in date order as
+   `country-portfolio_PF.parquet`, only after all workers validate.
+
+Existing BaseReturn and LocalReturn drive attribution. Analytics and Forex are
+joined and checked, but **do not rewrite returns or change the BF formula**.
+The generated spot FX is not calibrated to the original synthetic returns.
+The account determines the base-currency quote to validate. This mode measures
+the six-file read/join workload, not a newly defined financial model.
+
+With 12 workers there are 72 persistent input readers and at most 72 concurrent
+read/decode calls. Rust uses six scoped input threads per active date worker;
+Go uses six goroutines per worker, with GOMAXPROCS controlled by `--threads`.
+The daily inputs are not sequenced within a worker. Each worker retains only
+one applicable SMF snapshot and its parsed lookup tables, reusing both until
+its effective snapshot changes. The cache is local to the invocation; it is
+not reused across separate runs or API requests. Workers receive consecutive
+date ranges so adjacent dates usually share a snapshot. No portfolio/index/
+analytics reread is needed during the same date's calculation.
+Output still uses the existing bounded writer batches, independently of input
+loading. Whole-date memory depends on the actual largest date, not 65536.
+
+Metrics include workers, readers per worker, dates, report rows, joined US
+security count, analytics/FX checksums, and decoded rows/read-decode seconds for
+each source. `smf_snapshot_loads` counts initial loads and replacements;
+`smf_cache_hits` counts dates that reuse the existing snapshot. SMF decoded rows
+and read-decode time increase only on cache misses. Read-decode times are sums across concurrent readers, not elapsed
+phase times or physical disk-read measurements. The wall clock includes setup,
+processing, and report finalization through the point metrics are recorded.
+
+## Validation
+
+```sh
+.venv/bin/python python/test_six_inputs.py
+cargo test --manifest-path rust/Cargo.toml
+go -C go test ./...
+.venv/bin/python python/test_attribution.py \
+  --go results/six-input/benchmark-go
+```
+
+The six-input suite compares every attribution/contribution field with the
+independent Python oracle and compares one-worker/multi-worker and Rust/Go
+outputs. It checks effective-date classification changes and snapshot
+carry-forward, explicit date windows despite unequal file coverage, dates
+larger than 65536 rows spread over multiple row groups, decoded/joined row counts,
+and analytics/FX checksums. Failure cases cover missing dates, missing analytics
+securities, a nonfinite fifteenth analytics column, missing FX, inactive accounts,
+duplicate master instruments, invalid windows, and incomplete coverage. Failed
+runs must not publish a final report in a fresh output directory.
+
+## Initial selected-window run before SMF caching
+
+Measured on November 4, 2026, using 12 workers, six readers per worker, and the
+explicit request 2023-01-01 through 2025-12-28. These are sequential single runs
+with uncontrolled cache state; they are not cold-cache measurements.
+
+| Engine | Native elapsed seconds | Peak process RSS | Dates | Report rows |
+|---|---:|---:|---:|---:|
+| Rust | 11.509 | 1.406 GiB | 1093 | 2186 |
+| Go | 15.134 | 3.227 GiB | 1093 | 2186 |
+
+Every output field is identical across engines (maximum absolute difference
+zero). Both match the pre-existing country baseline within the oracle's
+numeric tolerance. All six decoded row counts and the joined analytics/FX
+checksums were verified. The 22 six-input fixture checks, nine Rust unit tests,
+all Go tests, and the original nine-scenario Python oracle also passed.
+
+| Input | Rows decoded in each engine |
+|---|---:|
+| Accounts | 1093 |
+| Forex | 4372 |
+| SMF | 174880000 |
+| Analytics | 109300000 |
+| Portfolio returns | 65580000 |
+| Index returns | 109300000 |
+
+There were 172694000 US security/date joins. The original analytics file has
+365000000 rows; only the requested dates' 109300000 rows were decoded. This run
+does not claim to read all 42.25 GiB of the analytics file. The SMF row count
+includes repeated decoding of applicable monthly snapshots for each day.
+
+Evidence: [summary and validation](../results/six-input/full/summary.json),
+[Rust metrics](../results/six-input/full/rust/metrics.csv),
+[Go metrics](../results/six-input/full/go/metrics.csv),
+[Rust process usage](../results/six-input/full/rust/usage.txt),
+[Go process usage](../results/six-input/full/go/usage.txt), and
+[fixture manifest](../results/six-input/inputs/manifest.json). These generated
+artifacts are local and ignored by Git.
+
+Reproduce both engines and the full field/count/checksum comparisons:
+
+```sh
+.venv/bin/python python/benchmark_six_inputs.py \
+  --start-date 2023-01-01 --end-date 2025-12-28 --threads 12
+```
+
+The benchmark harness uses macOS `/usr/bin/time -l` for per-process memory
+measurements and compares against the existing country report specified by
+`--baseline`.
+
+## Per-worker SMF caching
+
+Implemented in both engines. A worker receives a consecutive date range and
+keeps the decoded SMF snapshot **and its parsed lookup tables** until the latest
+applicable snapshot date changes. On a hit there is no SMF file read, decode,
+or lookup-table rebuild. The other five inputs continue reading concurrently.
+A replacement is loaded concurrently with those five inputs; old snapshot
+buffers are released once no longer needed. Each worker starts with an empty
+cache. Sparse per-security history remains outside this snapshot input contract.
+
+The 24 six-input checks include one-worker and multi-worker cache hits,
+replacement at an effective-date classification change, and unchanged output
+against the independent oracle. Rust and Go native tests also pass.
+
+A verification run on the same 1093-date window produced these results:
+
+| Metric | Rust | Go |
+|---|---:|---:|
+| Native elapsed seconds | 8.281 | 9.757 |
+| Peak process RSS, GiB | 1.438 | 2.578 |
+| SMF snapshot loads | 46 | 46 |
+| SMF cache hits | 1047 | 1047 |
+| SMF rows actually decoded | 7360000 | 7360000 |
+| Report rows | 2186 | 2186 |
+
+There are 36 monthly snapshots, but boundary months can be loaded by more than
+one worker, so total loads across the 12 independent caches are 46. Before
+caching, SMF was decoded 1093 times (174880000 rows). The new decoded row count
+is 95.8% lower. Outputs remain identical across Rust and Go and match the
+existing country baseline within tolerance. All six input row counts and joined
+checksums were verified. Timing/cache conditions remain uncontrolled; these
+single runs are not a controlled speedup comparison.
+
+Evidence: [cached run summary](../results/six-input/cached/summary.json),
+[Rust cache metrics](../results/six-input/cached/rust/metrics.csv), and
+[Go cache metrics](../results/six-input/cached/go/metrics.csv).
+
+The benchmark harness now defaults to `results/six-input/cached` so the original
+uncached run evidence is retained. The binaries were rebuilt; existing native
+commands automatically use caching. For a new macOS purge run:
+
+```sh
+sudo purge && /usr/bin/time -l \
+  rust/target/release/portfolio-attribution \
+  --scenario six-input --data results/six-input/inputs \
+  --start-date 2023-01-01 --end-date 2025-12-28 --threads 12 \
+  --output-dir results/six-input/cached-purged/rust \
+  --metrics results/six-input/cached-purged/rust/metrics.csv
+
+sudo purge && /usr/bin/time -l \
+  results/six-input/benchmark-go \
+  --scenario six-input --data results/six-input/inputs \
+  --start-date 2023-01-01 --end-date 2025-12-28 --threads 12 \
+  --output-dir results/six-input/cached-purged/go \
+  --metrics results/six-input/cached-purged/go/metrics.csv
+```
