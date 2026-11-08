@@ -23,6 +23,7 @@ var outputHeader = []string{"Scenario", "Entity", "PeriodStart", "PeriodEnd", "D
 type config struct {
 	data, output, metrics, scenario, period, subset string
 	startDate, endDate                              string
+	smfTrace                                        string
 	threads, maxDays                                int
 	effectiveWorkers                                int
 }
@@ -775,6 +776,8 @@ func worker(path string, c config, m *master, input <-chan *day) (mt metrics, er
 func run() error {
 	wall := time.Now()
 	var c config
+	var listen string
+	flag.StringVar(&listen, "listen", "", "serve six-input HTTP API, e.g. 127.0.0.1:8080")
 	flag.StringVar(&c.data, "data", "attribution_data", "CSV and/or Parquet input directory")
 	flag.StringVar(&c.output, "output-dir", "results/go", "CSV output directory")
 	flag.StringVar(&c.metrics, "metrics", "results/go-metrics.csv", "metrics CSV")
@@ -786,9 +789,17 @@ func run() error {
 	flag.IntVar(&c.effectiveWorkers, "effective-date-workers", runtime.GOMAXPROCS(0), "parallel cumulative month-end calculations")
 	flag.StringVar(&c.startDate, "start-date", "", "six-input inclusive calculation start YYYY-MM-DD")
 	flag.StringVar(&c.endDate, "end-date", "", "six-input inclusive calculation end YYYY-MM-DD")
+	flag.StringVar(&c.smfTrace, "smf-trace", "off", "off|summary|records: per-worker SMF JSONL in output directory")
 	flag.Parse()
+	if c.smfTrace != "off" && c.smfTrace != "summary" && c.smfTrace != "records" {
+		return errors.New("smf-trace must be off, summary, or records")
+	}
 	if c.threads < 1 || c.maxDays < 0 {
 		return errors.New("invalid threads/max-days")
+	}
+	if listen != "" {
+		runtime.GOMAXPROCS(c.threads)
+		return serveAttribution(listen, c)
 	}
 	switch c.scenario {
 	case "security", "subset", "country", "weekly", "monthly", "cumulative", "six-input":

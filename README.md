@@ -2,9 +2,12 @@
 
 Go and Rust implement attribution from CSV or typed Arrow/Parquet inputs. Python provides independent correctness checks and benchmark orchestration.
 
+Daily SMF snapshots are the supported production approach. See [snapshot preparation and execution](docs/DAILY_SMF_SNAPSHOTS.md).
+
 ## Reports
 
 - [Six concurrent inputs per effective date](docs/SIX_INPUT_DATE_PIPELINE.md) — Accounts, Forex, historical SMF, 42 GiB analytics, portfolio and index returns; fixture generation, explicit date windows, Rust/Go execution and validation.
+- [Rust and Go attribution APIs and memory experiments](docs/ATTRIBUTION_API_MEMORY.md) — in-process requests, concurrent load, scalable securities/accounts/history fixtures, RSS and heap evidence.
 - [Current country attribution with an effective-dated SMF: optimized CSV and Parquet](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md) — the single country report, including latest runtimes, whole-run phases, worker stages, memory, calculation flow, optimization history and raw evidence links. Future country runs update this file in place.
 - [Historical CSV/Parquet benchmarks across five attribution scenarios](CSV_PARQUET_REPORT.md) — earlier measurements before the effective-dated master and complete-date worker pools.
 - [Historical attribution stage benchmarks with four portfolios](ATTRIBUTION_STAGE_COMPARISON.md) — a different fixture and output contract.

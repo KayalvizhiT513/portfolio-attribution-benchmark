@@ -14,9 +14,14 @@ use parquet::{
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fs::{self, File},
+    io::{BufWriter, Write},
     path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     thread,
-    time::Instant,
+    time::{Instant, SystemTime},
 };
 
 const NAMES: [&str; 6] = [
@@ -37,6 +42,214 @@ struct Plan {
     path: PathBuf,
     metadata: ArrowReaderMetadata,
     dates: BTreeMap<String, Range>,
+    daily_snapshot: bool,
+}
+// One immutable SMF plan for the lifetime of an API server.
+// Per-request fingerprint checks use stat only.
+pub(crate) struct SharedSmf {
+    plan: Arc<Plan>,
+    fingerprints: Vec<(PathBuf, u64, SystemTime)>,
+    load_seconds: f64,
+    uses: AtomicU64,
+}
+impl SharedSmf {
+    pub(crate) fn open(dir: &Path) -> Result<Self> {
+        let started = Instant::now();
+        let plan = Arc::new(plan(dir, 2)?);
+        let paths = vec![plan.path.clone()];
+        let fingerprints = paths
+            .into_iter()
+            .map(|path| {
+                let metadata = fs::metadata(&path)?;
+                Ok((path, metadata.len(), metadata.modified()?))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(Self {
+            plan,
+            fingerprints,
+            load_seconds: started.elapsed().as_secs_f64(),
+            uses: AtomicU64::new(0),
+        })
+    }
+    fn validated_plan(&self) -> Result<Arc<Plan>> {
+        for (path, length, modified) in &self.fingerprints {
+            let metadata = fs::metadata(path)?;
+            if metadata.len() != *length || metadata.modified()? != *modified {
+                return Err("shared SMF source changed; restart the server".into());
+            }
+        }
+        self.uses.fetch_add(1, Ordering::Relaxed);
+        Ok(Arc::clone(&self.plan))
+    }
+    pub(crate) fn snapshot(&self) -> serde_json::Value {
+        serde_json::json!({"scope":"server", "mode":if self.plan.daily_snapshot {"daily_snapshot"}else{"date_grouped"},
+            "metadata_loads":1,
+            "startup_load_seconds":self.load_seconds, "request_uses":self.uses.load(Ordering::Relaxed),
+            "state_scope":"worker"})
+    }
+}
+// Workers retain only sums for aggregate output, never the daily reports.
+#[derive(Default)]
+struct Sums {
+    entity: Option<String>,
+    start: String,
+    end: String,
+    days: usize,
+    values: BTreeMap<String, [[f64; 12]; 2]>,
+    metrics: Metrics,
+    rows: [u64; 6],
+    reads: [f64; 6],
+    joined: u64,
+    analytics_sum: f64,
+    fx_sum: f64,
+    snapshot_rows_served: u64,
+    loads: u64,
+    hits: u64,
+}
+impl Sums {
+    fn add(&mut self, r: DateReport, total: bool) -> Result<()> {
+        if self.entity.as_ref().is_some_and(|e| e != &r.entity) {
+            return Err("portfolio entity changes across dates".into());
+        }
+        self.entity = Some(r.entity);
+        if self.start.is_empty() || r.date < self.start {
+            self.start = r.date.clone();
+        }
+        if self.end.is_empty() || r.date > self.end {
+            self.end = r.date;
+        }
+        self.days += 1;
+        if total {
+            self.values.entry("ALL".into()).or_default();
+        }
+        for (k, a) in r.period.acc.iter().enumerate().filter(|(_, a)| a.present) {
+            let key = if total { "ALL" } else { &r.names[k] };
+            let values = self.values.entry(key.to_string()).or_default();
+            for t in 0..2 {
+                // Returns here are arithmetic sums of daily report values, not linked returns.
+                let rp = r.period.growth[0][t] - 1.0;
+                let rb = r.period.growth[1][t] - 1.0;
+                let numbers = [
+                    a.w[0],
+                    a.w[1],
+                    a.e[t][0],
+                    a.e[t][1],
+                    a.e[t][2],
+                    a.e[t].iter().sum(),
+                    rp,
+                    rb,
+                    rp - rb,
+                    a.contribution[0][t],
+                    a.contribution[1][t],
+                    a.contribution[0][t] - a.contribution[1][t],
+                ];
+                for j in 0..12 {
+                    // Portfolio-wide daily returns occur once in the total row.
+                    if !total || !(6..=8).contains(&j) {
+                        values[t][j] += numbers[j];
+                    }
+                }
+            }
+        }
+        if total && !self.values.is_empty() {
+            let values = self.values.get_mut("ALL").unwrap();
+            for t in 0..2 {
+                let rp = r.period.growth[0][t] - 1.0;
+                let rb = r.period.growth[1][t] - 1.0;
+                values[t][6] += rp;
+                values[t][7] += rb;
+                values[t][8] += rp - rb;
+            }
+        }
+        self.metrics.add(&r.metrics);
+        for i in 0..6 {
+            self.rows[i] += r.rows[i];
+            self.reads[i] += r.reads[i];
+        }
+        self.joined += r.joined;
+        self.analytics_sum += r.analytics_sum;
+        self.fx_sum += r.fx_sum;
+        self.snapshot_rows_served += r.snapshot_rows_served;
+        if r.rows[2] > 0 {
+            self.loads += 1;
+        } else {
+            self.hits += 1;
+        }
+        Ok(())
+    }
+    fn merge(&mut self, other: Self) -> Result<()> {
+        if let (Some(a), Some(b)) = (&self.entity, &other.entity) {
+            if a != b {
+                return Err("portfolio entity changes across dates".into());
+            }
+        }
+        if self.entity.is_none() {
+            self.entity = other.entity;
+        }
+        if self.start.is_empty() || (!other.start.is_empty() && other.start < self.start) {
+            self.start = other.start;
+        }
+        if self.end < other.end {
+            self.end = other.end;
+        }
+        self.days += other.days;
+        for (key, values) in other.values {
+            let dest = self.values.entry(key).or_default();
+            for t in 0..2 {
+                for j in 0..12 {
+                    dest[t][j] += values[t][j];
+                }
+            }
+        }
+        self.metrics.add(&other.metrics);
+        for i in 0..6 {
+            self.rows[i] += other.rows[i];
+            self.reads[i] += other.reads[i];
+        }
+        self.joined += other.joined;
+        self.analytics_sum += other.analytics_sum;
+        self.fx_sum += other.fx_sum;
+        self.snapshot_rows_served += other.snapshot_rows_served;
+        self.loads += other.loads;
+        self.hits += other.hits;
+        Ok(())
+    }
+    fn write(&self, c: &Config, writer: &mut output::Writer, mt: &mut Metrics) -> Result<()> {
+        let mut record = csv::ByteRecord::new();
+        let days = self.days.to_string();
+        for (key, values) in &self.values {
+            for t in 0..2 {
+                let return_type = if t == 0 { "base" } else { "local" };
+                if c.return_type != "both" && c.return_type != return_type {
+                    continue;
+                }
+                writer.row(
+                    &[
+                        "arithmetic_sum",
+                        self.entity.as_deref().unwrap_or(""),
+                        &self.start,
+                        &self.end,
+                        &days,
+                        if c.aggregate == "total" {
+                            "total"
+                        } else {
+                            "detail"
+                        },
+                        key,
+                        return_type,
+                    ],
+                    &values[t],
+                    &mut record,
+                )?;
+                mt.written += 1;
+                mt.report_rows += 1;
+                for j in 0..3 {
+                    mt.checksum[j] += values[t][j + 2];
+                }
+            }
+        }
+        Ok(())
+    }
 }
 struct DateReport {
     date: String,
@@ -49,6 +262,8 @@ struct DateReport {
     joined: u64,
     analytics_sum: f64,
     fx_sum: f64,
+    stages: [f64; 5],
+    snapshot_rows_served: u64,
 }
 
 fn schema_for(i: usize) -> Vec<(&'static str, DataType)> {
@@ -100,7 +315,11 @@ fn plan(dir: &Path, i: usize) -> Result<Plan> {
     let file = File::open(&path)?;
     let metadata = ArrowReaderMetadata::load(&file, ArrowReaderOptions::default())?;
     let schema = metadata.schema();
-    let expected = schema_for(i);
+    let daily_snapshot = i == 2 && schema.field_with_name("SnapshotDate").is_ok();
+    let mut expected = schema_for(i);
+    if daily_snapshot {
+        expected.push(("SnapshotDate", DataType::Date32));
+    }
     if schema.fields().len() != expected.len() {
         return Err(format!("{}: unexpected columns", NAMES[i]).into());
     }
@@ -114,7 +333,9 @@ fn plan(dir: &Path, i: usize) -> Result<Plan> {
             return Err(format!("{}: invalid column {name}", NAMES[i]).into());
         }
     }
-    let date_name = if i == 3 {
+    let date_name = if daily_snapshot {
+        "SnapshotDate"
+    } else if i == 3 {
         "Effective Date"
     } else {
         "EffectiveDate"
@@ -163,6 +384,7 @@ fn plan(dir: &Path, i: usize) -> Result<Plan> {
         path,
         metadata,
         dates,
+        daily_snapshot,
     })
 }
 fn read_date(
@@ -190,7 +412,9 @@ fn read_date(
     .with_batch_size(r.rows)
     .build()?;
     let batches = reader.collect::<std::result::Result<Vec<_>, _>>()?;
-    let dc = if plan.path.file_stem().unwrap() == "analytics" {
+    let dc = if plan.daily_snapshot {
+        "SnapshotDate"
+    } else if plan.path.file_stem().unwrap() == "analytics" {
         "Effective Date"
     } else {
         "EffectiveDate"
@@ -213,6 +437,19 @@ fn read_date(
             }
             if ds.values().iter().any(|&v| v != expected) {
                 return Err("mixed decoded dates".into());
+            }
+        }
+        if plan.daily_snapshot {
+            let effective = dates(b, "EffectiveDate");
+            for row in 0..b.num_rows() {
+                if effective.value(row) > ds.value(row) {
+                    return Err("snapshot contains future security effective date".into());
+                }
+                if arrow_array::temporal_conversions::date32_to_datetime(effective.value(row))
+                    .is_none()
+                {
+                    return Err("invalid snapshot security effective date".into());
+                }
             }
         }
         count += b.num_rows();
@@ -263,24 +500,60 @@ struct SmfState {
     currencies: Vec<String>,
     aliases: Vec<i64>,
 }
-fn parse_smf(batches: &[RecordBatch]) -> Result<SmfState> {
-    let mut m = Master {
-        ids: HashMap::new(),
-        names: Vec::new(),
-        history: Vec::new(),
-        country_names: Vec::new(),
-        selected: Vec::new(),
-        subset_slots: Vec::new(),
-        subset_names: Vec::new(),
-    };
-    let mut currencies = Vec::new();
-    let mut aliases = Vec::new();
-    // Deterministic country slots across snapshots, even if classifications change.
-    let countries: std::collections::BTreeSet<&str> = batches
-        .iter()
-        .flat_map(|b| strings(b, "Country").iter().flatten())
-        .collect();
-    m.country_names = countries.into_iter().map(str::to_string).collect();
+// One file per worker avoids a shared trace lock. Errors fail the calculation
+// rather than silently producing an incomplete audit trail.
+#[derive(Default)]
+struct SmfAccess {
+    snapshot_rows_served: u64,
+}
+
+struct SmfTrace {
+    writer: BufWriter<File>,
+    worker: usize,
+    request: Option<u64>,
+    records: bool,
+    started: Instant,
+    sequence: u64,
+}
+impl SmfTrace {
+    fn emit(&mut self, mut event: serde_json::Value) -> Result<()> {
+        event["worker_id"] = self.worker.into();
+        event["request_id"] = self.request.into();
+        event["sequence"] = self.sequence.into();
+        event["seconds"] = self.started.elapsed().as_secs_f64().into();
+        self.sequence += 1;
+        writeln!(self.writer, "{event}")?;
+        Ok(())
+    }
+}
+fn smf_attributes(country: &str, currency: &str, alias: i64) -> serde_json::Value {
+    serde_json::json!({"country": country, "currency": currency, "analytics_id": alias})
+}
+// Apply one effective date at a time. Missing securities retain their state.
+fn apply_smf(
+    state: &mut Option<SmfState>,
+    batches: &[RecordBatch],
+    trace: &mut Option<SmfTrace>,
+    calculation_date: &str,
+    effective_date: &str,
+    daily_snapshot: bool,
+) -> Result<()> {
+    let state = state.get_or_insert_with(|| SmfState {
+        master: Master {
+            ids: HashMap::new(),
+            names: Vec::new(),
+            history: Vec::new(),
+            country_names: Vec::new(),
+            selected: Vec::new(),
+            subset_slots: Vec::new(),
+            subset_names: Vec::new(),
+        },
+        currencies: Vec::new(),
+        aliases: Vec::new(),
+    });
+    let m = &mut state.master;
+    let mut seen = HashSet::new();
+    let (mut inserted, mut updated, mut unchanged) = (0u64, 0u64, 0u64);
     for b in batches {
         let ids = strings(b, "InstrumentId");
         let cs = strings(b, "Currency");
@@ -295,29 +568,137 @@ fn parse_smf(batches: &[RecordBatch]) -> Result<SmfState> {
                 || currency.is_empty()
                 || country.is_empty()
                 || alias <= 0
-                || m.ids.contains_key(id)
+                || !seen.insert(id.to_string())
             {
-                return Err("invalid or duplicate snapshot instrument".into());
+                return Err("invalid or duplicate effective-date instrument".into());
             }
-            let slot = m.names.len();
-            m.ids.insert(id.to_string(), slot);
-            m.names.push(id.to_string());
-            m.history.push(vec![(
-                String::new(),
-                m.country_names
-                    .binary_search_by(|n| n.as_str().cmp(country))
-                    .unwrap(),
-            )]);
-            currencies.push(currency.to_string());
-            aliases.push(alias);
+            let existing = m.ids.get(id).copied();
+            let changed = existing.is_some_and(|slot| {
+                m.country_names[m.history[slot][0].1] != country
+                    || state.currencies[slot] != currency
+                    || state.aliases[slot] != alias
+            });
+            let action = if existing.is_none() {
+                inserted += 1;
+                "inserted"
+            } else if changed {
+                updated += 1;
+                "updated"
+            } else {
+                unchanged += 1;
+                "unchanged"
+            };
+            let record = if trace.as_ref().is_some_and(|t| t.records) {
+                Some(
+                    serde_json::json!({"event":"security_applied", "calculation_date":calculation_date,
+                    "effective_date":arrow_array::temporal_conversions::date32_to_datetime(dates(b,"EffectiveDate").value(r)).ok_or("invalid SMF effective date")?.date().to_string(),
+                    "snapshot_date":if daily_snapshot {Some(calculation_date)}else{None}, "instrument_id":id, "action":action,
+                    "before": existing.map(|slot| smf_attributes(
+                        &m.country_names[m.history[slot][0].1], &state.currencies[slot], state.aliases[slot])),
+                    "after":smf_attributes(country, currency, alias)}),
+                )
+            } else {
+                None
+            };
+            let country_slot = match m.country_names.iter().position(|n| n == country) {
+                Some(slot) => slot,
+                None => {
+                    m.country_names.push(country.to_string());
+                    m.country_names.len() - 1
+                }
+            };
+            if let Some(&slot) = m.ids.get(id) {
+                m.history[slot][0].1 = country_slot;
+                state.currencies[slot] = currency.to_string();
+                state.aliases[slot] = alias;
+            } else {
+                let slot = m.names.len();
+                m.ids.insert(id.to_string(), slot);
+                m.names.push(id.to_string());
+                m.history.push(vec![(String::new(), country_slot)]);
+                m.selected.push(true);
+                state.currencies.push(currency.to_string());
+                state.aliases.push(alias);
+            }
+            if let (Some(t), Some(record)) = (trace.as_mut(), record) {
+                t.emit(record)?;
+            }
         }
     }
-    m.selected = vec![true; m.names.len()];
-    Ok(SmfState {
-        master: m,
-        currencies,
-        aliases,
-    })
+    if let Some(t) = trace {
+        t.emit(serde_json::json!({"event":if daily_snapshot {"snapshot_loaded"}else{"effective_date_applied"}, "calculation_date":calculation_date,
+            "snapshot_date":if daily_snapshot {Some(calculation_date)}else{None},
+            "effective_date":if daily_snapshot {None}else{Some(effective_date)}, "rows":inserted+updated+unchanged,
+            "inserted":inserted, "updated":updated, "unchanged":unchanged,
+            "state_securities":m.names.len()}))?;
+    }
+    Ok(())
+}
+
+// Bootstrap from history, then decode only changes since the previous date.
+// Discard each date's decoded batches after applying it to bound history memory.
+fn advance_smf(
+    file: &File,
+    plan: &Plan,
+    date: &str,
+    previous: Option<&str>,
+    state: &mut Option<SmfState>,
+    trace: &mut Option<SmfTrace>,
+    timings: &mut [f64; 3],
+    access: &mut SmfAccess,
+) -> Result<(Vec<RecordBatch>, f64, u64)> {
+    let start = Instant::now();
+    let lower = match previous {
+        Some(day) => std::ops::Bound::Excluded(day.to_string()),
+        None => std::ops::Bound::Unbounded,
+    };
+    let mut rows = 0;
+    let mut effective_dates = 0;
+    if plan.daily_snapshot {
+        if let Some(t) = trace.as_mut() {
+            t.emit(
+                serde_json::json!({"event":"snapshot_reset", "calculation_date":date,
+                "previous_state_securities":state.as_ref().map_or(0, |s|s.master.names.len())}),
+            )?;
+        }
+        // Each worker owns only its current date's parsed snapshot.
+        *state = None;
+        let (batches, read_seconds, count) = read_date(file, plan, date, false)?;
+        timings[0] = read_seconds;
+        let apply_started = Instant::now();
+        apply_smf(state, &batches, trace, date, date, true)?;
+        timings[1] = apply_started.elapsed().as_secs_f64();
+        rows = count;
+        access.snapshot_rows_served = count;
+        effective_dates = 1;
+    } else {
+        for (effective, _) in plan
+            .dates
+            .range((lower, std::ops::Bound::Included(date.to_string())))
+        {
+            let (batches, read_seconds, count) = read_date(file, plan, effective, false)?;
+            timings[0] += read_seconds;
+            let apply_started = Instant::now();
+            apply_smf(state, &batches, trace, date, effective, false)?;
+            timings[1] += apply_started.elapsed().as_secs_f64();
+            effective_dates += 1;
+            rows += count;
+        }
+    }
+    if state.is_none() {
+        return Err("no SMF history effective on date".into());
+    }
+    if let Some(t) = trace {
+        t.emit(serde_json::json!({"event":"date_ready", "calculation_date":date,
+            "previous_date":previous, "mode":if plan.daily_snapshot {if previous.is_none(){"snapshot_initialize"}else{"snapshot_replace"}}else if previous.is_none() {"initialize"} else if rows == 0 {"reuse"} else {"update"},
+            "effective_dates_applied":effective_dates, "rows_applied":if plan.daily_snapshot{access.snapshot_rows_served}else{rows},
+            "rows_decoded":rows,
+            "state_securities":state.as_ref().unwrap().master.names.len()}))?;
+        t.writer.flush()?;
+    }
+    let seconds = start.elapsed().as_secs_f64();
+    timings[2] = seconds - timings[0] - timings[1];
+    Ok((Vec::new(), seconds, rows))
 }
 
 fn calculate(
@@ -328,6 +709,8 @@ fn calculate(
     c: &Config,
     smf_cache: &mut Option<SmfState>,
 ) -> Result<DateReport> {
+    let mut stages = [0.0; 5];
+    let mut stage_started = Instant::now();
     let mut accounts = HashMap::new();
     let mut account_ids = HashSet::new();
     for b in &tables[0] {
@@ -367,9 +750,8 @@ fn calculate(
             }
         }
     }
-    if rows[2] > 0 || smf_cache.is_none() {
-        *smf_cache = Some(parse_smf(&tables[2])?);
-    }
+    stages[0] = stage_started.elapsed().as_secs_f64();
+    stage_started = Instant::now();
     let state = smf_cache.as_ref().unwrap();
     let (m, currencies, aliases) = (&state.master, &state.currencies, &state.aliases);
     let mut analytics = HashMap::new();
@@ -392,6 +774,8 @@ fn calculate(
             }
         }
     }
+    stages[1] = stage_started.elapsed().as_secs_f64();
+    stage_started = Instant::now();
     let mut mt = Metrics::default();
     let mut daily = Vec::new();
     // Move the decoded return buffers into adapters; do not reread either file.
@@ -405,14 +789,26 @@ fn calculate(
             raw: Vec::new(),
             seen: Vec::new(),
         };
-        let d = s.next(&m, c, &mut mt)?.ok_or("empty returns date")?;
+        let mut d = s.next(&m, c, &mut mt)?.ok_or("empty returns date")?;
+        if c.aggregate != "daily" {
+            d.country_count = 0;
+        }
         if d.date != date || s.next(&m, c, &mut mt)?.is_some() {
             return Err("return date mismatch".into());
         }
         daily.push(d);
     }
+    stages[2] = stage_started.elapsed().as_secs_f64();
+    stage_started = Instant::now();
     let pd = &daily[0];
     let bd = &daily[1];
+    if c.aggregate != "daily" {
+        let portfolio_empty = !pd.stats.iter().any(|s| s.present);
+        let benchmark_empty = !bd.stats.iter().any(|s| s.present);
+        if portfolio_empty != benchmark_empty {
+            return Err(format!("US holdings missing on only one side: {date}").into());
+        }
+    }
     let (base, active) = accounts
         .get(&pd.entity)
         .ok_or("missing portfolio account")?;
@@ -438,12 +834,19 @@ fn calculate(
             joined += 1;
         }
     }
+    stages[3] = stage_started.elapsed().as_secs_f64();
+    stage_started = Instant::now();
     let mut period = Period::new(pd, date.to_string(), c);
     period.add(pd, bd, &mut mt)?;
+    stages[4] = stage_started.elapsed().as_secs_f64();
     Ok(DateReport {
         date: date.to_string(),
         entity: pd.entity.clone(),
-        names: m.country_names.clone(),
+        names: if c.aggregate == "daily" {
+            m.country_names.clone()
+        } else {
+            m.names.clone()
+        },
         period,
         metrics: mt,
         rows,
@@ -451,10 +854,27 @@ fn calculate(
         joined,
         analytics_sum,
         fx_sum,
+        stages,
+        snapshot_rows_served: 0,
     })
 }
 
 pub fn run(config: &Config) -> Result<()> {
+    run_with_pool(config, None)
+}
+
+pub(crate) fn run_with_pool(
+    config: &Config,
+    pool: Option<&crate::worker_pool::WorkerPool>,
+) -> Result<()> {
+    run_with_shared_smf(config, pool, None)
+}
+
+pub(crate) fn run_with_shared_smf(
+    config: &Config,
+    pool: Option<&crate::worker_pool::WorkerPool>,
+    shared_smf: Option<&SharedSmf>,
+) -> Result<()> {
     let start = Instant::now();
     if config.period != "day" || config.subset.is_some() {
         return Err("six-input requires daily country calculation without subset".into());
@@ -465,8 +885,21 @@ pub fn run(config: &Config) -> Result<()> {
     if fs::canonicalize(&c.output)? == fs::canonicalize(&c.data)? {
         return Err("output must differ from inputs".into());
     }
+    let shared_plan = shared_smf
+        .map(|shared| shared.validated_plan())
+        .transpose()?;
     let plans = (0..6)
-        .map(|i| plan(&c.data, i))
+        .map(|i| {
+            if i == 2 {
+                if let Some(shared) = &shared_plan {
+                    Ok(Arc::clone(shared))
+                } else {
+                    Ok(Arc::new(plan(&c.data, i)?))
+                }
+            } else {
+                Ok(Arc::new(plan(&c.data, i)?))
+            }
+        })
         .collect::<Result<Vec<_>>>()?;
     let (first, last) = match (&c.start_date, &c.end_date) {
         (Some(a), Some(b)) => (a.clone(), b.clone()),
@@ -507,7 +940,8 @@ pub fn run(config: &Config) -> Result<()> {
     }
     for d in &days {
         for (i, p) in plans.iter().enumerate() {
-            if (i == 2 && p.dates.range(..=d.clone()).next_back().is_none())
+            if (i == 2 && !p.daily_snapshot && p.dates.range(..=d.clone()).next_back().is_none())
+                || (i == 2 && p.daily_snapshot && !p.dates.contains_key(d))
                 || (i != 2 && !p.dates.contains_key(d))
             {
                 return Err(format!("{} missing date {d}", NAMES[i]).into());
@@ -515,74 +949,165 @@ pub fn run(config: &Config) -> Result<()> {
         }
     }
     let workers = c.threads.min(days.len());
-    let mut reports = thread::scope(|scope| -> Result<Vec<DateReport>> {
+    let planning_seconds = start.elapsed().as_secs_f64();
+    let workers_started = Instant::now();
+    let (mut reports, sums) = thread::scope(|scope| -> Result<(Vec<DateReport>, Sums)> {
         let mut handles = Vec::new();
         for worker in 0..workers {
             let (plans, days, c) = (&plans, &days, &c);
-            handles.push(scope.spawn(move || -> Result<Vec<DateReport>> {
+            handles.push(scope.spawn(move || -> Result<(Vec<DateReport>, Sums)> {
+                // Acquire before opening readers or allocating the worker's SMF
+                // cache. Keep this permit through the entire assigned range.
+                let worker_started = Instant::now();
+                let first = days.len() * worker / workers;
+                let last = days.len() * (worker + 1) / workers;
+                let _permit = pool.map(|pool| {
+                    pool.acquire_worker(Some(crate::worker_pool::WorkerLabel {
+                        request_id: c.request_id.unwrap_or(0),
+                        worker_id: worker + 1,
+                        first_date: days[first].clone(),
+                        last_date: days[last - 1].clone(),
+                    }))
+                });
+                let admission_wait_seconds = worker_started.elapsed().as_secs_f64();
+                let mut profile = if c.stage_profile {
+                    Some(BufWriter::new(File::options().write(true).create_new(true).open(
+                        c.output.join(format!("stage-profile-worker-{:02}.jsonl", worker + 1)))?))
+                } else { None };
+                // Build the private source plan only after acquiring a worker slot.
+                let private_plans;
+                let plans = if c.private_smf {
+                    private_plans = plans.iter().enumerate().map(|(i, p)| {
+                        if i == 2 { Ok(Arc::new(plan(&c.data, 2)?)) } else { Ok(Arc::clone(p)) }
+                    }).collect::<Result<Vec<_>>>()?;
+                    &private_plans
+                } else { plans };
                 let files = plans
                     .iter()
                     .map(|p| File::open(&p.path))
                     .collect::<std::io::Result<Vec<_>>>()?;
                 let mut out = Vec::new();
-                let mut cached_smf: Option<(String, Vec<RecordBatch>)> = None;
+                let mut sums = Sums::default();
+                let mut smf_activity = None;
                 let mut cached_master = None;
-                let first = days.len() * worker / workers;
-                let last = days.len() * (worker + 1) / workers;
+                let mut previous_date: Option<&str> = None;
+                let mut smf_trace = if c.smf_trace == "off" { None } else {
+                    let mut trace = SmfTrace {
+                        writer: BufWriter::new(File::options().write(true).create_new(true).open(
+                            c.output.join(format!("smf-trace-worker-{:02}.jsonl", worker + 1)))?),
+                        worker: worker + 1, request: c.request_id,
+                        records: c.smf_trace == "records", started: Instant::now(), sequence: 0,
+                    };
+                    trace.emit(serde_json::json!({"event":"worker_start", "engine":"rust",
+                        "trace_level":c.smf_trace, "initialization_mode":if plans[2].daily_snapshot {"daily_snapshot"}else{"replay"}, "first_date":days[first], "last_date":days[last-1]}))?;
+                    trace.writer.flush()?;
+                    Some(trace)
+                };
+                if let Some(writer) = &mut profile {
+                    writeln!(writer, "{}", serde_json::json!({"event":"worker_start", "worker_id":worker+1,
+                        "first_date":days[first], "last_date":days[last-1], "admission_wait_seconds":admission_wait_seconds,
+                        "setup_seconds":worker_started.elapsed().as_secs_f64()-admission_wait_seconds}))?;
+                }
                 for date in &days[first..last] {
-                    let snapshot = plans[2]
-                        .dates
-                        .range(..=date.clone())
-                        .next_back()
-                        .ok_or("missing SMF snapshot")?
-                        .0;
-                    let hit = cached_smf.as_ref().is_some_and(|(key, _)| key == snapshot);
-                    let loaded = thread::scope(|scope| -> Result<Vec<_>> {
-                        let tasks: Vec<_> = (0..6)
-                            .map(|i| {
-                                let file = &files[i];
-                                let p = &plans[i];
-                                let cached = if i == 2 && hit {
-                                    Some(cached_smf.as_ref().unwrap().1.clone())
-                                } else {
-                                    None
-                                };
-                                scope.spawn(move || match cached {
-                                    Some(batches) => Ok((batches, 0.0, 0)),
-                                    None => read_date(file, p, date, i == 2),
+                    let date_started = Instant::now();
+                    let input_started = Instant::now();
+                    let mut smf_times = [0.0; 3];
+                    let mut smf_access = SmfAccess::default();
+                    let loaded = {
+                        let _reading = pool.map(|p| p.activity.reading_workers.enter());
+                        thread::scope(|scope| -> Result<Vec<_>> {
+                            let mut smf_target = Some((&mut cached_master, &mut smf_trace, &mut smf_times, &mut smf_access));
+                            let tasks: Vec<_> = (0..6)
+                                .map(|i| {
+                                    let file = &files[i];
+                                    let p = &plans[i];
+                                    let target = if i == 2 { smf_target.take() } else { None };
+                                    scope.spawn(move || {
+                                        let (batches, seconds, rows) = {
+                                            let _read =
+                                                pool.map(|p| p.activity.read_decode_calls.enter());
+                                            if let Some((state, trace, timings, access)) = target {
+                                                advance_smf(file, p, date, previous_date, state, trace, timings, access)?
+                                            } else {
+                                                read_date(file, p, date, false)?
+                                            }
+                                        };
+                                        let retained = if i != 2 {
+                                            pool.map(|p| p.activity.retained_daily_inputs.enter())
+                                        } else {
+                                            None
+                                        };
+                                        Ok((batches, seconds, rows, retained))
+                                    })
                                 })
-                            })
-                            .collect();
-                        tasks
-                            .into_iter()
-                            .map(|h| h.join().map_err(|_| "input reader panicked")?)
-                            .collect()
-                    })?;
-                    if !hit {
-                        cached_smf = Some((snapshot.clone(), loaded[2].0.clone()));
+                                .collect();
+                            tasks
+                                .into_iter()
+                                .map(|h| h.join().map_err(|_| "input reader panicked")?)
+                                .collect()
+                        })?
+                    };
+                    let input_phase_seconds = input_started.elapsed().as_secs_f64();
+                    if smf_activity.is_none() {
+                        smf_activity = pool.map(|p| p.activity.workers_with_smf_cache.enter());
                     }
                     let mut tables = Vec::new();
                     let mut rows = [0; 6];
                     let mut reads = [0.0; 6];
-                    for (i, (t, s, n)) in loaded.into_iter().enumerate() {
+                    let mut retained_inputs = Vec::new();
+                    for (i, (t, s, n, retained)) in loaded.into_iter().enumerate() {
+                        retained_inputs.push(retained);
                         tables.push(t);
                         reads[i] = s;
                         rows[i] = n;
                     }
-                    out.push(
-                        calculate(date, tables, rows, reads, c, &mut cached_master)
-                            .map_err(|e| format!("date {date}: {e}"))?,
-                    );
+                    let calculation_started = Instant::now();
+                    let mut report = calculate(date, tables, rows, reads, c, &mut cached_master)
+                        .map_err(|e| format!("date {date}: {e}"))?;
+                    let calculation_seconds = calculation_started.elapsed().as_secs_f64();
+                    let stages = report.stages;
+                    report.snapshot_rows_served=smf_access.snapshot_rows_served;
+                    if c.aggregate == "daily" { out.push(report); } else { sums.add(report, c.aggregate == "total")?; }
+                    drop(retained_inputs);
+                    let date_seconds = date_started.elapsed().as_secs_f64();
+                    if let Some(writer) = &mut profile {
+                        writeln!(writer, "{}", serde_json::json!({"event":"date_timing", "worker_id":worker+1,
+                            "date":date, "initialization":previous_date.is_none(),
+                            "date_seconds":date_seconds, "input_phase_seconds":input_phase_seconds,
+                            "input_read_decode_seconds":reads,
+                            "smf_read_decode_seconds":smf_times[0], "smf_apply_and_trace_seconds":smf_times[1],
+                            "smf_release_and_other_seconds":smf_times[2],
+                            "accounts_fx_lookup_seconds":stages[0], "analytics_lookup_seconds":stages[1],
+                            "returns_processing_seconds":stages[2], "join_validation_seconds":stages[3],
+                            "attribution_seconds":stages[4], "calculate_call_seconds":calculation_seconds,
+                            "calculate_cleanup_and_other_seconds":calculation_seconds-stages.iter().sum::<f64>(),
+                            "date_other_seconds":date_seconds-input_phase_seconds-calculation_seconds}))?;
+                    }
+                    previous_date = Some(date);
                 }
-                Ok(out)
+                if let Some(t) = &mut smf_trace {
+                    t.emit(serde_json::json!({"event":"worker_complete"}))?;
+                    t.writer.flush()?;
+                }
+                if let Some(writer) = &mut profile {
+                    writeln!(writer, "{}", serde_json::json!({"event":"worker_complete", "worker_id":worker+1,
+                        "worker_seconds":worker_started.elapsed().as_secs_f64()}))?;
+                    writer.flush()?;
+                }
+                Ok((out, sums))
             }));
         }
         let mut out = Vec::new();
+        let mut sums = Sums::default();
         for h in handles {
-            out.extend(h.join().map_err(|_| "date worker panicked")??);
+            let (reports, partial) = h.join().map_err(|_| "date worker panicked")??;
+            out.extend(reports);
+            sums.merge(partial)?;
         }
-        Ok(out)
+        Ok((out, sums))
     })?;
+    let worker_phase_seconds = workers_started.elapsed().as_secs_f64();
+    let output_started = Instant::now();
     reports.sort_by(|a, b| a.date.cmp(&b.date));
     let target = output::path(&c, &plans[4].path);
     let partial = output::partial(&target);
@@ -593,11 +1118,25 @@ pub fn run(config: &Config) -> Result<()> {
     let (mut joined, mut analytics_sum, mut fx_sum) = (0u64, 0.0, 0.0);
     let mut entity = None;
     let (mut smf_loads, mut smf_hits) = (0u64, 0u64);
+    let mut snapshot_rows_served = 0u64;
+    if c.aggregate != "daily" {
+        mt.add(&sums.metrics);
+        rows = sums.rows;
+        reads = sums.reads;
+        joined = sums.joined;
+        analytics_sum = sums.analytics_sum;
+        fx_sum = sums.fx_sum;
+        snapshot_rows_served = sums.snapshot_rows_served;
+        smf_loads = sums.loads;
+        smf_hits = sums.hits;
+        sums.write(&c, &mut writer, &mut mt)?;
+    }
     for r in reports {
         if entity.as_ref().is_some_and(|e| e != &r.entity) {
             return Err("portfolio entity changes across dates".into());
         }
         entity = Some(r.entity.clone());
+        snapshot_rows_served += r.snapshot_rows_served;
         mt.add(&r.metrics);
         r.period
             .write(&c, &r.entity, &r.names, &mut writer, &mut mt)?;
@@ -616,6 +1155,8 @@ pub fn run(config: &Config) -> Result<()> {
     }
     writer.finish()?;
     fs::rename(partial, target)?;
+    let report_write_seconds = output_started.elapsed().as_secs_f64();
+    let metrics_started = Instant::now();
     if let Some(parent) = c.metrics.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -648,10 +1189,33 @@ pub fn run(config: &Config) -> Result<()> {
         header.push(format!("{}_read_decode_seconds", NAMES[i]));
         values.push(reads[i].to_string());
     }
-    header.extend(["smf_snapshot_loads".into(), "smf_cache_hits".into()]);
-    values.extend([smf_loads.to_string(), smf_hits.to_string()]);
+    header.extend([
+        "smf_snapshot_loads".into(),
+        "smf_cache_hits".into(),
+        "smf_snapshot_rows_served".into(),
+    ]);
+    values.extend([
+        smf_loads.to_string(),
+        smf_hits.to_string(),
+        snapshot_rows_served.to_string(),
+    ]);
     w.write_record(header)?;
     w.write_record(values)?;
     w.flush()?;
+    if c.stage_profile {
+        let metrics_write_seconds = metrics_started.elapsed().as_secs_f64();
+        fs::write(
+            c.output.join("stage-profile.json"),
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "smf_reading_path":if plans[2].daily_snapshot {"daily_snapshot"}else{"date_grouped"},
+            "smf_shared_at_server":shared_smf.is_some(),
+                "smf_source_scope":if c.private_smf {"worker"}else if shared_smf.is_some(){"server"}else{"request"},
+                "planning_seconds":planning_seconds, "worker_phase_seconds":worker_phase_seconds,
+                "report_write_seconds":report_write_seconds, "metrics_write_seconds":metrics_write_seconds,
+                "elapsed_before_profile_write_seconds":start.elapsed().as_secs_f64(),
+                "note":"Elapsed spans include scheduling/I/O waits. Worker/input timings overlap and are not additive across workers or input readers. SMF apply includes enabled trace serialization; cleanup residuals include uninstrumented overhead. Profile writing is outside per-date spans."
+            }))?,
+        )?;
+    }
     Ok(())
 }

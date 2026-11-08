@@ -3,9 +3,11 @@ package main
 // Six persistent readers per date worker. Decoding runs concurrently across all
 // six files; the requested batch size is the selected complete date's row count.
 import (
+	"bufio"
 	"context"
 	"encoding/binary"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -270,21 +272,39 @@ type sixSMF struct {
 	aliases    []int64
 }
 
-func parseSixSMF(batches []arrow.RecordBatch) (state *sixSMF, err error) {
-	m := master{ids: map[string]int{}}
-	countrySet := map[string]bool{}
-	for _, b := range batches {
-		a := sixCol(b, "Country").(*array.String)
-		for r := 0; r < a.Len(); r++ {
-			countrySet[a.Value(r)] = true
-		}
+// A worker owns its trace; no global trace lock is needed.
+type sixSMFTrace struct {
+	file     *os.File
+	writer   *bufio.Writer
+	worker   int
+	records  bool
+	sequence uint64
+	started  time.Time
+}
+
+func (t *sixSMFTrace) emit(event map[string]any) error {
+	if t == nil {
+		return nil
 	}
-	for name := range countrySet {
-		m.countryNames = append(m.countryNames, name)
+	event["worker_id"] = t.worker
+	event["sequence"] = t.sequence
+	event["seconds"] = seconds(t.started)
+	t.sequence++
+	return json.NewEncoder(t.writer).Encode(event)
+}
+func sixSMFAttributes(country, currency string, alias int64) map[string]any {
+	return map[string]any{"country": country, "currency": currency, "analytics_id": alias}
+}
+
+// Apply one effective date; securities absent from this delta retain their state.
+func applySixSMF(cache **sixSMF, batches []arrow.RecordBatch, trace *sixSMFTrace, calculationDate, effectiveDate string) error {
+	if *cache == nil {
+		*cache = &sixSMF{master: master{ids: map[string]int{}}}
 	}
-	sort.Strings(m.countryNames)
-	var currencies []string
-	var aliases []int64
+	state := *cache
+	m := &state.master
+	seen := map[string]bool{}
+	inserted, updated, unchanged := 0, 0, 0
 	for _, b := range batches {
 		ids := sixCol(b, "InstrumentId").(*array.String)
 		cs := sixCol(b, "Currency").(*array.String)
@@ -292,20 +312,105 @@ func parseSixSMF(batches []arrow.RecordBatch) (state *sixSMF, err error) {
 		aliasIDs := sixCol(b, "AnalyticsSecId").(*array.Int64)
 		for r := 0; r < int(b.NumRows()); r++ {
 			id, currency, country, alias := ids.Value(r), cs.Value(r), countries.Value(r), aliasIDs.Value(r)
-			_, exists := m.ids[id]
-			if id == "" || currency == "" || country == "" || alias <= 0 || exists {
-				return nil, fmt.Errorf("invalid or duplicate snapshot instrument")
+			if id == "" || currency == "" || country == "" || alias <= 0 || seen[id] {
+				return fmt.Errorf("invalid or duplicate effective-date instrument")
 			}
-			m.ids[id] = len(m.names)
-			m.names = append(m.names, id)
-			m.history = append(m.history, []masterVersion{{"", sort.SearchStrings(m.countryNames, country)}})
-			currencies = append(currencies, currency)
-			aliases = append(aliases, alias)
-			m.selected = append(m.selected, true)
+			seen[id] = true
+			slot, exists := m.ids[id]
+			var before any
+			action := "inserted"
+			if exists {
+				oldCountry := m.countryNames[m.history[slot][0].country]
+				if oldCountry != country || state.currencies[slot] != currency || state.aliases[slot] != alias {
+					action = "updated"
+					updated++
+				} else {
+					action = "unchanged"
+					unchanged++
+				}
+				if trace != nil && trace.records {
+					before = sixSMFAttributes(oldCountry, state.currencies[slot], state.aliases[slot])
+				}
+			} else {
+				inserted++
+			}
+			countrySlot := 0
+			for countrySlot < len(m.countryNames) && m.countryNames[countrySlot] != country {
+				countrySlot++
+			}
+			if countrySlot == len(m.countryNames) {
+				m.countryNames = append(m.countryNames, country)
+			}
+			if slot, exists := m.ids[id]; exists {
+				m.history[slot] = []masterVersion{{"", countrySlot}}
+				state.currencies[slot] = currency
+				state.aliases[slot] = alias
+			} else {
+				m.ids[id] = len(m.names)
+				m.names = append(m.names, id)
+				m.history = append(m.history, []masterVersion{{"", countrySlot}})
+				m.selected = append(m.selected, true)
+				state.currencies = append(state.currencies, currency)
+				state.aliases = append(state.aliases, alias)
+			}
+			if trace != nil && trace.records {
+				if err := trace.emit(map[string]any{"event": "security_applied", "calculation_date": calculationDate,
+					"effective_date": effectiveDate, "instrument_id": id, "action": action,
+					"before": before, "after": sixSMFAttributes(country, currency, alias)}); err != nil {
+					return err
+				}
+			}
 		}
 	}
-	return &sixSMF{m, currencies, aliases}, nil
+	return trace.emit(map[string]any{"event": "effective_date_applied", "calculation_date": calculationDate,
+		"effective_date": effectiveDate, "rows": inserted + updated + unchanged,
+		"inserted": inserted, "updated": updated, "unchanged": unchanged, "state_securities": len(m.names)})
 }
+
+// Bootstrap history once, then read only new effective dates. Release each
+// decoded change date immediately rather than retaining the historical batches.
+func advanceSixSMF(f *file.Reader, p *sixPlan, date, previous string, cache **sixSMF, trace *sixSMFTrace) (out sixLoaded) {
+	start := time.Now()
+	defer func() { out.seconds = seconds(start) }()
+	effectiveDates := 0
+	first := sort.Search(len(p.ranges), func(i int) bool { return p.ranges[i].date > previous })
+	for n := first; n < len(p.ranges) && p.ranges[n].date <= date; n++ {
+		loaded := readSix(f, p, p.ranges[n].date, false)
+		if loaded.err != nil {
+			out.err = loaded.err
+			return
+		}
+		out.err = applySixSMF(cache, loaded.batches, trace, date, p.ranges[n].date)
+		effectiveDates++
+		out.rows += loaded.rows
+		releaseSix(loaded.batches)
+		if out.err != nil {
+			return
+		}
+	}
+	if *cache == nil {
+		out.err = fmt.Errorf("no SMF history effective on date")
+		return
+	}
+	if trace != nil {
+		mode := "update"
+		var previousValue any = previous
+		if previous == "" {
+			mode = "initialize"
+			previousValue = nil
+		} else if out.rows == 0 {
+			mode = "reuse"
+		}
+		out.err = trace.emit(map[string]any{"event": "date_ready", "calculation_date": date,
+			"previous_date": previousValue, "mode": mode, "effective_dates_applied": effectiveDates,
+			"rows_applied": out.rows, "state_securities": len((*cache).master.names)})
+		if out.err == nil {
+			out.err = trace.writer.Flush()
+		}
+	}
+	return
+}
+
 func calculateSix(date string, loaded [6]sixLoaded, c config, smfCache **sixSMF) (out sixReport, err error) {
 	defer func() {
 		for _, v := range loaded {
@@ -344,12 +449,6 @@ func calculateSix(date string, loaded [6]sixLoaded, c config, smfCache **sixSMF)
 				return out, fmt.Errorf("invalid or duplicate FX quote")
 			}
 			fx[key] = rate
-		}
-	}
-	if loaded[2].rows > 0 || *smfCache == nil {
-		*smfCache, err = parseSixSMF(loaded[2].batches)
-		if err != nil {
-			return out, err
 		}
 	}
 	state := *smfCache
@@ -515,29 +614,41 @@ func runSixInput(c config) error {
 					return
 				}
 			}
-			var cachedSMF []arrow.RecordBatch
 			var cachedMaster *sixSMF
-			cachedSnapshot := ""
-			defer func() { releaseSix(cachedSMF) }()
+			previousDate := ""
 			first, last := len(days)*worker/workers, len(days)*(worker+1)/workers
+			var trace *sixSMFTrace
+			if c.smfTrace != "" && c.smfTrace != "off" {
+				f, err := os.OpenFile(filepath.Join(c.output, fmt.Sprintf("smf-trace-worker-%02d.jsonl", worker+1)), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+				if err != nil {
+					res.err = err
+					return
+				}
+				trace = &sixSMFTrace{file: f, writer: bufio.NewWriter(f), worker: worker + 1, records: c.smfTrace == "records", started: time.Now()}
+				defer f.Close()
+				defer trace.writer.Flush()
+				res.err = trace.emit(map[string]any{"event": "worker_start", "engine": "go", "trace_level": c.smfTrace,
+					"first_date": days[first], "last_date": days[last-1]})
+				if res.err == nil {
+					res.err = trace.writer.Flush()
+				}
+				if res.err != nil {
+					return
+				}
+			}
 			for n := first; n < last; n++ {
 				date := days[n]
-				snapshot, _ := plans[2].selected(date, true)
-				hit := cachedSnapshot == snapshot.date
 				var loaded [6]sixLoaded
 				var wg sync.WaitGroup
 				for i := range files {
 					wg.Add(1)
 					go func(i int) {
 						defer wg.Done()
-						if i == 2 && hit {
-							for _, b := range cachedSMF {
-								b.Retain()
-							}
-							loaded[i] = sixLoaded{batches: cachedSMF}
-							return
+						if i == 2 {
+							loaded[i] = advanceSixSMF(files[i], &plans[i], date, previousDate, &cachedMaster, trace)
+						} else {
+							loaded[i] = readSix(files[i], &plans[i], date, false)
 						}
-						loaded[i] = readSix(files[i], &plans[i], date, i == 2)
 					}(i)
 				}
 				wg.Wait()
@@ -552,14 +663,6 @@ func runSixInput(c config) error {
 					}
 					return
 				}
-				if !hit {
-					releaseSix(cachedSMF)
-					cachedSMF = append([]arrow.RecordBatch(nil), loaded[2].batches...)
-					for _, b := range cachedSMF {
-						b.Retain()
-					}
-					cachedSnapshot = snapshot.date
-				}
 				var report sixReport
 				report, res.err = calculateSix(date, loaded, c, &cachedMaster)
 				if res.err != nil {
@@ -567,6 +670,13 @@ func runSixInput(c config) error {
 					return
 				}
 				res.reports = append(res.reports, report)
+				previousDate = date
+			}
+			if trace != nil {
+				res.err = trace.emit(map[string]any{"event": "worker_complete"})
+				if res.err == nil {
+					res.err = trace.writer.Flush()
+				}
 			}
 		}(worker)
 	}

@@ -8,11 +8,13 @@ use std::{
     thread,
     time::Instant,
 };
+mod api;
 mod country_parallel;
 mod cumulative;
 mod input;
 mod output;
 mod six_input;
+mod worker_pool;
 use input::Input;
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 const HEADER: [&str; 6] = [
@@ -47,6 +49,16 @@ const OUT: [&str; 20] = [
 ];
 #[derive(Clone)]
 struct Config {
+    listen: Option<String>,
+    worker_limit: usize,
+    request_limit: usize,
+    worker_trace: Option<PathBuf>,
+    smf_trace: String,
+    stage_profile: bool,
+    private_smf: bool,
+    aggregate: String,
+    return_type: String,
+    request_id: Option<u64>,
     data: PathBuf,
     output: PathBuf,
     metrics: PathBuf,
@@ -61,6 +73,16 @@ struct Config {
 }
 fn config() -> Result<Config> {
     let mut c = Config {
+        listen: None,
+        worker_limit: 12,
+        request_limit: 12,
+        worker_trace: None,
+        smf_trace: "off".into(),
+        stage_profile: false,
+        private_smf: false,
+        aggregate: "daily".into(),
+        return_type: "base".into(),
+        request_id: None,
         data: "attribution_data".into(),
         output: "results/rust".into(),
         metrics: "results/rust-metrics.csv".into(),
@@ -76,12 +98,38 @@ fn config() -> Result<Config> {
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         if a == "--help" {
+            println!("--aggregate daily|total|security sums daily attribution (six-input/API); --return-type base|local|both selects summed output (default base)");
+            println!("--listen HOST:PORT serves the six-input HTTP API in-process");
+            println!(
+                "--request-limit N caps API requests before metadata/index opening (default 12)"
+            );
+            println!("--worker-limit N caps date workers across all API requests (default 12)");
+            println!(
+                "--worker-trace PATH records API worker queue/admission/release events (new file)"
+            );
+            println!("--private-smf true|false opens independent SMF plans and states per worker");
+            println!("--stage-profile true|false writes detailed six-input stage timings");
+            println!("--smf-trace off|summary|records writes per-worker SMF JSONL in the output directory");
             println!("--scenario security|subset|country|weekly|monthly|cumulative|six-input --start-date YYYY-MM-DD --end-date YYYY-MM-DD --effective-date-workers N --data DIR (CSV and/or Parquet) --output-dir DIR --metrics FILE --threads N --max-days N --instruments-file CSV_OR_PARQUET --period all|day|week|month|quarter|year");
             println!("--threads defaults to available CPU parallelism; caps country date-range workers or streaming portfolio workers.");
             std::process::exit(0);
         }
         let v = args.next().ok_or("missing option value")?;
         match a.as_str() {
+            "--aggregate" => c.aggregate = v,
+            "--return-type" => c.return_type = v,
+            "--listen" => c.listen = Some(v),
+            "--worker-limit" => c.worker_limit = v.parse()?,
+            "--request-limit" => c.request_limit = v.parse()?,
+            "--worker-trace" => c.worker_trace = Some(v.into()),
+            "--private-smf" => c.private_smf = v.parse()?,
+            "--stage-profile" => c.stage_profile = v.parse()?,
+            "--smf-trace" => {
+                if !["off", "summary", "records"].contains(&v.as_str()) {
+                    return Err("smf-trace must be off, summary, or records".into());
+                }
+                c.smf_trace = v;
+            }
             "--data" => c.data = v.into(),
             "--output-dir" => c.output = v.into(),
             "--metrics" => c.metrics = v.into(),
@@ -107,8 +155,21 @@ fn config() -> Result<Config> {
     ]
     .contains(&c.scenario.as_str())
         || c.threads == 0
+        || c.worker_limit == 0
+        || c.request_limit == 0
     {
         return Err("invalid scenario or threads".into());
+    }
+    if !["daily", "total", "security"].contains(&c.aggregate.as_str())
+        || !["base", "local", "both"].contains(&c.return_type.as_str())
+    {
+        return Err(
+            "aggregate must be daily, total, or security; return-type must be base, local, or both"
+                .into(),
+        );
+    }
+    if c.aggregate != "daily" && c.scenario != "six-input" && c.listen.is_none() {
+        return Err("aggregation requires six-input or API mode".into());
     }
     if c.period.is_empty() {
         c.period = match c.scenario.as_str() {
@@ -924,6 +985,9 @@ fn worker(path: &Path, c: &Config, m: &Master, rx: mpsc::Receiver<Arc<Day>>) -> 
 fn run() -> Result<()> {
     let wall = Instant::now();
     let c = config()?;
+    if let Some(address) = &c.listen {
+        return api::serve(address, &c);
+    }
     if c.scenario == "six-input" {
         return six_input::run(&c);
     }
