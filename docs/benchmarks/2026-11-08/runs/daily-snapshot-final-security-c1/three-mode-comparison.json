@@ -1,0 +1,57 @@
+{
+  "runs": [
+    {
+      "mode": "daily",
+      "request_seconds": 13.046292834002088,
+      "peak_sampled_rss_gib": 1.3298187255859375,
+      "output_rows": 2186,
+      "profile": {
+        "elapsed_before_profile_write_seconds": 13.038683375,
+        "metrics_write_seconds": 0.000155625,
+        "note": "Elapsed spans include scheduling/I/O waits. Worker/input timings overlap and are not additive across workers or input readers. SMF apply includes enabled trace serialization; cleanup residuals include uninstrumented overhead. Profile writing is outside per-date spans.",
+        "planning_seconds": 0.0252125,
+        "report_write_seconds": 0.0167815,
+        "smf_reading_path": "daily_snapshot",
+        "smf_shared_at_server": true,
+        "smf_source_scope": "server",
+        "worker_phase_seconds": 12.996532042
+      }
+    },
+    {
+      "mode": "total",
+      "request_seconds": 12.859073040999647,
+      "peak_sampled_rss_gib": 1.331298828125,
+      "output_rows": 1,
+      "profile": {
+        "elapsed_before_profile_write_seconds": 12.856344291,
+        "metrics_write_seconds": 0.000105791,
+        "note": "Elapsed spans include scheduling/I/O waits. Worker/input timings overlap and are not additive across workers or input readers. SMF apply includes enabled trace serialization; cleanup residuals include uninstrumented overhead. Profile writing is outside per-date spans.",
+        "planning_seconds": 0.024532208,
+        "report_write_seconds": 0.007001458,
+        "smf_reading_path": "daily_snapshot",
+        "smf_shared_at_server": true,
+        "smf_source_scope": "server",
+        "worker_phase_seconds": 12.824702916
+      }
+    },
+    {
+      "mode": "security",
+      "request_seconds": 13.909044750002067,
+      "peak_sampled_rss_gib": 2.0693817138671875,
+      "output_rows": 159000,
+      "profile": {
+        "elapsed_before_profile_write_seconds": 13.900270625,
+        "metrics_write_seconds": 0.000268084,
+        "note": "Elapsed spans include scheduling/I/O waits. Worker/input timings overlap and are not additive across workers or input readers. SMF apply includes enabled trace serialization; cleanup residuals include uninstrumented overhead. Profile writing is outside per-date spans.",
+        "planning_seconds": 0.02475425,
+        "report_write_seconds": 0.085370792,
+        "smf_reading_path": "daily_snapshot",
+        "smf_shared_at_server": true,
+        "smf_source_scope": "server",
+        "worker_phase_seconds": 13.789875541
+      }
+    }
+  ],
+  "conditions": "One request per mode, same binary/data/window, 12 workers; user-confirmed purge before each; no warmup; temporary report finish/sync/rename in all modes",
+  "validation": "Daily additive base columns match total; summed security additive columns match total; all reports match previous outputs within tolerance"
+}

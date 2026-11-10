@@ -1,0 +1,147 @@
+{
+  "successful_requests": 20,
+  "batch_seconds": 254.88282454199998,
+  "peak_rss_gib": 12.326339721679688,
+  "read_activity": {
+    "read_decode_calls": {
+      "current": 0,
+      "peak": 791
+    },
+    "reading_workers": {
+      "current": 0,
+      "peak": 213
+    },
+    "retained_daily_inputs": {
+      "current": 0,
+      "peak": 1200
+    },
+    "workers_with_smf_cache": {
+      "current": 0,
+      "peak": 240
+    }
+  },
+  "host_swap_counter_deltas": {
+    "Swapins": 0,
+    "Swapouts": 0
+  },
+  "worker_trace": {
+    "apis": 20,
+    "workers": 240,
+    "events": 720,
+    "slots": 240,
+    "peak_holders": 240,
+    "all_workers_released": true,
+    "fifo_verified": true,
+    "slot_overlap": false,
+    "seconds": 254.57314545800003,
+    "note": "Application slot occupancy includes reading, waiting and computation; this is not a CPU scheduler trace."
+  },
+  "outputs_match_baseline": true,
+  "output_checks": [
+    {
+      "request_id": 3,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 13,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 18,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 4,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 12,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 6,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 11,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 20,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 7,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 16,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 2,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 9,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 14,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 17,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 15,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 1,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 8,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 19,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 5,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    },
+    {
+      "request_id": 10,
+      "rows": 2186,
+      "max_absolute_difference": 0.0
+    }
+  ],
+  "cache_policy": {
+    "pre_run": "User reported sudo purge completed before this run was launched.",
+    "during_run": "No cache flushing between requests; OS cache shared normally.",
+    "attribution": "RSS is process-specific; VM and swap counters are system-wide."
+  }
+}

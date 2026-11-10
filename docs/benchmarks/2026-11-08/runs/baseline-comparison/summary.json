@@ -1,0 +1,2194 @@
+{
+  "command": [
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/benchmark-go",
+    "--listen",
+    "127.0.0.1:53206",
+    "--data",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/fixtures/baseline",
+    "--output-dir",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/baseline-comparison/requests",
+    "--threads",
+    "12"
+  ],
+  "pid": 38752,
+  "workers_per_request": 12,
+  "data": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/fixtures/baseline",
+  "start_date": "2023-01-01",
+  "end_date": "2023-01-12",
+  "process_exit_before_driver_shutdown": null,
+  "peak_sampled_rss_bytes": 263602176,
+  "batches": [
+    {
+      "phase": "load-c1-r1",
+      "concurrency": 1,
+      "repeat": 1,
+      "seconds": 0.05080083299981197,
+      "responses": [
+        {
+          "status": 200,
+          "seconds": 0.050252333996468224,
+          "body": {
+            "elapsed_seconds": 0.049125709,
+            "metrics": {
+              "accounts_read_decode_seconds": "0.114082667",
+              "accounts_rows_decoded": "12",
+              "analytics_checksum": "23400.899999999732",
+              "analytics_read_decode_seconds": "0.33575720899999995",
+              "analytics_rows_decoded": "120000",
+              "days": "12",
+              "forex_read_decode_seconds": "0.08684425",
+              "forex_rows_decoded": "12",
+              "fx_checksum": "120000",
+              "index_read_decode_seconds": "0.21787974999999998",
+              "index_rows_decoded": "120000",
+              "joined_us_securities": "120000",
+              "language": "go",
+              "output_rows": "24",
+              "portfolio_PF_read_decode_seconds": "0.20645579200000003",
+              "portfolio_PF_rows_decoded": "120000",
+              "readers_per_worker": "6",
+              "security_master_read_decode_seconds": "0.22164545900000002",
+              "security_master_rows_decoded": "120000",
+              "smf_cache_hits": "0",
+              "smf_snapshot_loads": "12",
+              "wall_seconds": "0.048986667",
+              "workers": "12"
+            },
+            "output_dir": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/baseline-comparison/requests/request-3295875194",
+            "report": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/baseline-comparison/requests/request-3295875194/country-portfolio_PF.parquet"
+          }
+        }
+      ]
+    },
+    {
+      "phase": "load-c1-r2",
+      "concurrency": 1,
+      "repeat": 2,
+      "seconds": 0.04221629200037569,
+      "responses": [
+        {
+          "status": 200,
+          "seconds": 0.040747834005742334,
+          "body": {
+            "elapsed_seconds": 0.038352084,
+            "metrics": {
+              "accounts_read_decode_seconds": "0.025553748",
+              "accounts_rows_decoded": "12",
+              "analytics_checksum": "23400.899999999732",
+              "analytics_read_decode_seconds": "0.26915525199999996",
+              "analytics_rows_decoded": "120000",
+              "days": "12",
+              "forex_read_decode_seconds": "0.05831758200000001",
+              "forex_rows_decoded": "12",
+              "fx_checksum": "120000",
+              "index_read_decode_seconds": "0.12745541600000002",
+              "index_rows_decoded": "120000",
+              "joined_us_securities": "120000",
+              "language": "go",
+              "output_rows": "24",
+              "portfolio_PF_read_decode_seconds": "0.14497116600000004",
+              "portfolio_PF_rows_decoded": "120000",
+              "readers_per_worker": "6",
+              "security_master_read_decode_seconds": "0.16298612499999998",
+              "security_master_rows_decoded": "120000",
+              "smf_cache_hits": "0",
+              "smf_snapshot_loads": "12",
+              "wall_seconds": "0.038236459",
+              "workers": "12"
+            },
+            "output_dir": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/baseline-comparison/requests/request-1301095744",
+            "report": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/baseline-comparison/requests/request-1301095744/country-portfolio_PF.parquet"
+          }
+        }
+      ]
+    }
+  ],
+  "samples": [
+    {
+      "seconds": 0.014939291999326088,
+      "phase": "baseline",
+      "rss_bytes": 22200320,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005337920010788366,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1484912,
+          "heap_inuse_bytes": 2113536,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.044687916997645516,
+      "phase": "baseline",
+      "rss_bytes": 22200320,
+      "health": {
+        "status": 200,
+        "seconds": 0.000531457997567486,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1489384,
+          "heap_inuse_bytes": 2121728,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.07156224999926053,
+      "phase": "baseline",
+      "rss_bytes": 22200320,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005577089978032745,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1493856,
+          "heap_inuse_bytes": 2121728,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.09753270899818745,
+      "phase": "baseline",
+      "rss_bytes": 22200320,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005177920029382221,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1498328,
+          "heap_inuse_bytes": 2121728,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.1274853750001057,
+      "phase": "baseline",
+      "rss_bytes": 22200320,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005715000006603077,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1502800,
+          "heap_inuse_bytes": 2121728,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.15590720900218002,
+      "phase": "baseline",
+      "rss_bytes": 22233088,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007252919967868365,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1507272,
+          "heap_inuse_bytes": 2138112,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.1857500420010183,
+      "phase": "baseline",
+      "rss_bytes": 22233088,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006377499958034605,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1511744,
+          "heap_inuse_bytes": 2146304,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.2124393339981907,
+      "phase": "baseline",
+      "rss_bytes": 22249472,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006798339964007027,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1516216,
+          "heap_inuse_bytes": 2162688,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.24105333400075324,
+      "phase": "baseline",
+      "rss_bytes": 22249472,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006222910014912486,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1520688,
+          "heap_inuse_bytes": 2170880,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.2715502499995637,
+      "phase": "baseline",
+      "rss_bytes": 22249472,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006814999942434952,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1525160,
+          "heap_inuse_bytes": 2170880,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.29819462500017835,
+      "phase": "baseline",
+      "rss_bytes": 22249472,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006474170004366897,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1529632,
+          "heap_inuse_bytes": 2170880,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.3287855840026168,
+      "phase": "baseline",
+      "rss_bytes": 22249472,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005982500006211922,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1534104,
+          "heap_inuse_bytes": 2170880,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.3565007090001018,
+      "phase": "baseline",
+      "rss_bytes": 22249472,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006489160005003214,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1538576,
+          "heap_inuse_bytes": 2179072,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.3868934999991325,
+      "phase": "baseline",
+      "rss_bytes": 22298624,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005667919976986013,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1543048,
+          "heap_inuse_bytes": 2179072,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.4138137089976226,
+      "phase": "baseline",
+      "rss_bytes": 22298624,
+      "health": {
+        "status": 200,
+        "seconds": 0.000651333000860177,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1547520,
+          "heap_inuse_bytes": 2179072,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.44467720900138374,
+      "phase": "baseline",
+      "rss_bytes": 22298624,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007800410021445714,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1551992,
+          "heap_inuse_bytes": 2179072,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.4756166250008391,
+      "phase": "baseline",
+      "rss_bytes": 22298624,
+      "health": {
+        "status": 200,
+        "seconds": 0.000771250000980217,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1556464,
+          "heap_inuse_bytes": 2179072,
+          "heap_sys_bytes": 3899392,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.5070967499996186,
+      "phase": "baseline",
+      "rss_bytes": 22298624,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007655830049770884,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1572424,
+          "heap_inuse_bytes": 2236416,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.5393264169979375,
+      "phase": "baseline",
+      "rss_bytes": 22560768,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008253330015577376,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1578032,
+          "heap_inuse_bytes": 2236416,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.5702115000021877,
+      "phase": "baseline",
+      "rss_bytes": 22593536,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008415830016019754,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1582504,
+          "heap_inuse_bytes": 2244608,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.6003087499993853,
+      "phase": "baseline",
+      "rss_bytes": 22642688,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007359999945037998,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1586976,
+          "heap_inuse_bytes": 2244608,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.6325358750036685,
+      "phase": "baseline",
+      "rss_bytes": 22675456,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008299999972223304,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1591448,
+          "heap_inuse_bytes": 2252800,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.6631033340017893,
+      "phase": "baseline",
+      "rss_bytes": 22708224,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008026249997783452,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1595920,
+          "heap_inuse_bytes": 2252800,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.6906461250036955,
+      "phase": "baseline",
+      "rss_bytes": 22740992,
+      "health": {
+        "status": 200,
+        "seconds": 0.000767707999330014,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1600392,
+          "heap_inuse_bytes": 2252800,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.7219445840019034,
+      "phase": "baseline",
+      "rss_bytes": 22790144,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008249169986811467,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1604864,
+          "heap_inuse_bytes": 2260992,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.7491660000014235,
+      "phase": "baseline",
+      "rss_bytes": 22888448,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007507080008508638,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1609336,
+          "heap_inuse_bytes": 2260992,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.7797497499996098,
+      "phase": "baseline",
+      "rss_bytes": 22921216,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006318329978967085,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1613808,
+          "heap_inuse_bytes": 2260992,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.8115047920000507,
+      "phase": "baseline",
+      "rss_bytes": 22953984,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007137920038076118,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1618280,
+          "heap_inuse_bytes": 2269184,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.8433442090026801,
+      "phase": "baseline",
+      "rss_bytes": 22953984,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008008329969015904,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1622752,
+          "heap_inuse_bytes": 2277376,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.8743519999989076,
+      "phase": "baseline",
+      "rss_bytes": 22953984,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007251249990076758,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1627224,
+          "heap_inuse_bytes": 2277376,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.905805041998974,
+      "phase": "baseline",
+      "rss_bytes": 22953984,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006904590045451187,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1631696,
+          "heap_inuse_bytes": 2277376,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.9328355000034207,
+      "phase": "baseline",
+      "rss_bytes": 22953984,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007970829974510707,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1636168,
+          "heap_inuse_bytes": 2277376,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.9631063339984394,
+      "phase": "baseline",
+      "rss_bytes": 22953984,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008596249972470105,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1640640,
+          "heap_inuse_bytes": 2277376,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.992244084001868,
+      "phase": "baseline",
+      "rss_bytes": 22953984,
+      "health": {
+        "status": 200,
+        "seconds": 0.0009645840036682785,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 0,
+          "heap_alloc_bytes": 1645112,
+          "heap_inuse_bytes": 2285568,
+          "heap_sys_bytes": 3866624,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.0221762500004843,
+      "phase": "load-c1-r1",
+      "rss_bytes": 29081600,
+      "health": {
+        "status": 200,
+        "seconds": 0.0010953330056509003,
+        "body": {
+          "active": 1,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 2,
+          "heap_alloc_bytes": 3253400,
+          "heap_inuse_bytes": 6004736,
+          "heap_sys_bytes": 11173888,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.0497002089978196,
+      "phase": "load-c1-r1",
+      "rss_bytes": 176717824,
+      "health": {
+        "status": 200,
+        "seconds": 0.002402625003014691,
+        "body": {
+          "active": 1,
+          "completed": 0,
+          "failed": 0,
+          "gc_cycles": 10,
+          "heap_alloc_bytes": 178463008,
+          "heap_inuse_bytes": 185982976,
+          "heap_sys_bytes": 191528960,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.0759782919994905,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005169169962755404,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52450688,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.1018932500010123,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.00048429099842906,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52455160,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.1294634169971687,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005407079952419735,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52459632,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.155239542000345,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005064159995527007,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52464104,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.1802397089995793,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0004948749992763624,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52468576,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.2095647919995827,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005627920036204159,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52473048,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.239179124997463,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005547500040847808,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52477520,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.2692769170025713,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005547090040636249,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52481992,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.2978035420019296,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005411669990280643,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52486464,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.3281817090028198,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006065420020604506,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52490936,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.3584096249978757,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005660829992848448,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52495408,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.3856891250034096,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005087079989607446,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52499880,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.4161938340039342,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006712500035064295,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52504352,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.445229584001936,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007530419970862567,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52508824,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.4738057499998831,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007719580025877804,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52513296,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.5052404169982765,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006863750022603199,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52517768,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.5368882090042462,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252542976,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006763749988749623,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52522240,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.5682100420017377,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007227079986478202,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52526712,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.5997958750012913,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007173750054789707,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52531184,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.6311251250008354,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007238329999381676,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52535656,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.6639195419993484,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008857499997247942,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52540128,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.6970616670005256,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0010548339996603318,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52544600,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.7286178750000545,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006844999952591024,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52549072,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.757311834000575,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007114999971236102,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52553544,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.7894349170019268,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007306669940589927,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52558016,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.8214516250009183,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007645840014447458,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52562488,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.8533680000036838,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007959160066093318,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52566960,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.8829960840012063,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007389169986709021,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52571432,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.9145318340015365,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008708329987712204,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52575904,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.9476467499989667,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008953340002335608,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52580376,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 1.975634041999001,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.0009274580006604083,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52584848,
+          "heap_inuse_bytes": 57098240,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.0077155839971965,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.001008292005280964,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52599832,
+          "heap_inuse_bytes": 57106432,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.0406245420017513,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 252575744,
+      "health": {
+        "status": 200,
+        "seconds": 0.000873125005455222,
+        "body": {
+          "active": 0,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 52615832,
+          "heap_inuse_bytes": 57114624,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.072829875003663,
+      "phase": "load-c1-r2",
+      "rss_bytes": 252624896,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005950419945293106,
+        "body": {
+          "active": 1,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 12,
+          "heap_alloc_bytes": 53390648,
+          "heap_inuse_bytes": 57606144,
+          "heap_sys_bytes": 233963520,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.100565834000008,
+      "phase": "load-c1-r2",
+      "rss_bytes": 261160960,
+      "health": {
+        "status": 200,
+        "seconds": 0.001303083001403138,
+        "body": {
+          "active": 1,
+          "completed": 1,
+          "failed": 0,
+          "gc_cycles": 18,
+          "heap_alloc_bytes": 218226440,
+          "heap_inuse_bytes": 224387072,
+          "heap_sys_bytes": 233668608,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.1273027089991956,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263585792,
+      "health": {
+        "status": 200,
+        "seconds": 0.0004842910057050176,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55141896,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.155705625002156,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005085000011604279,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55146368,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.180782084004022,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005862920006620698,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55150840,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.2110322500011534,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006025830007274635,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55155312,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.237982833998103,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006699160003336146,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55159784,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.2644870419971994,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006160829943837598,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55164256,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.2949535840016324,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006698750003124587,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55168728,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.325458500003151,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006010840006638318,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55173200,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.3567370000018855,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006900000007590279,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55177672,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.3880672919985955,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006696670025121421,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55182144,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.414971042002435,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007847909946576692,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55186616,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.4468834170038463,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007871670022723265,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55191088,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.478411459000199,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007087080011842772,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55195560,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.510131333998288,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0009022080048453063,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55200032,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.541616417001933,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007681249990127981,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55204504,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.574283417001425,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008857080028974451,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55208976,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.605369167002209,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0006437920019379817,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55213448,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.6365206249975017,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007662499992875382,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55217920,
+          "heap_inuse_bytes": 60432384,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.6663600419997238,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007943329983390868,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55224552,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.698899374998291,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0009137919987551868,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55230024,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.7322281669985387,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0009587909953552298,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55234496,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.76177716699749,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008481249969918281,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55238968,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.79129566699703,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007392080005956814,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55243440,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.8230696250029723,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007108749996405095,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55247912,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.8551052090042504,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0007697909968555905,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55252384,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.8879477090013097,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008431250025751069,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55259016,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.917145334002271,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0009218340055667795,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55264512,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.9509715419990243,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0010361249951529317,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55268984,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 2.9846370840023155,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0010133329997188412,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55273456,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 3.0178553340010694,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0009906250052154064,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55277928,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 3.0515917090015137,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0010802079996210523,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55282400,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 3.083895791998657,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.00091804100520676,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55286872,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 3.118113208998693,
+      "phase": "idle-c1-r2",
+      "rss_bytes": 263602176,
+      "health": {
+        "status": 200,
+        "seconds": 0.0010337919957237318,
+        "body": {
+          "active": 0,
+          "completed": 2,
+          "failed": 0,
+          "gc_cycles": 19,
+          "heap_alloc_bytes": 55291344,
+          "heap_inuse_bytes": 60440576,
+          "heap_sys_bytes": 238157824,
+          "pid": 38752,
+          "workers_per_request": 12
+        }
+      }
+    }
+  ],
+  "caveats": [
+    "Sampled RSS may miss short peaks; shared pages are included.",
+    "Heap counters are server-wide, not per-request.",
+    "RSS retention alone does not establish a leak.",
+    "Process death is not classified as OOM without OS evidence."
+  ]
+}

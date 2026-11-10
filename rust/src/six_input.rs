@@ -1,6 +1,8 @@
 //! Six persistent readers per date worker. All six decode concurrently before
 //! joining; batch rows are derived from the selected complete date, not 65536.
-use crate::{input::Input, output, Config, Master, Metrics, Period, Result, Stream, HEADER};
+use crate::{
+    input::Input, output, Config, Day, Master, Metrics, Period, Result, Stat, Stream, HEADER,
+};
 use arrow_array::{
     Array, BooleanArray, Date32Array, Float64Array, Int64Array, RecordBatch, StringArray,
 };
@@ -88,6 +90,75 @@ impl SharedSmf {
             "state_scope":"worker"})
     }
 }
+#[derive(Default)]
+struct CountedValues {
+    values: [[f64; 12]; 2],
+    count: u32,
+}
+#[derive(Default)]
+struct SectorValues {
+    name: String,
+    aggregate: CountedValues,
+    pairs: Vec<usize>,
+    daily_portfolio: Stat,
+    daily_benchmark: Stat,
+    touched: bool,
+}
+struct SecuritySlots {
+    name: String,
+    pairs: Vec<(usize, usize)>,
+}
+struct SecurityPair {
+    sector: usize,
+    security: usize,
+    accumulated: CountedValues,
+}
+#[derive(Clone, Copy)]
+struct SnapshotSlot {
+    sector: usize,
+    security: usize,
+    pair: usize,
+}
+fn add_stat(dest: &mut Stat, value: Stat) {
+    dest.w += value.w;
+    dest.present |= value.present;
+    for t in 0..2 {
+        dest.r[t] += value.r[t];
+    }
+}
+fn add_attribution(dest: &mut CountedValues, p: Stat, b: Stat, benchmark: [f64; 2]) {
+    dest.count += 1;
+    for t in 0..2 {
+        let e = crate::effect(p, b, t, benchmark[t]);
+        let rp = if p.w > 0.0 { p.r[t] / p.w } else { 0.0 };
+        let rb = if b.w > 0.0 { b.r[t] / b.w } else { 0.0 };
+        let numbers = [
+            p.w,
+            b.w,
+            e[0],
+            e[1],
+            e[2],
+            e.iter().sum(),
+            rp,
+            rb,
+            rp - rb,
+            p.r[t],
+            b.r[t],
+            p.r[t] - b.r[t],
+        ];
+        for j in 0..12 {
+            dest.values[t][j] += numbers[j];
+        }
+    }
+}
+fn merge_counted(dest: &mut CountedValues, source: CountedValues) {
+    dest.count += source.count;
+    for t in 0..2 {
+        for j in 0..12 {
+            dest.values[t][j] += source.values[t][j];
+        }
+    }
+}
 // Workers retain only sums for aggregate output, never the daily reports.
 #[derive(Default)]
 struct Sums {
@@ -95,7 +166,14 @@ struct Sums {
     start: String,
     end: String,
     days: usize,
-    values: BTreeMap<String, [[f64; 12]; 2]>,
+    values: HashMap<String, [[f64; 12]; 2]>,
+    sectors: Vec<SectorValues>,
+    sector_ids: HashMap<String, usize>,
+    securities: Vec<SecuritySlots>,
+    security_ids: HashMap<String, usize>,
+    pairs: Vec<SecurityPair>,
+    snapshot_slots: Vec<Option<SnapshotSlot>>,
+    touched_sectors: Vec<usize>,
     metrics: Metrics,
     rows: [u64; 6],
     reads: [f64; 6],
@@ -107,7 +185,7 @@ struct Sums {
     hits: u64,
 }
 impl Sums {
-    fn add(&mut self, r: DateReport, total: bool) -> Result<()> {
+    fn add(&mut self, r: DateReport) -> Result<()> {
         if self.entity.as_ref().is_some_and(|e| e != &r.entity) {
             return Err("portfolio entity changes across dates".into());
         }
@@ -119,48 +197,6 @@ impl Sums {
             self.end = r.date;
         }
         self.days += 1;
-        if total {
-            self.values.entry("ALL".into()).or_default();
-        }
-        for (k, a) in r.period.acc.iter().enumerate().filter(|(_, a)| a.present) {
-            let key = if total { "ALL" } else { &r.names[k] };
-            let values = self.values.entry(key.to_string()).or_default();
-            for t in 0..2 {
-                // Returns here are arithmetic sums of daily report values, not linked returns.
-                let rp = r.period.growth[0][t] - 1.0;
-                let rb = r.period.growth[1][t] - 1.0;
-                let numbers = [
-                    a.w[0],
-                    a.w[1],
-                    a.e[t][0],
-                    a.e[t][1],
-                    a.e[t][2],
-                    a.e[t].iter().sum(),
-                    rp,
-                    rb,
-                    rp - rb,
-                    a.contribution[0][t],
-                    a.contribution[1][t],
-                    a.contribution[0][t] - a.contribution[1][t],
-                ];
-                for j in 0..12 {
-                    // Portfolio-wide daily returns occur once in the total row.
-                    if !total || !(6..=8).contains(&j) {
-                        values[t][j] += numbers[j];
-                    }
-                }
-            }
-        }
-        if total && !self.values.is_empty() {
-            let values = self.values.get_mut("ALL").unwrap();
-            for t in 0..2 {
-                let rp = r.period.growth[0][t] - 1.0;
-                let rb = r.period.growth[1][t] - 1.0;
-                values[t][6] += rp;
-                values[t][7] += rb;
-                values[t][8] += rp - rb;
-            }
-        }
         self.metrics.add(&r.metrics);
         for i in 0..6 {
             self.rows[i] += r.rows[i];
@@ -177,7 +213,283 @@ impl Sums {
         }
         Ok(())
     }
+    // Fold effects directly into worker sums. Snapshot slot order may change,
+    // so security state is keyed by stable ID with allocation only on first use.
+    fn add_effects(
+        &mut self,
+        p: &Day,
+        b: &Day,
+        names: &[String],
+        total: bool,
+        metrics: &mut Metrics,
+    ) -> Result<()> {
+        let started = Instant::now();
+        let totals: [[f64; 2]; 2] = [
+            [
+                p.stats.iter().map(|s| s.r[0]).sum(),
+                p.stats.iter().map(|s| s.r[1]).sum(),
+            ],
+            [
+                b.stats.iter().map(|s| s.r[0]).sum(),
+                b.stats.iter().map(|s| s.r[1]).sum(),
+            ],
+        ];
+        let mut day_total = [[0.0; 12]; 2];
+        let mut daily_effects = [0.0; 2];
+        for (k, name) in names.iter().enumerate() {
+            let ps = p.stats[k];
+            let bs = b.stats[k];
+            if !ps.present && !bs.present {
+                continue;
+            }
+            metrics.effects += 6;
+            let dest = if total {
+                &mut day_total
+            } else {
+                if !self.values.contains_key(name.as_str()) {
+                    self.values.insert(name.clone(), [[0.0; 12]; 2]);
+                }
+                self.values.get_mut(name.as_str()).unwrap()
+            };
+            for t in 0..2 {
+                let e = crate::effect(ps, bs, t, totals[1][t]);
+                let values = [
+                    ps.w,
+                    bs.w,
+                    e[0],
+                    e[1],
+                    e[2],
+                    e.iter().sum(),
+                    0.0,
+                    0.0,
+                    0.0,
+                    ps.r[t],
+                    bs.r[t],
+                    ps.r[t] - bs.r[t],
+                ];
+                for j in 0..12 {
+                    dest[t][j] += values[j];
+                }
+                daily_effects[t] += values[5];
+                if !total {
+                    dest[t][6] += totals[0][t];
+                    dest[t][7] += totals[1][t];
+                    dest[t][8] += totals[0][t] - totals[1][t];
+                }
+            }
+        }
+        for t in 0..2 {
+            if (daily_effects[t] - (totals[0][t] - totals[1][t])).abs() > 1e-9 {
+                return Err("daily reconciliation failed".into());
+            }
+        }
+        if total {
+            if !self.values.contains_key("ALL") {
+                self.values.insert("ALL".into(), [[0.0; 12]; 2]);
+            }
+            let dest = self.values.get_mut("ALL").unwrap();
+            for t in 0..2 {
+                day_total[t][6] = totals[0][t];
+                day_total[t][7] = totals[1][t];
+                day_total[t][8] = totals[0][t] - totals[1][t];
+                for j in 0..12 {
+                    dest[t][j] += day_total[t][j];
+                }
+            }
+        }
+        metrics.compute += started.elapsed().as_secs_f64();
+        Ok(())
+    }
+    fn sector_slot(&mut self, name: &str) -> usize {
+        if let Some(&slot) = self.sector_ids.get(name) {
+            return slot;
+        }
+        let slot = self.sectors.len();
+        self.sector_ids.insert(name.to_string(), slot);
+        self.sectors.push(SectorValues {
+            name: name.to_string(),
+            ..Default::default()
+        });
+        slot
+    }
+    fn security_slot(&mut self, name: &str) -> usize {
+        if let Some(&slot) = self.security_ids.get(name) {
+            return slot;
+        }
+        let slot = self.securities.len();
+        self.security_ids.insert(name.to_string(), slot);
+        self.securities.push(SecuritySlots {
+            name: name.to_string(),
+            pairs: Vec::new(),
+        });
+        slot
+    }
+    fn pair_slot(&mut self, sector: usize, security: usize) -> usize {
+        if let Some(&(_, slot)) = self.securities[security]
+            .pairs
+            .iter()
+            .find(|(s, _)| *s == sector)
+        {
+            return slot;
+        }
+        let slot = self.pairs.len();
+        self.pairs.push(SecurityPair {
+            sector,
+            security,
+            accumulated: CountedValues::default(),
+        });
+        self.securities[security].pairs.push((sector, slot));
+        self.sectors[sector].pairs.push(slot);
+        slot
+    }
+    fn add_sector_effects(
+        &mut self,
+        p: &Day,
+        b: &Day,
+        ids: &[String],
+        sectors: &[String],
+        metrics: &mut Metrics,
+    ) -> Result<()> {
+        let started = Instant::now();
+        let benchmark: [f64; 2] = [
+            b.stats.iter().map(|s| s.r[0]).sum(),
+            b.stats.iter().map(|s| s.r[1]).sum(),
+        ];
+        let portfolio: [f64; 2] = [
+            p.stats.iter().map(|s| s.r[0]).sum(),
+            p.stats.iter().map(|s| s.r[1]).sum(),
+        ];
+        // Slot positions in a snapshot are only hints. Check their identities so
+        // reorderings, changing universes and sector moves cannot reuse a wrong key.
+        self.snapshot_slots.resize(ids.len(), None);
+        for (k, id) in ids.iter().enumerate() {
+            let ps = p.stats[k];
+            let bs = b.stats[k];
+            if !ps.present && !bs.present {
+                continue;
+            }
+            let sector = sectors[k].as_str();
+            if sector.is_empty() {
+                return Err("sector aggregation requires Sector in the SMF".into());
+            }
+            let cached = self.snapshot_slots[k].filter(|slot| {
+                self.securities[slot.security].name == *id
+                    && self.sectors[slot.sector].name == sector
+            });
+            let slot = if let Some(slot) = cached {
+                slot
+            } else {
+                let security = self.security_slot(id);
+                let sector = self.sector_slot(sector);
+                let pair = self.pair_slot(sector, security);
+                let slot = SnapshotSlot {
+                    sector,
+                    security,
+                    pair,
+                };
+                self.snapshot_slots[k] = Some(slot);
+                slot
+            };
+            let grouped = &mut self.sectors[slot.sector];
+            if !grouped.touched {
+                grouped.touched = true;
+                self.touched_sectors.push(slot.sector);
+            }
+            add_stat(&mut grouped.daily_portfolio, ps);
+            add_stat(&mut grouped.daily_benchmark, bs);
+            add_attribution(&mut self.pairs[slot.pair].accumulated, ps, bs, benchmark);
+            metrics.effects += 6;
+        }
+        let mut reconciliation = [0.0; 2];
+        for sector in self.touched_sectors.drain(..) {
+            let group = &mut self.sectors[sector];
+            let ps = std::mem::take(&mut group.daily_portfolio);
+            let bs = std::mem::take(&mut group.daily_benchmark);
+            group.touched = false;
+            add_attribution(&mut group.aggregate, ps, bs, benchmark);
+            for t in 0..2 {
+                reconciliation[t] += crate::effect(ps, bs, t, benchmark[t]).iter().sum::<f64>();
+            }
+            metrics.effects += 6;
+        }
+        for t in 0..2 {
+            if (reconciliation[t] - (portfolio[t] - benchmark[t])).abs() > 1e-9 {
+                return Err("sector daily reconciliation failed".into());
+            }
+        }
+        metrics.compute += started.elapsed().as_secs_f64();
+        Ok(())
+    }
+    fn write_sectors(
+        &self,
+        c: &Config,
+        writer: &mut output::Writer,
+        mt: &mut Metrics,
+    ) -> Result<()> {
+        let mut record = csv::ByteRecord::new();
+        let days = self.days.to_string();
+        let mut sectors: Vec<_> = self.sectors.iter().collect();
+        sectors.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+        for group in sectors {
+            let sector = group.name.as_str();
+            let mut securities: Vec<_> =
+                group.pairs.iter().map(|&slot| &self.pairs[slot]).collect();
+            securities.sort_unstable_by(|a, b| {
+                self.securities[a.security]
+                    .name
+                    .cmp(&self.securities[b.security].name)
+            });
+            let rows = std::iter::once(("sector", "", &group.aggregate)).chain(
+                securities.into_iter().map(|pair| {
+                    (
+                        "security",
+                        self.securities[pair.security].name.as_str(),
+                        &pair.accumulated,
+                    )
+                }),
+            );
+            for (kind, id, accumulated) in rows {
+                for t in 0..2 {
+                    let return_type = if t == 0 { "base" } else { "local" };
+                    if c.return_type != "both" && c.return_type != return_type {
+                        continue;
+                    }
+                    writer.row_with_group(
+                        &[
+                            "sector_attribution",
+                            self.entity.as_deref().unwrap_or(""),
+                            &self.start,
+                            &self.end,
+                            &days,
+                            kind,
+                            if kind == "sector" { sector } else { id },
+                            return_type,
+                        ],
+                        &accumulated.values[t],
+                        &mut record,
+                        Some((sector, id, accumulated.count)),
+                    )?;
+                    mt.written += 1;
+                    mt.report_rows += 1;
+                    // Only sector effects represent the report's top-level attribution.
+                    if kind == "sector" {
+                        for j in 0..3 {
+                            mt.checksum[j] += accumulated.values[t][j + 2];
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
     fn merge(&mut self, other: Self) -> Result<()> {
+        // Adopt the first worker without rebuilding its catalogs or copying sums.
+        if self.days == 0 && self.entity.is_none() {
+            *self = other;
+            self.snapshot_slots = Vec::new();
+            self.touched_sectors = Vec::new();
+            return Ok(());
+        }
         if let (Some(a), Some(b)) = (&self.entity, &other.entity) {
             if a != b {
                 return Err("portfolio entity changes across dates".into());
@@ -201,6 +513,36 @@ impl Sums {
                 }
             }
         }
+        // Worker IDs are local: translate each catalog once, then merge numeric pairs.
+        if self.sector_ids.capacity() < other.sectors.len() {
+            self.sector_ids
+                .reserve(other.sectors.len().saturating_sub(self.sector_ids.len()));
+        }
+        if self.security_ids.capacity() < other.securities.len() {
+            self.security_ids.reserve(
+                other
+                    .securities
+                    .len()
+                    .saturating_sub(self.security_ids.len()),
+            );
+        }
+        let sector_slots: Vec<_> = other
+            .sectors
+            .iter()
+            .map(|s| self.sector_slot(&s.name))
+            .collect();
+        let security_slots: Vec<_> = other
+            .securities
+            .iter()
+            .map(|s| self.security_slot(&s.name))
+            .collect();
+        for (source, &slot) in other.sectors.into_iter().zip(&sector_slots) {
+            merge_counted(&mut self.sectors[slot].aggregate, source.aggregate);
+        }
+        for pair in other.pairs {
+            let slot = self.pair_slot(sector_slots[pair.sector], security_slots[pair.security]);
+            merge_counted(&mut self.pairs[slot].accumulated, pair.accumulated);
+        }
         self.metrics.add(&other.metrics);
         for i in 0..6 {
             self.rows[i] += other.rows[i];
@@ -215,9 +557,14 @@ impl Sums {
         Ok(())
     }
     fn write(&self, c: &Config, writer: &mut output::Writer, mt: &mut Metrics) -> Result<()> {
+        if c.aggregate == "sector" {
+            return self.write_sectors(c, writer, mt);
+        }
         let mut record = csv::ByteRecord::new();
         let days = self.days.to_string();
-        for (key, values) in &self.values {
+        let mut ordered: Vec<_> = self.values.iter().collect();
+        ordered.sort_unstable_by(|a, b| a.0.cmp(b.0));
+        for (key, values) in ordered {
             for t in 0..2 {
                 let return_type = if t == 0 { "base" } else { "local" };
                 if c.return_type != "both" && c.return_type != return_type {
@@ -255,7 +602,7 @@ struct DateReport {
     date: String,
     entity: String,
     names: Vec<String>,
-    period: Period,
+    period: Option<Period>,
     metrics: Metrics,
     rows: [u64; 6],
     reads: [f64; 6],
@@ -317,6 +664,9 @@ fn plan(dir: &Path, i: usize) -> Result<Plan> {
     let schema = metadata.schema();
     let daily_snapshot = i == 2 && schema.field_with_name("SnapshotDate").is_ok();
     let mut expected = schema_for(i);
+    if i == 2 && schema.field_with_name("Sector").is_ok() {
+        expected.push(("Sector", DataType::Utf8));
+    }
     if daily_snapshot {
         expected.push(("SnapshotDate", DataType::Date32));
     }
@@ -499,6 +849,7 @@ struct SmfState {
     master: Master,
     currencies: Vec<String>,
     aliases: Vec<i64>,
+    sectors: Vec<String>,
 }
 // One file per worker avoids a shared trace lock. Errors fail the calculation
 // rather than silently producing an incomplete audit trail.
@@ -526,8 +877,13 @@ impl SmfTrace {
         Ok(())
     }
 }
-fn smf_attributes(country: &str, currency: &str, alias: i64) -> serde_json::Value {
-    serde_json::json!({"country": country, "currency": currency, "analytics_id": alias})
+fn smf_attributes(country: &str, currency: &str, alias: i64, sector: &str) -> serde_json::Value {
+    let mut value =
+        serde_json::json!({"country": country, "currency": currency, "analytics_id": alias});
+    if !sector.is_empty() {
+        value["sector"] = sector.into();
+    }
+    value
 }
 // Apply one effective date at a time. Missing securities retain their state.
 fn apply_smf(
@@ -550,6 +906,7 @@ fn apply_smf(
         },
         currencies: Vec::new(),
         aliases: Vec::new(),
+        sectors: Vec::new(),
     });
     let m = &mut state.master;
     let mut seen = HashSet::new();
@@ -559,11 +916,16 @@ fn apply_smf(
         let cs = strings(b, "Currency");
         let countries = strings(b, "Country");
         let alias_ids = ints(b, "AnalyticsSecId");
+        let sectors = b.column_by_name("Sector").map(|_| strings(b, "Sector"));
         for r in 0..b.num_rows() {
             let id = ids.value(r);
             let currency = cs.value(r);
             let country = countries.value(r);
             let alias = alias_ids.value(r);
+            let sector = sectors.map(|v| v.value(r)).unwrap_or("");
+            if sectors.is_some_and(|v| v.is_null(r) || sector.is_empty()) {
+                return Err("invalid SMF sector".into());
+            }
             if id.is_empty()
                 || currency.is_empty()
                 || country.is_empty()
@@ -577,6 +939,7 @@ fn apply_smf(
                 m.country_names[m.history[slot][0].1] != country
                     || state.currencies[slot] != currency
                     || state.aliases[slot] != alias
+                    || state.sectors[slot] != sector
             });
             let action = if existing.is_none() {
                 inserted += 1;
@@ -594,8 +957,8 @@ fn apply_smf(
                     "effective_date":arrow_array::temporal_conversions::date32_to_datetime(dates(b,"EffectiveDate").value(r)).ok_or("invalid SMF effective date")?.date().to_string(),
                     "snapshot_date":if daily_snapshot {Some(calculation_date)}else{None}, "instrument_id":id, "action":action,
                     "before": existing.map(|slot| smf_attributes(
-                        &m.country_names[m.history[slot][0].1], &state.currencies[slot], state.aliases[slot])),
-                    "after":smf_attributes(country, currency, alias)}),
+                        &m.country_names[m.history[slot][0].1], &state.currencies[slot], state.aliases[slot], &state.sectors[slot])),
+                    "after":smf_attributes(country, currency, alias, sector)}),
                 )
             } else {
                 None
@@ -611,6 +974,7 @@ fn apply_smf(
                 m.history[slot][0].1 = country_slot;
                 state.currencies[slot] = currency.to_string();
                 state.aliases[slot] = alias;
+                state.sectors[slot] = sector.to_string();
             } else {
                 let slot = m.names.len();
                 m.ids.insert(id.to_string(), slot);
@@ -619,6 +983,7 @@ fn apply_smf(
                 m.selected.push(true);
                 state.currencies.push(currency.to_string());
                 state.aliases.push(alias);
+                state.sectors.push(sector.to_string());
             }
             if let (Some(t), Some(record)) = (trace.as_mut(), record) {
                 t.emit(record)?;
@@ -708,6 +1073,7 @@ fn calculate(
     reads: [f64; 6],
     c: &Config,
     smf_cache: &mut Option<SmfState>,
+    sums: &mut Sums,
 ) -> Result<DateReport> {
     let mut stages = [0.0; 5];
     let mut stage_started = Instant::now();
@@ -836,8 +1202,18 @@ fn calculate(
     }
     stages[3] = stage_started.elapsed().as_secs_f64();
     stage_started = Instant::now();
-    let mut period = Period::new(pd, date.to_string(), c);
-    period.add(pd, bd, &mut mt)?;
+    let period = if c.aggregate == "daily" {
+        let mut period = Period::new(pd, date.to_string(), c);
+        period.add(pd, bd, &mut mt)?;
+        Some(period)
+    } else {
+        if c.aggregate == "sector" {
+            sums.add_sector_effects(pd, bd, &m.names, &state.sectors, &mut mt)?;
+        } else {
+            sums.add_effects(pd, bd, &m.names, c.aggregate == "total", &mut mt)?;
+        }
+        None
+    };
     stages[4] = stage_started.elapsed().as_secs_f64();
     Ok(DateReport {
         date: date.to_string(),
@@ -845,7 +1221,7 @@ fn calculate(
         names: if c.aggregate == "daily" {
             m.country_names.clone()
         } else {
-            m.names.clone()
+            Vec::new()
         },
         period,
         metrics: mt,
@@ -1062,12 +1438,12 @@ pub(crate) fn run_with_shared_smf(
                         rows[i] = n;
                     }
                     let calculation_started = Instant::now();
-                    let mut report = calculate(date, tables, rows, reads, c, &mut cached_master)
+                    let mut report = calculate(date, tables, rows, reads, c, &mut cached_master, &mut sums)
                         .map_err(|e| format!("date {date}: {e}"))?;
                     let calculation_seconds = calculation_started.elapsed().as_secs_f64();
                     let stages = report.stages;
                     report.snapshot_rows_served=smf_access.snapshot_rows_served;
-                    if c.aggregate == "daily" { out.push(report); } else { sums.add(report, c.aggregate == "total")?; }
+                    if c.aggregate == "daily" { out.push(report); } else { sums.add(report)?; }
                     drop(retained_inputs);
                     let date_seconds = date_started.elapsed().as_secs_f64();
                     if let Some(writer) = &mut profile {
@@ -1111,7 +1487,7 @@ pub(crate) fn run_with_shared_smf(
     reports.sort_by(|a, b| a.date.cmp(&b.date));
     let target = output::path(&c, &plans[4].path);
     let partial = output::partial(&target);
-    let mut writer = output::Writer::new(&partial, true)?;
+    let mut writer = output::Writer::new_with_sector(&partial, true, c.aggregate == "sector")?;
     let mut mt = Metrics::default();
     let mut rows = [0u64; 6];
     let mut reads = [0.0; 6];
@@ -1138,8 +1514,13 @@ pub(crate) fn run_with_shared_smf(
         entity = Some(r.entity.clone());
         snapshot_rows_served += r.snapshot_rows_served;
         mt.add(&r.metrics);
-        r.period
-            .write(&c, &r.entity, &r.names, &mut writer, &mut mt)?;
+        r.period.ok_or("missing daily report")?.write(
+            &c,
+            &r.entity,
+            &r.names,
+            &mut writer,
+            &mut mt,
+        )?;
         for i in 0..6 {
             rows[i] += r.rows[i];
             reads[i] += r.reads[i];

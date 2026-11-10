@@ -39,7 +39,7 @@ def main():
     p.add_argument('--request-limit', type=int, help='Rust API request admission slots before metadata/index opening (default 12)')
     p.add_argument('--worker-trace', action='store_true', help='Record Rust worker queue/admission/release events')
     p.add_argument('--smf-trace', choices=['off', 'summary', 'records'], default='off', help='Per-worker SMF update tracing in request output directories')
-    p.add_argument('--aggregate', choices=['daily', 'total', 'security'], default='daily')
+    p.add_argument('--aggregate', choices=['daily', 'total', 'security', 'sector'], default='daily')
     p.add_argument('--return-type', choices=['base', 'local', 'both'], default='base')
     p.add_argument('--private-smf', action='store_true', help='Independent SMF source plan and state per worker and request')
     p.add_argument('--stage-profile', action='store_true', help='Rust detailed per-date stage timings')

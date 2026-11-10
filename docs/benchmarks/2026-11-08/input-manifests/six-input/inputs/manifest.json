@@ -1,0 +1,26 @@
+{
+  "dates": 1093,
+  "start": "2023-01-01",
+  "end": "2025-12-28",
+  "excluded_return_dates": [
+    "2025-12-29",
+    "2025-12-30"
+  ],
+  "historical_smf": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/country-security-first-v2-2026-11-02/inputs/history/parquet/security_master.parquet",
+  "smf_snapshots": 36,
+  "analytics": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/large_parquet/securities.parquet",
+  "analytics_dates": 3650,
+  "analytics_mapping": "AnalyticsSecId = ((numeric suffix of InstrumentId - 1) % 100000) + 1",
+  "mapping_semantics": "Synthetic many-to-one aliases; distinct holdings can share analytics values.",
+  "accounts": "One active USD account per date for the existing portfolio entity.",
+  "forex": "Daily synthetic spot quotes; Rate = ToCurrency units per FromCurrency unit.",
+  "calculation": "Existing BaseReturn/LocalReturn retained; analytics and FX joined and validated, not used to rewrite returns.",
+  "schemas": {
+    "accounts.parquet": "AccountId: string\nEffectiveDate: date32[day]\nPortfolioEntity: string\nBaseCurrency: string\nIsActive: bool",
+    "forex.parquet": "EffectiveDate: date32[day]\nFromCurrency: string\nToCurrency: string\nRate: double",
+    "security_master.parquet": "InstrumentId: string\nEffectiveDate: date32[day]\nCurrency: string\nCountry: string\nAnalyticsSecId: int64",
+    "analytics.parquet": "SecId: int64\nEffective Date: date32[day]\nFloat01: double\nFloat02: double\nFloat03: double\nFloat04: double\nFloat05: double\nFloat06: double\nFloat07: double\nFloat08: double\nFloat09: double\nFloat10: double\nFloat11: double\nFloat12: double\nFloat13: double\nFloat14: double\nFloat15: double",
+    "portfolio_PF.parquet": "Entity: string\nEffectiveDate: date32[day]\nInstrumentId: string\nWeight: double\nBaseReturn: double\nLocalReturn: double",
+    "index.parquet": "Entity: string\nEffectiveDate: date32[day]\nInstrumentId: string\nWeight: double\nBaseReturn: double\nLocalReturn: double"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "status": 200,
+  "request_seconds": 12.915721709000536,
+  "peak_sampled_rss_gib": 1.37664794921875,
+  "output_rows": 2186,
+  "days": 1093,
+  "all_fields_match_previous_daily": true,
+  "base_additive_columns_reconcile_to_optimized_total": true,
+  "report": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/daily-snapshot-daily-output-direct-c1/requests/request-9598-1794119999729452000-0/country-portfolio_PF.parquet",
+  "profile": {
+    "elapsed_before_profile_write_seconds": 12.912707125,
+    "metrics_write_seconds": 0.000190084,
+    "note": "Elapsed spans include scheduling/I/O waits. Worker/input timings overlap and are not additive across workers or input readers. SMF apply includes enabled trace serialization; cleanup residuals include uninstrumented overhead. Profile writing is outside per-date spans.",
+    "planning_seconds": 0.024490542,
+    "report_write_seconds": 0.010715875,
+    "smf_reading_path": "daily_snapshot",
+    "smf_shared_at_server": true,
+    "smf_source_scope": "server",
+    "worker_phase_seconds": 12.877308583
+  }
+}

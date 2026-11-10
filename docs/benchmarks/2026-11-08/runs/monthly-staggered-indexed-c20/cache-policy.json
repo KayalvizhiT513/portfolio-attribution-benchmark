@@ -1,0 +1,8 @@
+{
+  "purge": "user-reported",
+  "confirmation": "I just done purge",
+  "preparation_completed_before_purge": true,
+  "pre_run_data_reads_after_confirmation": false,
+  "warmup_requests": 0,
+  "note": "Purge confirmed before the 20-request batch. No cache flushes between simultaneous requests. OS purge effects not independently verified."
+}

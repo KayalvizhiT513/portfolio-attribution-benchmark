@@ -1,0 +1,5 @@
+{
+  "pre_run": "User reported macOS sudo purge completed before this run was launched.",
+  "during_run": "No cache flushing between requests; all requests share the ordinary OS filesystem cache.",
+  "scope": "Pre-run purge recorded from user confirmation, not an independently verified cold-cache guarantee."
+}

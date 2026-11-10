@@ -1,0 +1,35 @@
+{
+  "requests": 1,
+  "workers": 12,
+  "api_seconds": [
+    10.641172208
+  ],
+  "peak_sampled_rss_gib": 1.6187744140625,
+  "selected_smf_records": 7651426,
+  "smf_trace_events": 2456,
+  "outputs_match_baseline": null,
+  "worker_trace": {
+    "apis": 1,
+    "workers": 12,
+    "events": 36,
+    "slots": 12,
+    "peak_holders": 12,
+    "all_workers_released": true,
+    "fifo_verified": true,
+    "slot_overlap": false,
+    "seconds": 8.448478375,
+    "note": "Application slot occupancy includes reading, waiting and computation; this is not a CPU scheduler trace."
+  },
+  "index_build_seconds": 0.4965429590010899,
+  "index_bytes": 94720000,
+  "sorting_seconds": 2.099787415998435,
+  "cache_policy": {
+    "purge": "user-reported",
+    "confirmation": "purge done",
+    "preparation_completed_before_purge": true,
+    "pre_run_data_reads_after_confirmation": false,
+    "warmup_requests": 0,
+    "note": "Purge effects are not independently verified."
+  },
+  "caveat": "Index preparation and sorting excluded from request latency and reported separately. Read-only mapped pages count in RSS. SMF rows count selected/materialized index records, not Parquet rows decoded during this API call."
+}

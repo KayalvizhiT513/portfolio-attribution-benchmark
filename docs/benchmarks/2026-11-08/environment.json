@@ -1,0 +1,11 @@
+{
+  "python": "3.14.6 (v3.14.6:c63aec69bd5, Jun 10 2026, 08:07:54) [Clang 21.0.0 (clang-2100.1.1.101)]",
+  "numpy": "2.5.4",
+  "pyarrow": "26.0.0",
+  "git_head": "7eb0c0b4b220bf9866c7353eec363ebde1b2f5a6",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Homebrew)",
+  "cargo": "cargo 1.99.1 (5f94df478 2026-08-27) (Homebrew)",
+  "timezone": "Asia/Kolkata",
+  "archive_date": "2026-11-08",
+  "note": "Current working-tree changes and script sources are preserved locally; older runs used earlier implementations."
+}

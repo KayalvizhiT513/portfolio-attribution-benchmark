@@ -1,0 +1,44 @@
+{
+  "server_ready_seconds": 0.013190957999540842,
+  "health": {
+    "active": 0,
+    "completed": 0,
+    "engine": "rust",
+    "failed": 0,
+    "peak_running_date_workers": 0,
+    "peak_running_requests": 0,
+    "pid": 8931,
+    "read_activity": {
+      "read_decode_calls": {
+        "current": 0,
+        "peak": 0
+      },
+      "reading_workers": {
+        "current": 0,
+        "peak": 0
+      },
+      "retained_daily_inputs": {
+        "current": 0,
+        "peak": 0
+      },
+      "workers_with_smf_cache": {
+        "current": 0,
+        "peak": 0
+      }
+    },
+    "request_limit": 20,
+    "running_date_workers": 0,
+    "running_requests": 0,
+    "shared_smf": {
+      "enabled": false,
+      "parsed_snapshot_cache": false,
+      "source_scope": "worker",
+      "state_scope": "worker"
+    },
+    "waiting_date_workers": 0,
+    "waiting_requests": 0,
+    "worker_limit": 12,
+    "workers_per_request": 12
+  },
+  "note": "Server startup precedes timed API batches. Shared SMF load/opening cost is included here and must be reported separately."
+}

@@ -1,0 +1,26 @@
+{
+  "requests": 1,
+  "workers": 12,
+  "api_seconds": [
+    15.094552916
+  ],
+  "peak_sampled_rss_gib": 2.99139404296875,
+  "selected_smf_records": 92161129,
+  "smf_trace_events": 3200,
+  "outputs_match_baseline": true,
+  "worker_trace": {
+    "apis": 1,
+    "workers": 12,
+    "events": 36,
+    "slots": 12,
+    "peak_holders": 12,
+    "all_workers_released": true,
+    "fifo_verified": true,
+    "slot_overlap": false,
+    "seconds": 11.378066542,
+    "note": "Application slot occupancy includes reading, waiting and computation; this is not a CPU scheduler trace."
+  },
+  "index_build_seconds": 4.51496954099639,
+  "index_bytes": 1461107200,
+  "caveat": "Index preparation and sorting excluded from request latency and reported separately. Read-only mapped pages count in RSS; cache is not cold after preparation. SMF rows count selected/materialized index records, not Parquet rows decoded during this API call."
+}

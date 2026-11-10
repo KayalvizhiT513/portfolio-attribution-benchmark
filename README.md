@@ -6,6 +6,8 @@ Daily SMF snapshots are the supported production approach. See [snapshot prepara
 
 ## Reports
 
+- [Dated benchmark input/output specifications, metrics, results and rebuild recipes](docs/benchmarks/2026-11-08/README.md) — archive created before bulk generated-data cleanup; rebuild inputs before rerunning.
+
 - [Six concurrent inputs per effective date](docs/SIX_INPUT_DATE_PIPELINE.md) — Accounts, Forex, historical SMF, 42 GiB analytics, portfolio and index returns; fixture generation, explicit date windows, Rust/Go execution and validation.
 - [Rust and Go attribution APIs and memory experiments](docs/ATTRIBUTION_API_MEMORY.md) — in-process requests, concurrent load, scalable securities/accounts/history fixtures, RSS and heap evidence.
 - [Current country attribution with an effective-dated SMF: optimized CSV and Parquet](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md) — the single country report, including latest runtimes, whole-run phases, worker stages, memory, calculation flow, optimization history and raw evidence links. Future country runs update this file in place.

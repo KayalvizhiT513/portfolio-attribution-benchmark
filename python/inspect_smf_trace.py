@@ -9,18 +9,25 @@ import pyarrow.parquet as pq
 
 
 def attributes(row):
-    return dict(country=row['Country'], currency=row['Currency'], analytics_id=row['AnalyticsSecId'])
+    result = dict(country=row['Country'], currency=row['Currency'], analytics_id=row['AnalyticsSecId'])
+    if 'Sector' in row: result['sector'] = row['Sector']
+    return result
 
 
 def validate_trace(path, data):
     """Use an independent streaming latest-per-security oracle for each worker."""
+    synthetic_sectors = None
     manifest_path = data / 'manifest.json'
     if manifest_path.exists():
         manifest = json.loads(manifest_path.read_text())
+        if manifest.get('sector_assignment', '').startswith('Synthetic:') and not manifest.get('sector_effective_dated'):
+            synthetic_sectors = manifest['sectors']
         if manifest.get('smf_format') == 'daily_complete_snapshots':
             data = Path(manifest['smf_snapshot_source'])
     source = (row for batch in pq.ParquetFile(data / 'security_master.parquet').iter_batches()
               for row in batch.to_pylist())
+    if synthetic_sectors:
+        source = (dict(row, Sector=row.get('Sector', synthetic_sectors[(int(row['InstrumentId'][1:])-1) % len(synthetic_sectors)])) for row in source)
     pending = next(source, None)
     actual, expected = {}, {}
     summaries = []

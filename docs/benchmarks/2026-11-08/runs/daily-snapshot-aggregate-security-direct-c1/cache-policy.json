@@ -1,0 +1,7 @@
+{
+  "cache_state": "cold-cache",
+  "basis": "User confirmed purge before run; OS effects not independently verified",
+  "warmup_requests": 0,
+  "aggregate": "security",
+  "implementation": "direct effect accumulation; worker-local snapshots"
+}

@@ -1,0 +1,631 @@
+diff --git a/README.md b/README.md
+index 71742f4..df59606 100644
+--- a/README.md
++++ b/README.md
+@@ -6,6 +6,8 @@ Daily SMF snapshots are the supported production approach. See [snapshot prepara
+ 
+ ## Reports
+ 
++- [Dated benchmark input/output specifications, metrics, results and rebuild recipes](docs/benchmarks/2026-11-08/README.md) — archive created before bulk generated-data cleanup; rebuild inputs before rerunning.
++
+ - [Six concurrent inputs per effective date](docs/SIX_INPUT_DATE_PIPELINE.md) — Accounts, Forex, historical SMF, 42 GiB analytics, portfolio and index returns; fixture generation, explicit date windows, Rust/Go execution and validation.
+ - [Rust and Go attribution APIs and memory experiments](docs/ATTRIBUTION_API_MEMORY.md) — in-process requests, concurrent load, scalable securities/accounts/history fixtures, RSS and heap evidence.
+ - [Current country attribution with an effective-dated SMF: optimized CSV and Parquet](COUNTRY_REPORT_EFFECTIVE_DATED_SMF.md) — the single country report, including latest runtimes, whole-run phases, worker stages, memory, calculation flow, optimization history and raw evidence links. Future country runs update this file in place.
+diff --git a/docs/DAILY_SMF_SNAPSHOTS.md b/docs/DAILY_SMF_SNAPSHOTS.md
+index 25f8dbf..e4900ab 100644
+--- a/docs/DAILY_SMF_SNAPSHOTS.md
++++ b/docs/DAILY_SMF_SNAPSHOTS.md
+@@ -99,8 +99,11 @@ rust/target/release/portfolio-attribution --scenario six-input \
+ 
+ The existing US filter, daily weight normalization and security attribution
+ formulas apply. Workers immediately add daily values to private accumulators;
+-only these accumulators are merged after workers finish. Daily reports are not
+-retained in aggregation modes. Memory scales with workers × unique securities
++only these accumulators are merged after workers finish. Effects are accumulated
++directly during calculation: no daily security result array or cloned security-name
++list is built. Security IDs are allocated only on first use in each worker, using
++a hash map; final output is sorted by ID. Daily reports are not retained in
++aggregation modes. The attribution timing includes this direct accumulation. Memory scales with workers × unique securities
+ for security aggregation, and workers for total aggregation, in addition to
+ normal input/snapshot buffers. Final rows are written through the existing
+ on-disk temporary file and renamed on completion.
+@@ -122,3 +125,75 @@ whole requested calculation window, including dates a given security is absent.
+ Missing securities contribute zero. There is no cross-date linking or compounding.
+ 
+ Validate with `.venv/bin/python python/test_aggregate_smf.py` after building Rust.
++
++All three output modes write to a temporary report, finish and sync the file,
++then rename it to the final report path. Interrupted writes leave an incomplete
++temporary file rather than publishing it as the final report. The direct
++aggregation optimization removes intermediate daily result arrays in memory;
++it does not change this output finalization sequence.
++
++## Sector aggregation (Rust)
++
++SMFs can optionally include `Sector: string`. Values must be non-null and
++nonempty. Sector mode requires the column; older inputs continue to work for
++daily, total and security modes. Snapshot preparation preserves sectors and their
++actual effective dates. Sector changes move subsequent effects to the new sector.
++
++`--aggregate sector` sums the same US-filtered security effects by each date's
++sector and across the requested dates. It rolls up security effects, rather than
++recomputing Brinson effects using sector-level weights and returns. Effects,
++weights and contributions reconcile to total mode. Portfolio-wide return columns
++occur once per sector/date of presence and are not additive across sectors.
++Base is the default; `--return-type local|both` works as in other aggregate modes.
++Output `Segment` contains the sector name, with one row per sector/return type.
++
++The benchmark has 11 **synthetic** sectors, assigned by numeric security ID modulo
++11. They are benchmark classifications, not verified real-world classifications.
++The existing snapshots remain unchanged; the sector-enriched dataset is separate:
++
++```sh
++.venv/bin/python python/prepare_sector_smf.py \
++  --source results/six-input/monthly-staggered-daily-snapshot-inputs \
++  --output results/six-input/monthly-staggered-sector-daily-snapshot-inputs
++.venv/bin/python python/load_attribution_api.py \
++  --binary rust/target/release/portfolio-attribution \
++  --data results/six-input/monthly-staggered-sector-daily-snapshot-inputs \
++  --output results/api/sector-c1 --aggregate sector \
++  --workers 12 --worker-limit 12 --request-limit 12 \
++  --concurrency 1 --repeats 1 --settle-seconds 0 --stage-profile
++```
++
++For cold-cache measurements, purge after preparation and validation, before the
++API run. The extra column changes input decoding cost, so comparisons with
++sector-free inputs include both the sector input cost and grouping cost.
++Validate with `.venv/bin/python python/test_sector_smf.py`.
++
++### Effective-dated sector benchmark
++
++The changing-sector fixture uses the same monthly history and 11 synthetic sector
++names, with one sector revision per security per year. The revision month is
++`1 + ((numeric ID - 1) % 12)`; the effective day remains the source's monthly
++update day, `1 + ((numeric ID - 1) % 28)`. Sectors stay unchanged between revision
++events. This is a deterministic test workload, not an industry frequency claim.
++
++Generate sectors on history records **before** resolving daily snapshots:
++
++```sh
++.venv/bin/python python/prepare_sector_smf.py \
++  --source results/six-input/monthly-staggered-history \
++  --output results/six-input/monthly-staggered-sector-dated-history \
++  --effective-dated
++.venv/bin/python python/prepare_daily_smf.py \
++  --source results/six-input/monthly-staggered-sector-dated-history \
++  --output results/six-input/monthly-staggered-sector-dated-snapshots
++.venv/bin/python python/validate_dated_sector_smf.py \
++  --history results/six-input/monthly-staggered-sector-dated-history \
++  --snapshots results/six-input/monthly-staggered-sector-dated-snapshots
++```
++
++The validator independently replays history chronologically and checks every
++snapshot's sector and EffectiveDate against the latest applicable record. It
++also records sector-change counts and examples in `dated-sector-validation.json`.
++Run `.venv/bin/python python/test_dated_sector_smf.py` for before/on/after event
++boundary checks, future-state exclusion, trace replay, and serial/parallel runs.
++Purge only after preparation and validation when measuring cold-cache latency.
+diff --git a/python/inspect_smf_trace.py b/python/inspect_smf_trace.py
+index 0590a0d..16f5f05 100644
+--- a/python/inspect_smf_trace.py
++++ b/python/inspect_smf_trace.py
+@@ -9,18 +9,25 @@ import pyarrow.parquet as pq
+ 
+ 
+ def attributes(row):
+-    return dict(country=row['Country'], currency=row['Currency'], analytics_id=row['AnalyticsSecId'])
++    result = dict(country=row['Country'], currency=row['Currency'], analytics_id=row['AnalyticsSecId'])
++    if 'Sector' in row: result['sector'] = row['Sector']
++    return result
+ 
+ 
+ def validate_trace(path, data):
+     """Use an independent streaming latest-per-security oracle for each worker."""
++    synthetic_sectors = None
+     manifest_path = data / 'manifest.json'
+     if manifest_path.exists():
+         manifest = json.loads(manifest_path.read_text())
++        if manifest.get('sector_assignment', '').startswith('Synthetic:') and not manifest.get('sector_effective_dated'):
++            synthetic_sectors = manifest['sectors']
+         if manifest.get('smf_format') == 'daily_complete_snapshots':
+             data = Path(manifest['smf_snapshot_source'])
+     source = (row for batch in pq.ParquetFile(data / 'security_master.parquet').iter_batches()
+               for row in batch.to_pylist())
++    if synthetic_sectors:
++        source = (dict(row, Sector=row.get('Sector', synthetic_sectors[(int(row['InstrumentId'][1:])-1) % len(synthetic_sectors)])) for row in source)
+     pending = next(source, None)
+     actual, expected = {}, {}
+     summaries = []
+diff --git a/python/load_attribution_api.py b/python/load_attribution_api.py
+index 84bcfcb..e375eb2 100644
+--- a/python/load_attribution_api.py
++++ b/python/load_attribution_api.py
+@@ -39,7 +39,7 @@ def main():
+     p.add_argument('--request-limit', type=int, help='Rust API request admission slots before metadata/index opening (default 12)')
+     p.add_argument('--worker-trace', action='store_true', help='Record Rust worker queue/admission/release events')
+     p.add_argument('--smf-trace', choices=['off', 'summary', 'records'], default='off', help='Per-worker SMF update tracing in request output directories')
+-    p.add_argument('--aggregate', choices=['daily', 'total', 'security'], default='daily')
++    p.add_argument('--aggregate', choices=['daily', 'total', 'security', 'sector'], default='daily')
+     p.add_argument('--return-type', choices=['base', 'local', 'both'], default='base')
+     p.add_argument('--private-smf', action='store_true', help='Independent SMF source plan and state per worker and request')
+     p.add_argument('--stage-profile', action='store_true', help='Rust detailed per-date stage timings')
+diff --git a/python/prepare_daily_smf.py b/python/prepare_daily_smf.py
+index 9c28b83..7fd6fd9 100644
+--- a/python/prepare_daily_smf.py
++++ b/python/prepare_daily_smf.py
+@@ -28,6 +28,8 @@ def prepare(source,output):
+     for name,col in [('accounts','EffectiveDate'),('forex','EffectiveDate'),('analytics','Effective Date')]:
+         if not set(days)<=set(date_groups(pq.ParquetFile(source/f'{name}.parquet'),col)):raise ValueError(f'{name} lacks return dates')
+     path=source/'security_master.parquet';stat=path.stat();file=pq.ParquetFile(path)
++    has_sector='Sector' in file.schema_arrow.names
++    sectors=np.empty(0,dtype=object)
+     changes=date_groups(file,'EffectiveDate');effective=iter(sorted(changes));pending=next(effective,None)
+     if pending is None or pending>days[0]:raise ValueError('no SMF history effective on first return date')
+     schema=file.schema_arrow.append(pa.field('SnapshotDate',pa.date32()))
+@@ -48,10 +50,14 @@ def prepare(source,output):
+                     new=pc.filter(t['InstrumentId'],pc.is_null(locations)).to_pylist()
+                     ids.extend(new);id_array=pa.array(ids,pa.string())
+                     countries=np.resize(countries,len(ids));currencies=np.resize(currencies,len(ids))
++                    if has_sector:sectors=np.resize(sectors,len(ids))
+                     dates=np.resize(dates,len(ids));aliases=np.resize(aliases,len(ids))
+                     order=np.array(sorted(range(len(ids)),key=lambda i:ids[i]),dtype=np.int64)
+                     locations=pc.index_in(t['InstrumentId'],value_set=id_array)
+                 slots=locations.to_numpy()
++                if has_sector:
++                    if pc.any(pc.equal(t['Sector'],'')).as_py():raise ValueError('empty SMF sector')
++                    sectors[slots]=t['Sector'].to_numpy()
+                 countries[slots]=t['Country'].to_numpy();currencies[slots]=t['Currency'].to_numpy()
+                 dates[slots]=pc.cast(t['EffectiveDate'],pa.int32()).to_numpy();aliases[slots]=t['AnalyticsSecId'].to_numpy()
+                 pending=next(effective,None)
+@@ -60,6 +66,7 @@ def prepare(source,output):
+                 'EffectiveDate':pa.array(dates[order],pa.date32()),'Country':pa.array(countries[order],pa.string()),
+                 'Currency':pa.array(currencies[order],pa.string()),'AnalyticsSecId':pa.array(aliases[order],pa.int64()),
+                 'SnapshotDate':pa.array(np.full(n,(day-dt.date(1970,1,1)).days,dtype=np.int32),pa.date32())}
++            if has_sector:values['Sector']=pa.array(sectors[order],pa.string())
+             writer.write_table(pa.Table.from_arrays([values[f.name] for f in schema],schema=schema),row_group_size=65536)
+             totals+=n;counts.append(dict(date=str(day),securities=n))
+             if len(counts)%100==0:print(f'{len(counts)}/{len(days)} snapshots; {totals:,} rows',flush=True)
+diff --git a/python/test_aggregate_smf.py b/python/test_aggregate_smf.py
+index 9e9eb06..dbbc8d1 100644
+--- a/python/test_aggregate_smf.py
++++ b/python/test_aggregate_smf.py
+@@ -1,9 +1,11 @@
+ """Check arithmetic sums against daily attribution and serial/parallel parity."""
++import datetime as dt
+ import math
+ import subprocess
+ import tempfile
+ from pathlib import Path
+ 
++import pyarrow as pa
+ import pyarrow.parquet as pq
+ from prepare_daily_smf import prepare
+ from test_six_inputs import fixture
+@@ -71,7 +73,39 @@ def main():
+             assert s2['Days'] == 4
+             assert s2['PortfolioWeight'] < row['PortfolioWeight']
+         assert len(run('total', 3, 'both')) == 2
+-    print('Passed: arithmetic totals match daily output; per-security sums reconcile; base/local selection; 1/3-worker parity.')
++        # Change the snapshot universe and slot order midway through the window.
++        before = {r['Segment']: r for r in run('security', 1)}
++        expected_total = run('total', 1)[0]
++        first_half = [r for day in ('2023-01-01', '2023-01-02')
++                      for r in run('security', 1, day=day) if r['Segment'] == 'S000001']
++        for name in ('security_master', 'portfolio_PF', 'index'):
++            path = data/f'{name}.parquet'
++            table = pq.read_table(path)
++            date_col = 'SnapshotDate' if name == 'security_master' else 'EffectiveDate'
++            values = table.to_pylist()
++            for value in values:
++                if value[date_col] >= dt.date(2023, 1, 3) and value['InstrumentId'] == 'S000001':
++                    value['InstrumentId'] = 'NEW_SECURITY'
++            with pq.ParquetWriter(path, table.schema) as writer:
++                for day in sorted({v[date_col] for v in values}):
++                    group = [v for v in values if v[date_col] == day]
++                    if name == 'security_master' and day.day % 2: group.reverse()
++                    writer.write_table(pa.Table.from_pylist(group, schema=table.schema), row_group_size=2)
++        changed = run('security', 1)
++        changed_parallel = run('security', 3)
++        assert [r['Segment'] for r in changed] == ['NEW_SECURITY', 'S000001', 'S000002']
++        for a, b in zip(changed, changed_parallel):
++            assert a['Segment'] == b['Segment']
++            for col in NUMBERS: close(a[col], b[col])
++        by_id = {r['Segment']: r for r in changed}
++        for col in NUMBERS:
++            first_sum = sum(r[col] for r in first_half)
++            close(by_id['S000001'][col], first_sum)
++            close(by_id['NEW_SECURITY'][col], before['S000001'][col]-first_sum)
++            close(by_id['S000002'][col], before['S000002'][col])
++        changed_total = run('total', 3)[0]
++        for col in NUMBERS: close(changed_total[col], expected_total[col])
++    print('Passed: arithmetic totals match daily output; per-security sums reconcile; base/local selection; changing security universe and row order; 1/3-worker parity.')
+ 
+ 
+ if __name__ == '__main__': main()
+diff --git a/rust/src/main.rs b/rust/src/main.rs
+index a7d4d5c..e955465 100644
+--- a/rust/src/main.rs
++++ b/rust/src/main.rs
+@@ -98,7 +98,7 @@ fn config() -> Result<Config> {
+     let mut args = std::env::args().skip(1);
+     while let Some(a) = args.next() {
+         if a == "--help" {
+-            println!("--aggregate daily|total|security sums daily attribution (six-input/API); --return-type base|local|both selects summed output (default base)");
++            println!("--aggregate daily|total|security|sector sums daily attribution (six-input/API); --return-type base|local|both selects summed output (default base)");
+             println!("--listen HOST:PORT serves the six-input HTTP API in-process");
+             println!(
+                 "--request-limit N caps API requests before metadata/index opening (default 12)"
+@@ -160,11 +160,11 @@ fn config() -> Result<Config> {
+     {
+         return Err("invalid scenario or threads".into());
+     }
+-    if !["daily", "total", "security"].contains(&c.aggregate.as_str())
++    if !["daily", "total", "security", "sector"].contains(&c.aggregate.as_str())
+         || !["base", "local", "both"].contains(&c.return_type.as_str())
+     {
+         return Err(
+-            "aggregate must be daily, total, or security; return-type must be base, local, or both"
++            "aggregate must be daily, total, security, or sector; return-type must be base, local, or both"
+                 .into(),
+         );
+     }
+diff --git a/rust/src/six_input.rs b/rust/src/six_input.rs
+index afaee1c..1184f6f 100644
+--- a/rust/src/six_input.rs
++++ b/rust/src/six_input.rs
+@@ -1,6 +1,6 @@
+ //! Six persistent readers per date worker. All six decode concurrently before
+ //! joining; batch rows are derived from the selected complete date, not 65536.
+-use crate::{input::Input, output, Config, Master, Metrics, Period, Result, Stream, HEADER};
++use crate::{input::Input, output, Config, Day, Master, Metrics, Period, Result, Stream, HEADER};
+ use arrow_array::{
+     Array, BooleanArray, Date32Array, Float64Array, Int64Array, RecordBatch, StringArray,
+ };
+@@ -95,7 +95,7 @@ struct Sums {
+     start: String,
+     end: String,
+     days: usize,
+-    values: BTreeMap<String, [[f64; 12]; 2]>,
++    values: HashMap<String, [[f64; 12]; 2]>,
+     metrics: Metrics,
+     rows: [u64; 6],
+     reads: [f64; 6],
+@@ -107,7 +107,7 @@ struct Sums {
+     hits: u64,
+ }
+ impl Sums {
+-    fn add(&mut self, r: DateReport, total: bool) -> Result<()> {
++    fn add(&mut self, r: DateReport) -> Result<()> {
+         if self.entity.as_ref().is_some_and(|e| e != &r.entity) {
+             return Err("portfolio entity changes across dates".into());
+         }
+@@ -119,48 +119,6 @@ impl Sums {
+             self.end = r.date;
+         }
+         self.days += 1;
+-        if total {
+-            self.values.entry("ALL".into()).or_default();
+-        }
+-        for (k, a) in r.period.acc.iter().enumerate().filter(|(_, a)| a.present) {
+-            let key = if total { "ALL" } else { &r.names[k] };
+-            let values = self.values.entry(key.to_string()).or_default();
+-            for t in 0..2 {
+-                // Returns here are arithmetic sums of daily report values, not linked returns.
+-                let rp = r.period.growth[0][t] - 1.0;
+-                let rb = r.period.growth[1][t] - 1.0;
+-                let numbers = [
+-                    a.w[0],
+-                    a.w[1],
+-                    a.e[t][0],
+-                    a.e[t][1],
+-                    a.e[t][2],
+-                    a.e[t].iter().sum(),
+-                    rp,
+-                    rb,
+-                    rp - rb,
+-                    a.contribution[0][t],
+-                    a.contribution[1][t],
+-                    a.contribution[0][t] - a.contribution[1][t],
+-                ];
+-                for j in 0..12 {
+-                    // Portfolio-wide daily returns occur once in the total row.
+-                    if !total || !(6..=8).contains(&j) {
+-                        values[t][j] += numbers[j];
+-                    }
+-                }
+-            }
+-        }
+-        if total && !self.values.is_empty() {
+-            let values = self.values.get_mut("ALL").unwrap();
+-            for t in 0..2 {
+-                let rp = r.period.growth[0][t] - 1.0;
+-                let rb = r.period.growth[1][t] - 1.0;
+-                values[t][6] += rp;
+-                values[t][7] += rb;
+-                values[t][8] += rp - rb;
+-            }
+-        }
+         self.metrics.add(&r.metrics);
+         for i in 0..6 {
+             self.rows[i] += r.rows[i];
+@@ -177,6 +135,99 @@ impl Sums {
+         }
+         Ok(())
+     }
++    // Fold effects directly into worker sums. Snapshot slot order may change,
++    // so security state is keyed by stable ID with allocation only on first use.
++    fn add_effects(
++        &mut self,
++        p: &Day,
++        b: &Day,
++        names: &[String],
++        total: bool,
++        sector: bool,
++        metrics: &mut Metrics,
++    ) -> Result<()> {
++        let started = Instant::now();
++        let totals: [[f64; 2]; 2] = [
++            [
++                p.stats.iter().map(|s| s.r[0]).sum(),
++                p.stats.iter().map(|s| s.r[1]).sum(),
++            ],
++            [
++                b.stats.iter().map(|s| s.r[0]).sum(),
++                b.stats.iter().map(|s| s.r[1]).sum(),
++            ],
++        ];
++        let mut day_total = [[0.0; 12]; 2];
++        let mut daily_effects = [0.0; 2];
++        let mut seen_sectors = HashSet::new();
++        for (k, name) in names.iter().enumerate() {
++            let ps = p.stats[k];
++            let bs = b.stats[k];
++            if !ps.present && !bs.present {
++                continue;
++            }
++            if sector && name.is_empty() {
++                return Err("sector aggregation requires Sector in the SMF".into());
++            }
++            let include_returns = !sector || seen_sectors.insert(name.as_str());
++            metrics.effects += 6;
++            let dest = if total {
++                &mut day_total
++            } else {
++                if !self.values.contains_key(name.as_str()) {
++                    self.values.insert(name.clone(), [[0.0; 12]; 2]);
++                }
++                self.values.get_mut(name.as_str()).unwrap()
++            };
++            for t in 0..2 {
++                let e = crate::effect(ps, bs, t, totals[1][t]);
++                let values = [
++                    ps.w,
++                    bs.w,
++                    e[0],
++                    e[1],
++                    e[2],
++                    e.iter().sum(),
++                    0.0,
++                    0.0,
++                    0.0,
++                    ps.r[t],
++                    bs.r[t],
++                    ps.r[t] - bs.r[t],
++                ];
++                for j in 0..12 {
++                    dest[t][j] += values[j];
++                }
++                daily_effects[t] += values[5];
++                if !total && include_returns {
++                    dest[t][6] += totals[0][t];
++                    dest[t][7] += totals[1][t];
++                    dest[t][8] += totals[0][t] - totals[1][t];
++                }
++            }
++        }
++        for t in 0..2 {
++            if (daily_effects[t] - (totals[0][t] - totals[1][t])).abs() > 1e-9 {
++                return Err("daily reconciliation failed".into());
++            }
++        }
++        if total {
++            if !self.values.contains_key("ALL") {
++                self.values.insert("ALL".into(), [[0.0; 12]; 2]);
++            }
++            let dest = self.values.get_mut("ALL").unwrap();
++            for t in 0..2 {
++                day_total[t][6] = totals[0][t];
++                day_total[t][7] = totals[1][t];
++                day_total[t][8] = totals[0][t] - totals[1][t];
++                for j in 0..12 {
++                    dest[t][j] += day_total[t][j];
++                }
++            }
++        }
++        metrics.compute += started.elapsed().as_secs_f64();
++        Ok(())
++    }
+     fn merge(&mut self, other: Self) -> Result<()> {
+         if let (Some(a), Some(b)) = (&self.entity, &other.entity) {
+             if a != b {
+@@ -217,7 +268,9 @@ impl Sums {
+     fn write(&self, c: &Config, writer: &mut output::Writer, mt: &mut Metrics) -> Result<()> {
+         let mut record = csv::ByteRecord::new();
+         let days = self.days.to_string();
+-        for (key, values) in &self.values {
++        let mut ordered: Vec<_> = self.values.iter().collect();
++        ordered.sort_unstable_by(|a, b| a.0.cmp(b.0));
++        for (key, values) in ordered {
+             for t in 0..2 {
+                 let return_type = if t == 0 { "base" } else { "local" };
+                 if c.return_type != "both" && c.return_type != return_type {
+@@ -255,7 +308,7 @@ struct DateReport {
+     date: String,
+     entity: String,
+     names: Vec<String>,
+-    period: Period,
++    period: Option<Period>,
+     metrics: Metrics,
+     rows: [u64; 6],
+     reads: [f64; 6],
+@@ -317,6 +370,9 @@ fn plan(dir: &Path, i: usize) -> Result<Plan> {
+     let schema = metadata.schema();
+     let daily_snapshot = i == 2 && schema.field_with_name("SnapshotDate").is_ok();
+     let mut expected = schema_for(i);
++    if i == 2 && schema.field_with_name("Sector").is_ok() {
++        expected.push(("Sector", DataType::Utf8));
++    }
+     if daily_snapshot {
+         expected.push(("SnapshotDate", DataType::Date32));
+     }
+@@ -499,6 +555,7 @@ struct SmfState {
+     master: Master,
+     currencies: Vec<String>,
+     aliases: Vec<i64>,
++    sectors: Vec<String>,
+ }
+ // One file per worker avoids a shared trace lock. Errors fail the calculation
+ // rather than silently producing an incomplete audit trail.
+@@ -526,8 +583,13 @@ impl SmfTrace {
+         Ok(())
+     }
+ }
+-fn smf_attributes(country: &str, currency: &str, alias: i64) -> serde_json::Value {
+-    serde_json::json!({"country": country, "currency": currency, "analytics_id": alias})
++fn smf_attributes(country: &str, currency: &str, alias: i64, sector: &str) -> serde_json::Value {
++    let mut value =
++        serde_json::json!({"country": country, "currency": currency, "analytics_id": alias});
++    if !sector.is_empty() {
++        value["sector"] = sector.into();
++    }
++    value
+ }
+ // Apply one effective date at a time. Missing securities retain their state.
+ fn apply_smf(
+@@ -550,6 +612,7 @@ fn apply_smf(
+         },
+         currencies: Vec::new(),
+         aliases: Vec::new(),
++        sectors: Vec::new(),
+     });
+     let m = &mut state.master;
+     let mut seen = HashSet::new();
+@@ -559,11 +622,16 @@ fn apply_smf(
+         let cs = strings(b, "Currency");
+         let countries = strings(b, "Country");
+         let alias_ids = ints(b, "AnalyticsSecId");
++        let sectors = b.column_by_name("Sector").map(|_| strings(b, "Sector"));
+         for r in 0..b.num_rows() {
+             let id = ids.value(r);
+             let currency = cs.value(r);
+             let country = countries.value(r);
+             let alias = alias_ids.value(r);
++            let sector = sectors.map(|v| v.value(r)).unwrap_or("");
++            if sectors.is_some_and(|v| v.is_null(r) || sector.is_empty()) {
++                return Err("invalid SMF sector".into());
++            }
+             if id.is_empty()
+                 || currency.is_empty()
+                 || country.is_empty()
+@@ -577,6 +645,7 @@ fn apply_smf(
+                 m.country_names[m.history[slot][0].1] != country
+                     || state.currencies[slot] != currency
+                     || state.aliases[slot] != alias
++                    || state.sectors[slot] != sector
+             });
+             let action = if existing.is_none() {
+                 inserted += 1;
+@@ -594,8 +663,8 @@ fn apply_smf(
+                     "effective_date":arrow_array::temporal_conversions::date32_to_datetime(dates(b,"EffectiveDate").value(r)).ok_or("invalid SMF effective date")?.date().to_string(),
+                     "snapshot_date":if daily_snapshot {Some(calculation_date)}else{None}, "instrument_id":id, "action":action,
+                     "before": existing.map(|slot| smf_attributes(
+-                        &m.country_names[m.history[slot][0].1], &state.currencies[slot], state.aliases[slot])),
+-                    "after":smf_attributes(country, currency, alias)}),
++                        &m.country_names[m.history[slot][0].1], &state.currencies[slot], state.aliases[slot], &state.sectors[slot])),
++                    "after":smf_attributes(country, currency, alias, sector)}),
+                 )
+             } else {
+                 None
+@@ -611,6 +680,7 @@ fn apply_smf(
+                 m.history[slot][0].1 = country_slot;
+                 state.currencies[slot] = currency.to_string();
+                 state.aliases[slot] = alias;
++                state.sectors[slot] = sector.to_string();
+             } else {
+                 let slot = m.names.len();
+                 m.ids.insert(id.to_string(), slot);
+@@ -619,6 +689,7 @@ fn apply_smf(
+                 m.selected.push(true);
+                 state.currencies.push(currency.to_string());
+                 state.aliases.push(alias);
++                state.sectors.push(sector.to_string());
+             }
+             if let (Some(t), Some(record)) = (trace.as_mut(), record) {
+                 t.emit(record)?;
+@@ -708,6 +779,7 @@ fn calculate(
+     reads: [f64; 6],
+     c: &Config,
+     smf_cache: &mut Option<SmfState>,
++    sums: &mut Sums,
+ ) -> Result<DateReport> {
+     let mut stages = [0.0; 5];
+     let mut stage_started = Instant::now();
+@@ -836,8 +908,16 @@ fn calculate(
+     }
+     stages[3] = stage_started.elapsed().as_secs_f64();
+     stage_started = Instant::now();
+-    let mut period = Period::new(pd, date.to_string(), c);
+-    period.add(pd, bd, &mut mt)?;
++    let period = if c.aggregate == "daily" {
++        let mut period = Period::new(pd, date.to_string(), c);
++        period.add(pd, bd, &mut mt)?;
++        Some(period)
++    } else {
++        let sector = c.aggregate == "sector";
++        let names = if sector { &state.sectors } else { &m.names };
++        sums.add_effects(pd, bd, names, c.aggregate == "total", sector, &mut mt)?;
++        None
++    };
+     stages[4] = stage_started.elapsed().as_secs_f64();
+     Ok(DateReport {
+         date: date.to_string(),
+@@ -845,7 +925,7 @@ fn calculate(
+         names: if c.aggregate == "daily" {
+             m.country_names.clone()
+         } else {
+-            m.names.clone()
++            Vec::new()
+         },
+         period,
+         metrics: mt,
+@@ -1062,12 +1142,12 @@ pub(crate) fn run_with_shared_smf(
+                         rows[i] = n;
+                     }
+                     let calculation_started = Instant::now();
+-                    let mut report = calculate(date, tables, rows, reads, c, &mut cached_master)
++                    let mut report = calculate(date, tables, rows, reads, c, &mut cached_master, &mut sums)
+                         .map_err(|e| format!("date {date}: {e}"))?;
+                     let calculation_seconds = calculation_started.elapsed().as_secs_f64();
+                     let stages = report.stages;
+                     report.snapshot_rows_served=smf_access.snapshot_rows_served;
+-                    if c.aggregate == "daily" { out.push(report); } else { sums.add(report, c.aggregate == "total")?; }
++                    if c.aggregate == "daily" { out.push(report); } else { sums.add(report)?; }
+                     drop(retained_inputs);
+                     let date_seconds = date_started.elapsed().as_secs_f64();
+                     if let Some(writer) = &mut profile {
+@@ -1138,8 +1218,13 @@ pub(crate) fn run_with_shared_smf(
+         entity = Some(r.entity.clone());
+         snapshot_rows_served += r.snapshot_rows_served;
+         mt.add(&r.metrics);
+-        r.period
+-            .write(&c, &r.entity, &r.names, &mut writer, &mut mt)?;
++        r.period.ok_or("missing daily report")?.write(
++            &c,
++            &r.entity,
++            &r.names,
++            &mut writer,
++            &mut mt,
++        )?;
+         for i in 0..6 {
+             rows[i] += r.rows[i];
+             reads[i] += r.reads[i];

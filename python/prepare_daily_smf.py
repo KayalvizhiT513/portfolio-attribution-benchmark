@@ -28,6 +28,8 @@ def prepare(source,output):
     for name,col in [('accounts','EffectiveDate'),('forex','EffectiveDate'),('analytics','Effective Date')]:
         if not set(days)<=set(date_groups(pq.ParquetFile(source/f'{name}.parquet'),col)):raise ValueError(f'{name} lacks return dates')
     path=source/'security_master.parquet';stat=path.stat();file=pq.ParquetFile(path)
+    has_sector='Sector' in file.schema_arrow.names
+    sectors=np.empty(0,dtype=object)
     changes=date_groups(file,'EffectiveDate');effective=iter(sorted(changes));pending=next(effective,None)
     if pending is None or pending>days[0]:raise ValueError('no SMF history effective on first return date')
     schema=file.schema_arrow.append(pa.field('SnapshotDate',pa.date32()))
@@ -48,10 +50,14 @@ def prepare(source,output):
                     new=pc.filter(t['InstrumentId'],pc.is_null(locations)).to_pylist()
                     ids.extend(new);id_array=pa.array(ids,pa.string())
                     countries=np.resize(countries,len(ids));currencies=np.resize(currencies,len(ids))
+                    if has_sector:sectors=np.resize(sectors,len(ids))
                     dates=np.resize(dates,len(ids));aliases=np.resize(aliases,len(ids))
                     order=np.array(sorted(range(len(ids)),key=lambda i:ids[i]),dtype=np.int64)
                     locations=pc.index_in(t['InstrumentId'],value_set=id_array)
                 slots=locations.to_numpy()
+                if has_sector:
+                    if pc.any(pc.equal(t['Sector'],'')).as_py():raise ValueError('empty SMF sector')
+                    sectors[slots]=t['Sector'].to_numpy()
                 countries[slots]=t['Country'].to_numpy();currencies[slots]=t['Currency'].to_numpy()
                 dates[slots]=pc.cast(t['EffectiveDate'],pa.int32()).to_numpy();aliases[slots]=t['AnalyticsSecId'].to_numpy()
                 pending=next(effective,None)
@@ -60,6 +66,7 @@ def prepare(source,output):
                 'EffectiveDate':pa.array(dates[order],pa.date32()),'Country':pa.array(countries[order],pa.string()),
                 'Currency':pa.array(currencies[order],pa.string()),'AnalyticsSecId':pa.array(aliases[order],pa.int64()),
                 'SnapshotDate':pa.array(np.full(n,(day-dt.date(1970,1,1)).days,dtype=np.int32),pa.date32())}
+            if has_sector:values['Sector']=pa.array(sectors[order],pa.string())
             writer.write_table(pa.Table.from_arrays([values[f.name] for f in schema],schema=schema),row_group_size=65536)
             totals+=n;counts.append(dict(date=str(day),securities=n))
             if len(counts)%100==0:print(f'{len(counts)}/{len(days)} snapshots; {totals:,} rows',flush=True)

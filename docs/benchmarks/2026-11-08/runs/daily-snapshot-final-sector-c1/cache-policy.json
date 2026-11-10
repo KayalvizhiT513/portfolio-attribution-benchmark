@@ -1,0 +1,8 @@
+{
+  "cache_state": "cold-cache",
+  "basis": "User confirmed purge after sector preparation and validation; OS effects not independently verified",
+  "warmup_requests": 0,
+  "aggregate": "sector",
+  "output_finalization": "temporary file, finish/sync, rename",
+  "sectors": "11 deterministic synthetic sectors"
+}

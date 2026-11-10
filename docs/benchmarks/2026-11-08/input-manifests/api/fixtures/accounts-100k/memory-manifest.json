@@ -1,0 +1,10 @@
+{
+  "securities": 10000,
+  "accounts_per_date": 100000,
+  "days": 12,
+  "account_history_days": 0,
+  "analytics_securities": 10000,
+  "master_securities": 10000,
+  "start_date": "2023-01-01",
+  "end_date": "2023-01-12"
+}

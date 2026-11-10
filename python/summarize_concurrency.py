@@ -59,7 +59,7 @@ def main():
         startup=json.loads((a.run/'startup.json').read_text())
         result['server_ready_seconds']=startup['server_ready_seconds']
         result['shared_smf']=health[-1].get('shared_smf')
-        result['startup_note']='Server ready/load time is outside API batch latency; report both to include shared index initialization cost.'
+        result['startup_note']='Server ready/load time is outside API batch latency; report both to include shared SMF metadata initialization cost.'
     (a.run/'concurrency-summary.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2))
 
 if __name__=='__main__':main()

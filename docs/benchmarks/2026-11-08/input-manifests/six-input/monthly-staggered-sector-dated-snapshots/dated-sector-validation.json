@@ -1,0 +1,49 @@
+{
+  "rows_validated": 174880000,
+  "snapshot_dates": 1093,
+  "securities": 160000,
+  "sector_changes": 480000,
+  "changes_per_security_min": 3,
+  "changes_per_security_max": 3,
+  "all_snapshot_sectors_match_independent_history_replay": true,
+  "all_snapshot_effective_dates_match_history": true,
+  "examples": [
+    {
+      "security": "S000001",
+      "effective_date": "2023-01-01",
+      "before": "Communication Services",
+      "after": "Consumer Discretionary"
+    },
+    {
+      "security": "S000061",
+      "effective_date": "2023-01-05",
+      "before": "Health Care",
+      "after": "Industrials"
+    },
+    {
+      "security": "S000037",
+      "effective_date": "2023-01-09",
+      "before": "Energy",
+      "after": "Financials"
+    },
+    {
+      "security": "S000013",
+      "effective_date": "2023-01-13",
+      "before": "Consumer Discretionary",
+      "after": "Consumer Staples"
+    },
+    {
+      "security": "S000073",
+      "effective_date": "2023-01-17",
+      "before": "Industrials",
+      "after": "Information Technology"
+    },
+    {
+      "security": "S000049",
+      "effective_date": "2023-01-21",
+      "before": "Financials",
+      "after": "Health Care"
+    }
+  ],
+  "validation_seconds": 9.276660417002859
+}

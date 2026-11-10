@@ -1,0 +1,55 @@
+[
+  {
+    "path": "attribution_data_parquet/expansion_provenance.parquet",
+    "bytes": 14133,
+    "rows": 3000,
+    "row_groups": 1,
+    "schema": "SourceInstrumentId: string\nAddedInstrumentId: string\nOriginalWeightFraction: double\nAddedWeightFraction: double",
+    "sha256": "e0eba0cd2a79c81f5f3464b78929fb6e5001bdff98b6ebc29802f90addbf43d1"
+  },
+  {
+    "path": "attribution_data_parquet/index.parquet",
+    "bytes": 3356731041,
+    "rows": 109500000,
+    "row_groups": 1095,
+    "schema": "Entity: string\nEffectiveDate: date32[day]\nInstrumentId: string\nWeight: double\nBaseReturn: double\nLocalReturn: double",
+    "sha256": "ba6b83a2b9290ecf8c61bcfaa5087bf42303f1faef950b2118b9eeb51029a27e"
+  },
+  {
+    "path": "attribution_data_parquet/instrument_remapping.parquet",
+    "bytes": 272207,
+    "rows": 57000,
+    "row_groups": 1,
+    "schema": "Scope: string\nSourceInstrumentId: string\nInstrumentId: string",
+    "sha256": "00cf9a34916dfe98b2c0456d4f720a4a0e3e1edecc942e02a3eb01afcc8eb87f"
+  },
+  {
+    "path": "attribution_data_parquet/manifest.json",
+    "bytes": 1948,
+    "sha256": "4cf2d66b93f799d1a0929120e398ea998800b0f36dc655399c4e6d33ae2903e2"
+  },
+  {
+    "path": "attribution_data_parquet/portfolio_PF.parquet",
+    "bytes": 1957441554,
+    "rows": 65700000,
+    "row_groups": 1095,
+    "schema": "Entity: string\nEffectiveDate: date32[day]\nInstrumentId: string\nWeight: double\nBaseReturn: double\nLocalReturn: double",
+    "sha256": "0f0cbd3f40bfcadbc8fb88239542ad7daad5219185c1375965d23dc52a8176ca"
+  },
+  {
+    "path": "attribution_data_parquet/security_master.parquet",
+    "bytes": 241007,
+    "rows": 160000,
+    "row_groups": 1,
+    "schema": "InstrumentId: string\nCurrency: string\nCountry: string",
+    "sha256": "5c87996749d0b306a72823442c84ecaa692d503adf86822eb5b14d8f47925691"
+  },
+  {
+    "path": "docs/benchmarks/2026-11-08/source/security_master_history.parquet",
+    "bytes": 512078,
+    "rows": 5760000,
+    "row_groups": 38,
+    "schema": "InstrumentId: string\nEffectiveDate: date32[day]\nCurrency: string\nCountry: string",
+    "sha256": "cb85d1b9f5f8aeeae084775c9820d97c945a50767c2a20b74f47c7cd6adc2a14"
+  }
+]

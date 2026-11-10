@@ -47,6 +47,13 @@ def collect(root):
         previous[slot]=row; rows.append(row)
     for api in api_ids.values():
         assert sorted(r['worker'] for r in rows if r['api']==api)==list(range(1,13)), 'expected 12 workers/API'
+    volumes=root/'worker-volumes.json'
+    if volumes.exists():
+        volume_data=json.loads(volumes.read_text())
+        by_worker={(r['api'],r['worker']):r for r in volume_data['workers']}
+        for row in rows:
+            volume=by_worker[(row['api'],row['worker'])]
+            row.update({k:v for k,v in volume.items() if k not in row})
     stats=dict(apis=len(api_ids),workers=len(rows),events=len(events),slots=limit,peak_holders=peak,
                all_workers_released=True,fifo_verified=True,slot_overlap=False,
                seconds=max(r['released_s'] for r in rows),
@@ -66,7 +73,7 @@ def static_plot(root,rows,stats):
         color=cmap((r['api']-1)%20)
         ax.barh(r['slot'],r['held_s'],left=r['admitted_s'],height=.72,color=color,edgecolor='white',linewidth=.6,zorder=3)
         if r['held_s']>stats['seconds']*.022:
-            ax.text(r['admitted_s']+r['held_s']/2,r['slot'],f'{r["api"]:02}.{r["worker"]:02}',ha='center',va='center',fontsize=5.8,color='#111827')
+            ax.text(r['admitted_s']+r['held_s']/2,r['slot'],f'{r["api"]:02}.{r["worker"]:02}' + (f'\n{r["total_input_rows"]/1e6:.2f}M rows' if 'total_input_rows' in r else ''),ha='center',va='center',fontsize=5.8,color='#111827')
     ax.set_yticks(range(1,stats['slots']+1),[f'Slot {n:02}' for n in range(1,stats['slots']+1)])
     ax.invert_yaxis(); ax.set_xlim(0,stats['seconds']*1.005)
     ax.set_xlabel('Seconds since the first worker queued',labelpad=10)
@@ -88,22 +95,23 @@ HTML = r'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="view
 <h1>How each API’s 12 workers competed</h1><p id="summary"></p><p class="note">These are measured application-slot events, <b>not CPU execution events</b>. A colored bar means the worker held its slot, including input waits and times macOS paused its threads. Gray means queued for a slot.</p>
 <div class="card"><h2>Who occupied each of the 12 slots?</h2><p>Time flows left to right. Hover for worker identity, wait time, date range and the previous holder of that slot. Click a block to inspect its API.</p><div id="legend" class="legend"></div><div id="slots"></div></div>
 <div class="card"><label for="api">Inspect API: </label><select id="api"><option value="all">All 20 APIs / 240 workers</option></select> <button id="reset">Show all</button><p id="selection"></p><div class="scroll" id="workers"></div></div>
-<div class="card"><h2>Exact admission and slot handoff order</h2><p>“Previous holder” means the worker that last held the same application slot, not the thread that previously ran on a CPU.</p><div class="scroll"><table><thead><tr><th>Admit #</th><th>API / worker</th><th>Slot</th><th>Queued s</th><th>Admitted s</th><th>Released s</th><th>Wait s</th><th>Held s</th><th>Previous holder</th><th>Rust thread ID</th><th>Date range</th></tr></thead><tbody id="order"></tbody></table></div></div>
+<div class="card"><h2>Exact admission and slot handoff order</h2><p>“Previous holder” means the worker that last held the same application slot, not the thread that previously ran on a CPU.</p><div class="scroll"><table><thead><tr><th>Admit #</th><th>API / worker</th><th>Slot</th><th>Queued s</th><th>Admitted s</th><th>Released s</th><th>Wait s</th><th>Held s</th><th>Previous holder</th><th>Rust thread ID</th><th>Date range</th><th>Dates</th><th>Input rows</th><th>SMF rows</th><th>Analytics rows</th><th>Portfolio rows</th><th>Benchmark rows</th></tr></thead><tbody id="order"></tbody></table></div></div>
 <script>
 const data=__DATA__,stats=__STATS__;
 const colors=['#1f77b4','#aec7e8','#ff7f0e','#ffbb78','#2ca02c','#98df8a','#d62728','#ff9896','#9467bd','#c5b0d5','#8c564b','#c49c94','#e377c2','#f7b6d2','#7f7f7f','#c7c7c7','#bcbd22','#dbdb8d','#17becf','#9edae5'];
 const fmt=x=>x.toFixed(3), label=r=>`API ${String(r.api).padStart(2,'0')} / W${String(r.worker).padStart(2,'0')}`;
+const volume=r=>r.total_input_rows===undefined?'Volume not recorded':`${r.dates} dates · ${r.total_input_rows.toLocaleString()} total input rows\nSMF ${r.security_master_rows.toLocaleString()} · analytics ${r.analytics_rows.toLocaleString()}\nPortfolio ${r.portfolio_PF_rows.toLocaleString()} · benchmark ${r.index_rows.toLocaleString()}\nAccounts ${r.accounts_rows.toLocaleString()} · FX ${r.forex_rows.toLocaleString()}\nBasis: ${r.volume_basis}`;
 const previous=r=>r.previous_api===null?'Initially free':`API ${String(r.previous_api).padStart(2,'0')} / W${String(r.previous_worker).padStart(2,'0')}`;
 const width=1380,left=145,right=15,plot=width-left-right,x=t=>left+t/stats.seconds*plot;
 const ns='http://www.w3.org/2000/svg';
 function node(tag,attrs,text){let e=document.createElementNS(ns,tag);for(let [k,v] of Object.entries(attrs||{}))e.setAttribute(k,v);if(text!==undefined)e.textContent=text;return e;}
 function base(height){let s=node('svg',{viewBox:`0 0 ${width} ${height}`});for(let t=0;t<=stats.seconds;t+=20){s.append(node('line',{x1:x(t),x2:x(t),y1:25,y2:height-20,stroke:'#e2e8f0'}));s.append(node('text',{x:x(t),y:16,'text-anchor':'middle'},`${t}s`));}return s;}
-function bar(s,r,y,wait=false){let a=wait?r.queued_s:r.admitted_s,b=wait?r.admitted_s:r.released_s;let e=node('rect',{x:x(a),y,width:Math.max(.4,x(b)-x(a)),height:19,fill:wait?'#d5dce8':colors[r.api-1],rx:2});e.append(node('title',{},`${label(r)} · slot ${r.slot}\nQueued ${fmt(r.queued_s)}s · admitted ${fmt(r.admitted_s)}s · released ${fmt(r.released_s)}s\nQueue wait ${fmt(r.wait_s)}s · slot held ${fmt(r.held_s)}s\nPrevious holder: ${previous(r)}\n${r.first_date} → ${r.last_date}\n${r.thread}`));if(!wait)e.addEventListener('click',()=>{document.querySelector('#api').value=r.api;render();});s.append(e);return e;}
+function bar(s,r,y,wait=false){let a=wait?r.queued_s:r.admitted_s,b=wait?r.admitted_s:r.released_s;let e=node('rect',{x:x(a),y,width:Math.max(.4,x(b)-x(a)),height:19,fill:wait?'#d5dce8':colors[r.api-1],rx:2});e.append(node('title',{},`${label(r)} · slot ${r.slot}\nQueued ${fmt(r.queued_s)}s · admitted ${fmt(r.admitted_s)}s · released ${fmt(r.released_s)}s\nQueue wait ${fmt(r.wait_s)}s · slot held ${fmt(r.held_s)}s\nPrevious holder: ${previous(r)}\n${volume(r)}\n${r.first_date} → ${r.last_date}\n${r.thread}`));if(!wait)e.addEventListener('click',()=>{document.querySelector('#api').value=r.api;render();});s.append(e);return e;}
 function render(){let chosen=document.querySelector('#api').value,rows=chosen==='all'?data:data.filter(r=>r.api===Number(chosen));
 let overview=base(410);for(let n=1;n<=stats.slots;n++)overview.append(node('text',{x:left-12,y:35+(n-1)*29+14,'text-anchor':'end'},`Slot ${n}`));for(let r of data){let b=bar(overview,r,35+(r.slot-1)*29);if(chosen!=='all'&&r.api!==Number(chosen))b.setAttribute('opacity','.18');}document.querySelector('#slots').replaceChildren(overview);
 let workers=base(rows.length*25+55);rows=rows.slice().sort((a,b)=>a.api-b.api||a.worker-b.worker);rows.forEach((r,i)=>{let y=30+i*25;workers.append(node('text',{x:left-12,y:y+14,'text-anchor':'end'},label(r)));bar(workers,r,y,true);bar(workers,r,y);});document.querySelector('#workers').replaceChildren(workers);
 document.querySelector('#selection').textContent=`${rows.length} workers shown. Gray: waiting for admission. Color: holding a slot until the full assigned date range finishes.`;
-document.querySelector('#order').replaceChildren(...data.filter(r=>chosen==='all'||r.api===Number(chosen)).map(r=>{let tr=document.createElement('tr');for(let value of [r.rank,label(r),r.slot,fmt(r.queued_s),fmt(r.admitted_s),fmt(r.released_s),fmt(r.wait_s),fmt(r.held_s),previous(r),r.thread,`${r.first_date} → ${r.last_date}`]){let td=document.createElement('td');td.textContent=value;tr.append(td);}return tr;}));}
+document.querySelector('#order').replaceChildren(...data.filter(r=>chosen==='all'||r.api===Number(chosen)).map(r=>{let tr=document.createElement('tr');for(let value of [r.rank,label(r),r.slot,fmt(r.queued_s),fmt(r.admitted_s),fmt(r.released_s),fmt(r.wait_s),fmt(r.held_s),previous(r),r.thread,`${r.first_date} → ${r.last_date}`,r.dates??'—',r.total_input_rows?.toLocaleString()??'—',r.security_master_rows?.toLocaleString()??'—',r.analytics_rows?.toLocaleString()??'—',r.portfolio_PF_rows?.toLocaleString()??'—',r.index_rows?.toLocaleString()??'—']){let td=document.createElement('td');td.textContent=value;tr.append(td);}return tr;}));}
 for(let i=1;i<=stats.apis;i++){let o=document.createElement('option');o.value=i;o.textContent=`API ${String(i).padStart(2,'0')} / 12 workers`;document.querySelector('#api').append(o);let sp=document.createElement('span');sp.innerHTML=`<i class="chip" style="background:${colors[i-1]}"></i>API ${String(i).padStart(2,'0')}`;document.querySelector('#legend').append(sp);}
 document.querySelector('#summary').textContent=`${stats.apis} APIs · ${stats.workers} date workers · ${stats.slots} shared slots · ${stats.seconds.toFixed(2)} seconds from first queue event to last slot release. FIFO and non-overlapping slot occupancy verified.`;
 document.querySelector('#api').addEventListener('change',render);document.querySelector('#reset').onclick=()=>{document.querySelector('#api').value='all';render();};render();

@@ -1,0 +1,10 @@
+{
+  "master_source": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data_us_ind_except_20251230/security_master.csv",
+  "master_source_sha256": "723d692795ec763877537d3caf725d50586277d753ba7780cb258e3a01d9f715",
+  "master_rows": 6078000,
+  "master_verification": "Every typed field and row matches updated CSV, in order",
+  "holdings_symlinks": [
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data_parquet/index.parquet",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/attribution_data_parquet/portfolio_PF.parquet"
+  ]
+}

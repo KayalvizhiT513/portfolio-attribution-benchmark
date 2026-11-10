@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "request_seconds": 16.57980787500037,
+  "peak_sampled_rss_gib": 2.4520263671875,
+  "output_rows": 159000,
+  "unique_securities": 159000,
+  "days": 1093,
+  "all_additive_columns_reconcile_to_total": true,
+  "sums": {
+    "PortfolioWeight": 1093.0,
+    "BenchmarkWeight": 1093.0,
+    "Allocation": 0.01357564442510949,
+    "Selection": -0.002220789651284788,
+    "Interaction": -0.023127308287982266,
+    "Total": -0.011772453514157566,
+    "PortfolioContribution": -0.007178952041549179,
+    "BenchmarkContribution": 0.004593501472608951,
+    "ActiveContribution": -0.01177245351415813
+  },
+  "report": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/daily-snapshot-aggregate-security-no-cache-c1/requests/request-6201-1794116060486537000-0/country-portfolio_PF.parquet",
+  "cache_policy": {
+    "cache_state": "cold-cache",
+    "basis": "User confirmed purge before this run; OS effects not independently verified",
+    "warmup_requests": 0
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "pre_run": "User reported sudo purge completed before this run was launched.",
+  "during_run": "No cache flushing between requests; OS cache shared normally.",
+  "attribution": "RSS is process-specific; VM and swap counters are system-wide."
+}

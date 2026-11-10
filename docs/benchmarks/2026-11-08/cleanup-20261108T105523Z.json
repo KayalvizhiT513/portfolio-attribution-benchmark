@@ -1,0 +1,465 @@
+{
+  "apply": false,
+  "records": [
+    {
+      "path": "attribution_data/index.csv",
+      "bytes": 7246180941,
+      "allocated_bytes": 7246184448,
+      "mtime_ns": 1793509012703213315,
+      "status": "planned",
+      "header": "\"Entity\",\"EffectiveDate\",\"InstrumentId\",\"Weight\",\"BaseReturn\",\"LocalReturn\""
+    },
+    {
+      "path": "attribution_data/portfolio_PF.csv",
+      "bytes": 5375650674,
+      "allocated_bytes": 5375651840,
+      "mtime_ns": 1793509524699454054,
+      "status": "planned",
+      "header": "\"Entity\",\"EffectiveDate\",\"InstrumentId\",\"Weight\",\"BaseReturn\",\"LocalReturn\""
+    },
+    {
+      "path": "attribution_data/security_master.csv",
+      "bytes": 155520045,
+      "allocated_bytes": 155521024,
+      "mtime_ns": 1793556162220617640,
+      "status": "planned",
+      "header": "InstrumentId,EffectiveDate,Currency,Country"
+    },
+    {
+      "path": "results/api/fixtures/securities-100k/analytics.parquet",
+      "bytes": 184920146,
+      "allocated_bytes": 184922112,
+      "mtime_ns": 1793913921512341168,
+      "status": "planned",
+      "rows": 1200000,
+      "row_groups": 48,
+      "schema": "SecId: int64\nEffective Date: date32[day]\nFloat01: double\nFloat02: double\nFloat03: double\nFloat04: double\nFloat05: double\nFloat06: double\nFloat07: double\nFloat08: double\nFloat09: double\nFloat10: double\nFloat11: double\nFloat12: double\nFloat13: double\nFloat14: double\nFloat15: double"
+    },
+    {
+      "path": "results/csv-parquet-native-output/csv/security/go/security-portfolio_PF.csv",
+      "bytes": 81204076,
+      "allocated_bytes": 81207296,
+      "mtime_ns": 1793512436440971188,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn,PortfolioContribution,BenchmarkContribution,ActiveContribution"
+    },
+    {
+      "path": "results/csv-parquet-native-output/csv/security/rust/security-portfolio_PF.csv",
+      "bytes": 83309447,
+      "allocated_bytes": 83312640,
+      "mtime_ns": 1793512412935672193,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn,PortfolioContribution,BenchmarkContribution,ActiveContribution"
+    },
+    {
+      "path": "results/go-date-cache/security/run-1/csv/security-portfolio_PF.csv",
+      "bytes": 81204076,
+      "allocated_bytes": 81207296,
+      "mtime_ns": 1793520796917292724,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn,PortfolioContribution,BenchmarkContribution,ActiveContribution"
+    },
+    {
+      "path": "results/large_parquet/securities.parquet",
+      "bytes": 45365904023,
+      "allocated_bytes": 45365907456,
+      "mtime_ns": 1793676275952439890,
+      "status": "planned",
+      "rows": 365000000,
+      "row_groups": 3650,
+      "schema": "SecId: int64\nEffective Date: date32[day]\nFloat01: double\nFloat02: double\nFloat03: double\nFloat04: double\nFloat05: double\nFloat06: double\nFloat07: double\nFloat08: double\nFloat09: double\nFloat10: double\nFloat11: double\nFloat12: double\nFloat13: double\nFloat14: double\nFloat15: double"
+    },
+    {
+      "path": "results/native-benchmark/monthly/go/monthly-portfolio_PF1.csv",
+      "bytes": 41077690,
+      "allocated_bytes": 41078784,
+      "mtime_ns": 1793468775417919238,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/monthly/go/monthly-portfolio_PF2.csv",
+      "bytes": 41379612,
+      "allocated_bytes": 41381888,
+      "mtime_ns": 1793468775418647324,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/monthly/go/monthly-portfolio_PF3.csv",
+      "bytes": 41377735,
+      "allocated_bytes": 41377792,
+      "mtime_ns": 1793468775418570366,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/monthly/go/monthly-portfolio_PF4.csv",
+      "bytes": 41576439,
+      "allocated_bytes": 41578496,
+      "mtime_ns": 1793468775418510240,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/monthly/rust/monthly-portfolio_PF1.csv",
+      "bytes": 41734390,
+      "allocated_bytes": 41738240,
+      "mtime_ns": 1793468775210804834,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/monthly/rust/monthly-portfolio_PF2.csv",
+      "bytes": 41836515,
+      "allocated_bytes": 41836544,
+      "mtime_ns": 1793468775232629420,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/monthly/rust/monthly-portfolio_PF3.csv",
+      "bytes": 41834457,
+      "allocated_bytes": 41836544,
+      "mtime_ns": 1793468775231286123,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/monthly/rust/monthly-portfolio_PF4.csv",
+      "bytes": 42033301,
+      "allocated_bytes": 42037248,
+      "mtime_ns": 1793468775211838630,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/security/go/security-portfolio_PF1.csv",
+      "bytes": 125081097,
+      "allocated_bytes": 125083648,
+      "mtime_ns": 1793468746315578706,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/security/go/security-portfolio_PF2.csv",
+      "bytes": 124682039,
+      "allocated_bytes": 124682240,
+      "mtime_ns": 1793468746315623956,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/security/go/security-portfolio_PF3.csv",
+      "bytes": 125781290,
+      "allocated_bytes": 125784064,
+      "mtime_ns": 1793468746314739494,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/security/go/security-portfolio_PF4.csv",
+      "bytes": 124977344,
+      "allocated_bytes": 124981248,
+      "mtime_ns": 1793468746314329659,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/security/rust/security-portfolio_PF1.csv",
+      "bytes": 126571658,
+      "allocated_bytes": 126574592,
+      "mtime_ns": 1793468745985131272,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/security/rust/security-portfolio_PF2.csv",
+      "bytes": 126572476,
+      "allocated_bytes": 126574592,
+      "mtime_ns": 1793468745984108476,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/security/rust/security-portfolio_PF3.csv",
+      "bytes": 127671734,
+      "allocated_bytes": 127672320,
+      "mtime_ns": 1793468746003500595,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/security/rust/security-portfolio_PF4.csv",
+      "bytes": 126667378,
+      "allocated_bytes": 126668800,
+      "mtime_ns": 1793468745985685358,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/weekly/go/weekly-portfolio_PF1.csv",
+      "bytes": 82579878,
+      "allocated_bytes": 82583552,
+      "mtime_ns": 1793468764195693559,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/weekly/go/weekly-portfolio_PF2.csv",
+      "bytes": 82581044,
+      "allocated_bytes": 82583552,
+      "mtime_ns": 1793468764196435604,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/weekly/go/weekly-portfolio_PF3.csv",
+      "bytes": 82979923,
+      "allocated_bytes": 82980864,
+      "mtime_ns": 1793468764196028019,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/weekly/go/weekly-portfolio_PF4.csv",
+      "bytes": 82578337,
+      "allocated_bytes": 82579456,
+      "mtime_ns": 1793468764196699355,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/weekly/rust/weekly-portfolio_PF1.csv",
+      "bytes": 83857634,
+      "allocated_bytes": 83861504,
+      "mtime_ns": 1793468763939994922,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/weekly/rust/weekly-portfolio_PF2.csv",
+      "bytes": 83858577,
+      "allocated_bytes": 83861504,
+      "mtime_ns": 1793468763958807413,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/weekly/rust/weekly-portfolio_PF3.csv",
+      "bytes": 84257270,
+      "allocated_bytes": 84258816,
+      "mtime_ns": 1793468763946982824,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-benchmark/weekly/rust/weekly-portfolio_PF4.csv",
+      "bytes": 83855791,
+      "allocated_bytes": 83857408,
+      "mtime_ns": 1793468763946215988,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-full-history/subset/go/subset-portfolio_PF1.csv",
+      "bytes": 185237285,
+      "allocated_bytes": 185237504,
+      "mtime_ns": 1793468908327631086,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-full-history/subset/go/subset-portfolio_PF2.csv",
+      "bytes": 185213934,
+      "allocated_bytes": 185217024,
+      "mtime_ns": 1793468908327635961,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-full-history/subset/go/subset-portfolio_PF3.csv",
+      "bytes": 185213766,
+      "allocated_bytes": 185217024,
+      "mtime_ns": 1793468908327631169,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-full-history/subset/go/subset-portfolio_PF4.csv",
+      "bytes": 185189730,
+      "allocated_bytes": 185192448,
+      "mtime_ns": 1793468908327646003,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-full-history/subset/rust/subset-portfolio_PF1.csv",
+      "bytes": 189871020,
+      "allocated_bytes": 189874176,
+      "mtime_ns": 1793468921655300816,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-full-history/subset/rust/subset-portfolio_PF2.csv",
+      "bytes": 189850347,
+      "allocated_bytes": 189853696,
+      "mtime_ns": 1793468921655028399,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-full-history/subset/rust/subset-portfolio_PF3.csv",
+      "bytes": 189850926,
+      "allocated_bytes": 189853696,
+      "mtime_ns": 1793468921654742022,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/native-full-history/subset/rust/subset-portfolio_PF4.csv",
+      "bytes": 189824084,
+      "allocated_bytes": 189825024,
+      "mtime_ns": 1793468921655171774,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn"
+    },
+    {
+      "path": "results/rust-date-cache/security/run-1/csv/security-portfolio_PF.csv",
+      "bytes": 83309447,
+      "allocated_bytes": 83312640,
+      "mtime_ns": 1793517406377390378,
+      "status": "planned",
+      "header": "Scenario,Entity,PeriodStart,PeriodEnd,Days,RowType,Segment,ReturnType,PortfolioWeight,BenchmarkWeight,Allocation,Selection,Interaction,Total,PortfolioReturn,BenchmarkReturn,ActiveReturn,PortfolioContribution,BenchmarkContribution,ActiveContribution"
+    },
+    {
+      "path": "results/six-input/daily-snapshot-inputs/security_master.parquet",
+      "bytes": 907406144,
+      "allocated_bytes": 907407360,
+      "mtime_ns": 1794034021774984354,
+      "status": "planned",
+      "rows": 174880000,
+      "row_groups": 3279,
+      "schema": "InstrumentId: string\nEffectiveDate: date32[day]\nCurrency: string\nCountry: string\nAnalyticsSecId: int64\nSnapshotDate: date32[day]"
+    },
+    {
+      "path": "results/six-input/inputs/security_master.parquet",
+      "bytes": 23773880,
+      "allocated_bytes": 23777280,
+      "mtime_ns": 1793790303609619264,
+      "status": "planned",
+      "rows": 5760000,
+      "row_groups": 36,
+      "schema": "InstrumentId: string\nEffectiveDate: date32[day]\nCurrency: string\nCountry: string\nAnalyticsSecId: int64"
+    },
+    {
+      "path": "results/six-input/monthly-staggered-daily-snapshot-inputs/security_master.parquet",
+      "bytes": 899852717,
+      "allocated_bytes": 899854336,
+      "mtime_ns": 1794036052828360464,
+      "status": "planned",
+      "rows": 174880000,
+      "row_groups": 3279,
+      "schema": "InstrumentId: string\nEffectiveDate: date32[day]\nCurrency: string\nCountry: string\nAnalyticsSecId: int64\nSnapshotDate: date32[day]"
+    },
+    {
+      "path": "results/six-input/monthly-staggered-history/security_master.parquet",
+      "bytes": 35696654,
+      "allocated_bytes": 35700736,
+      "mtime_ns": 1794035973185361737,
+      "status": "planned",
+      "rows": 5920000,
+      "row_groups": 1036,
+      "schema": "InstrumentId: string\nEffectiveDate: date32[day]\nCurrency: string\nCountry: string\nAnalyticsSecId: int64"
+    },
+    {
+      "path": "results/six-input/monthly-staggered-indexed-inputs/smf-history.bin",
+      "bytes": 94720000,
+      "allocated_bytes": 94720000,
+      "mtime_ns": 1794036053881231129,
+      "status": "planned"
+    },
+    {
+      "path": "results/six-input/monthly-staggered-sector-daily-snapshot-inputs/security_master.parquet",
+      "bytes": 902577792,
+      "allocated_bytes": 906440704,
+      "mtime_ns": 1794133748865029322,
+      "status": "planned",
+      "rows": 174880000,
+      "row_groups": 3279,
+      "schema": "InstrumentId: string\nEffectiveDate: date32[day]\nCurrency: string\nCountry: string\nAnalyticsSecId: int64\nSnapshotDate: date32[day]\nSector: string not null"
+    },
+    {
+      "path": "results/six-input/monthly-staggered-sector-dated-history/security_master.parquet",
+      "bytes": 36168444,
+      "allocated_bytes": 36204544,
+      "mtime_ns": 1794134432282342915,
+      "status": "planned",
+      "rows": 5920000,
+      "row_groups": 1036,
+      "schema": "InstrumentId: string\nEffectiveDate: date32[day]\nCurrency: string\nCountry: string\nAnalyticsSecId: int64\nSector: string not null"
+    },
+    {
+      "path": "results/six-input/monthly-staggered-sector-dated-snapshots/security_master.parquet",
+      "bytes": 904436403,
+      "allocated_bytes": 906686464,
+      "mtime_ns": 1794134473022064769,
+      "status": "planned",
+      "rows": 174880000,
+      "row_groups": 3279,
+      "schema": "InstrumentId: string\nEffectiveDate: date32[day]\nCurrency: string\nCountry: string\nAnalyticsSecId: int64\nSector: string not null\nSnapshotDate: date32[day]"
+    },
+    {
+      "path": "results/six-input/security-first-daily-heavy-inputs/security_master.parquet",
+      "bytes": 74041753,
+      "allocated_bytes": 74043392,
+      "mtime_ns": 1794031653461618221,
+      "status": "planned",
+      "rows": 91319200,
+      "row_groups": 1408,
+      "schema": "InstrumentId: string\nEffectiveDate: date32[day]\nCurrency: string\nCountry: string\nAnalyticsSecId: int64"
+    },
+    {
+      "path": "results/six-input/security-first-daily-heavy-inputs/smf-history.bin",
+      "bytes": 1461107200,
+      "allocated_bytes": 1461108736,
+      "mtime_ns": 1794032022859499304,
+      "status": "planned"
+    },
+    {
+      "path": "results/six-input/security-history-daily-heavy-inputs/security_master.parquet",
+      "bytes": 492494045,
+      "allocated_bytes": 492494848,
+      "mtime_ns": 1794017210627125769,
+      "status": "planned",
+      "rows": 91319200,
+      "row_groups": 2187,
+      "schema": "InstrumentId: string\nEffectiveDate: date32[day]\nCurrency: string\nCountry: string\nAnalyticsSecId: int64"
+    },
+    {
+      "path": "results/six-input/security-history-inputs/security_master.parquet",
+      "bytes": 34800102,
+      "allocated_bytes": 34803712,
+      "mtime_ns": 1794017110559795228,
+      "status": "planned",
+      "rows": 5706400,
+      "row_groups": 1095,
+      "schema": "InstrumentId: string\nEffectiveDate: date32[day]\nCurrency: string\nCountry: string\nAnalyticsSecId: int64"
+    },
+    {
+      "path": "results/smf-trace-demo/inputs/analytics.parquet",
+      "bytes": 39356860,
+      "allocated_bytes": 39358464,
+      "mtime_ns": 1794016976501321187,
+      "status": "planned",
+      "rows": 262156,
+      "row_groups": 12,
+      "schema": "SecId: int64\nEffective Date: date32[day]\nFloat01: double\nFloat02: double\nFloat03: double\nFloat04: double\nFloat05: double\nFloat06: double\nFloat07: double\nFloat08: double\nFloat09: double\nFloat10: double\nFloat11: double\nFloat12: double\nFloat13: double\nFloat14: double\nFloat15: double"
+    }
+  ],
+  "logical_bytes": 68071289570,
+  "allocated_bytes": 68077551616,
+  "rebuild": "python/rebuild_daily_benchmark.py; see README.md for canonical dependencies and legacy limitations",
+  "retained": "canonical attribution_data_parquet, historical SMF seed, legacy data/ source fixtures, supplied inputs, all small evidence and outputs, source code, .git, dependencies"
+}

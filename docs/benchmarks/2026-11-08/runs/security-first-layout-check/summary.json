@@ -1,0 +1,172 @@
+{
+  "command": [
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/rust/target/release/portfolio-attribution",
+    "--listen",
+    "127.0.0.1:63820",
+    "--data",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/six-input/security-first-daily-heavy-inputs",
+    "--output-dir",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/security-first-layout-check/requests",
+    "--threads",
+    "12",
+    "--worker-limit",
+    "12",
+    "--worker-trace",
+    "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/security-first-layout-check/worker-trace.jsonl",
+    "--smf-trace",
+    "summary",
+    "--stage-profile",
+    "true"
+  ],
+  "pid": 18196,
+  "workers_per_request": 12,
+  "data": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/six-input/security-first-daily-heavy-inputs",
+  "start_date": "2023-01-01",
+  "end_date": "2025-12-28",
+  "process_exit_before_driver_shutdown": null,
+  "peak_sampled_rss_bytes": 19709952,
+  "batches": [
+    {
+      "phase": "load-c1-r1",
+      "concurrency": 1,
+      "repeat": 1,
+      "seconds": 0.017929207999259233,
+      "responses": [
+        {
+          "status": 422,
+          "seconds": 0.01705575000232784,
+          "body": "{\"error\":\"six-input requires nonempty single-date row groups\"}",
+          "start_offset_seconds": 0.00029954199999338016,
+          "end_offset_seconds": 0.017537542000354733
+        }
+      ]
+    }
+  ],
+  "samples": [
+    {
+      "seconds": 0.01823629199861898,
+      "phase": "baseline",
+      "rss_bytes": 6766592,
+      "health": {
+        "status": 200,
+        "seconds": 0.0003929590020561591,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "engine": "rust",
+          "failed": 0,
+          "peak_running_date_workers": 0,
+          "pid": 18196,
+          "read_activity": {
+            "read_decode_calls": {
+              "current": 0,
+              "peak": 0
+            },
+            "reading_workers": {
+              "current": 0,
+              "peak": 0
+            },
+            "retained_daily_inputs": {
+              "current": 0,
+              "peak": 0
+            },
+            "workers_with_smf_cache": {
+              "current": 0,
+              "peak": 0
+            }
+          },
+          "running_date_workers": 0,
+          "waiting_date_workers": 0,
+          "worker_limit": 12,
+          "workers_per_request": 12
+        }
+      },
+      "host_swap": "total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)",
+      "host_vm_stat": "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                    99612.\nPages active:                                 547565.\nPages inactive:                               511019.\nPages speculative:                             35737.\nPages throttled:                                   0.\nPages wired down:                             168426.\nPages purgeable:                               17151.\n\"Translation faults\":                      165673087.\nPages copy-on-write:                         1890591.\nPages zero filled:                          74100086.\nPages reactivated:                          42555619.\nPages purged:                                 719842.\nFile-backed pages:                            246283.\nAnonymous pages:                              848038.\nPages stored in compressor:                   312965.\nPages occupied by compressor:                 169319.\nDecompressions:                             82036368.\nCompressions:                               85461032.\nPageins:                                     8401869.\nPageouts:                                        953.\nSwapins:                                           0.\nSwapouts:                                          0.\n"
+    },
+    {
+      "seconds": 0.23608395900009782,
+      "phase": "load-c1-r1",
+      "rss_bytes": 18104320,
+      "health": {
+        "status": 200,
+        "seconds": 0.0005746669994550757,
+        "body": {
+          "active": 1,
+          "completed": 0,
+          "engine": "rust",
+          "failed": 0,
+          "peak_running_date_workers": 0,
+          "pid": 18196,
+          "read_activity": {
+            "read_decode_calls": {
+              "current": 0,
+              "peak": 0
+            },
+            "reading_workers": {
+              "current": 0,
+              "peak": 0
+            },
+            "retained_daily_inputs": {
+              "current": 0,
+              "peak": 0
+            },
+            "workers_with_smf_cache": {
+              "current": 0,
+              "peak": 0
+            }
+          },
+          "running_date_workers": 0,
+          "waiting_date_workers": 0,
+          "worker_limit": 12,
+          "workers_per_request": 12
+        }
+      }
+    },
+    {
+      "seconds": 0.4487557089996699,
+      "phase": "idle-c1-r1",
+      "rss_bytes": 19709952,
+      "health": {
+        "status": 200,
+        "seconds": 0.0008272080012829974,
+        "body": {
+          "active": 0,
+          "completed": 0,
+          "engine": "rust",
+          "failed": 1,
+          "peak_running_date_workers": 0,
+          "pid": 18196,
+          "read_activity": {
+            "read_decode_calls": {
+              "current": 0,
+              "peak": 0
+            },
+            "reading_workers": {
+              "current": 0,
+              "peak": 0
+            },
+            "retained_daily_inputs": {
+              "current": 0,
+              "peak": 0
+            },
+            "workers_with_smf_cache": {
+              "current": 0,
+              "peak": 0
+            }
+          },
+          "running_date_workers": 0,
+          "waiting_date_workers": 0,
+          "worker_limit": 12,
+          "workers_per_request": 12
+        }
+      }
+    }
+  ],
+  "caveats": [
+    "Sampled RSS may miss short peaks; shared pages are included.",
+    "Heap counters, when provided by the engine, are server-wide.",
+    "RSS retention alone does not establish a leak.",
+    "Process death is not classified as OOM without OS evidence."
+  ]
+}

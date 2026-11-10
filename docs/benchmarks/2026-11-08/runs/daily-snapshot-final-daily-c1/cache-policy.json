@@ -1,0 +1,8 @@
+{
+  "cache_state": "cold-cache",
+  "basis": "User confirmed first purge immediately before run; OS effects not independently verified",
+  "warmup_requests": 0,
+  "aggregate": "daily",
+  "output_finalization": "temporary file, finish/sync, rename",
+  "sequence": "daily, total, security; separate user purge before each"
+}

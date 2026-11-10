@@ -1,0 +1,31 @@
+{
+  "status": 200,
+  "request_seconds": 31.17389004100005,
+  "peak_sampled_rss_gib": 1.033172607421875,
+  "report": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/daily-snapshot-aggregate-total-c1/requests/request-5234-1794115461736082000-0/country-portfolio_PF.parquet",
+  "rows": [
+    {
+      "Scenario": "arithmetic_sum",
+      "Entity": "PF_MERGED",
+      "PeriodStart": "2023-01-01",
+      "PeriodEnd": "2025-12-28",
+      "Days": 1093,
+      "RowType": "total",
+      "Segment": "ALL",
+      "ReturnType": "base",
+      "PortfolioWeight": 1093.000000000011,
+      "BenchmarkWeight": 1092.9999999999725,
+      "Allocation": 0.013575644425106202,
+      "Selection": -0.002220789651284707,
+      "Interaction": -0.023127308287982255,
+      "Total": -0.011772453514160416,
+      "PortfolioReturn": -0.007178952041549613,
+      "BenchmarkReturn": 0.004593501472610284,
+      "ActiveReturn": -0.011772453514159897,
+      "PortfolioContribution": -0.007178952041549013,
+      "BenchmarkContribution": 0.004593501472603494,
+      "ActiveContribution": -0.01177245351415652
+    }
+  ],
+  "checks": "one finite total row; 1093 days; effects and active contribution reconcile"
+}

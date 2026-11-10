@@ -98,7 +98,7 @@ fn config() -> Result<Config> {
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         if a == "--help" {
-            println!("--aggregate daily|total|security sums daily attribution (six-input/API); --return-type base|local|both selects summed output (default base)");
+            println!("--aggregate daily|total|security|sector daily attribution; sector computes sector Brinson plus security rows with date counts (six-input/API); --return-type base|local|both selects summed output (default base)");
             println!("--listen HOST:PORT serves the six-input HTTP API in-process");
             println!(
                 "--request-limit N caps API requests before metadata/index opening (default 12)"
@@ -160,11 +160,11 @@ fn config() -> Result<Config> {
     {
         return Err("invalid scenario or threads".into());
     }
-    if !["daily", "total", "security"].contains(&c.aggregate.as_str())
+    if !["daily", "total", "security", "sector"].contains(&c.aggregate.as_str())
         || !["base", "local", "both"].contains(&c.return_type.as_str())
     {
         return Err(
-            "aggregate must be daily, total, or security; return-type must be base, local, or both"
+            "aggregate must be daily, total, security, or sector; return-type must be base, local, or both"
                 .into(),
         );
     }

@@ -1,0 +1,11 @@
+{
+  "mode": "scan",
+  "rows": 365000000,
+  "logical_bytes": 48910000000,
+  "parquet_bytes": 45365904023,
+  "seconds": 12.63284058399995,
+  "peak_rss_bytes": 199901184,
+  "arrow_peak_allocated_bytes": 59484928,
+  "schema": "SecId: int64\nEffective Date: date32[day]\nFloat01: double\nFloat02: double\nFloat03: double\nFloat04: double\nFloat05: double\nFloat06: double\nFloat07: double\nFloat08: double\nFloat09: double\nFloat10: double\nFloat11: double\nFloat12: double\nFloat13: double\nFloat14: double\nFloat15: double",
+  "max_batch_bytes": 13400000
+}

@@ -1,0 +1,33 @@
+{
+  "requests": 1,
+  "workers": 12,
+  "smf_trace_events": 8216,
+  "smf_rows_decoded": 593536729,
+  "batch_seconds": [
+    30.410165207998944
+  ],
+  "first_request_completed_seconds": 30.40988004099927,
+  "peak_sampled_rss_gib": 1.539581298828125,
+  "swap_start_gib": 0.0,
+  "swap_peak_gib": 0.0,
+  "host_vm_counter_deltas": {
+    "Swapins": 0,
+    "Swapouts": 0
+  },
+  "worker_trace": {
+    "apis": 1,
+    "workers": 12,
+    "events": 36,
+    "slots": 12,
+    "peak_holders": 12,
+    "all_workers_released": true,
+    "fifo_verified": true,
+    "slot_overlap": false,
+    "seconds": 30.349789625,
+    "note": "Application slot occupancy includes reading, waiting and computation; this is not a CPU scheduler trace."
+  },
+  "baseline": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/daily-heavy-c1-run1/requests/request-10412-1794017588066231000-0/country-portfolio_PF.parquet",
+  "reports_matched": true,
+  "smf_summary_checks": "Every worker/date checked against source row-group counts and generated schedule; aggregate insert/update counts verified. Per-security values were verified on small record-level fixtures, not logged in this full run.",
+  "cache_policy": "OS-managed cache; no purge; separate server process per experiment."
+}

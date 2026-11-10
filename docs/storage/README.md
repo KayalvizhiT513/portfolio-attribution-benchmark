@@ -1,3 +1,7 @@
+# Storage audit — latest update November 8, 2026
+
+The prior November 7 inventory below is historical. See the [November 8 archive](../benchmarks/2026-11-08/README.md) and its cleanup journals for current generated-data removal, retained sources and rebuild recipes.
+
 # Storage audit — November 7, 2026
 
 Initial allocated size was approximately 84 GiB (`du`); results used 49 GiB.

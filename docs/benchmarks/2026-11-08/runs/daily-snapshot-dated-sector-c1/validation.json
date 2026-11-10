@@ -1,0 +1,36 @@
+{
+  "status": 200,
+  "request_seconds": 14.381097542001953,
+  "peak_sampled_rss_gib": 1.4668426513671875,
+  "output_rows": 11,
+  "days": 1093,
+  "sector_changes_in_source": 480000,
+  "additive_columns_reconcile_to_total": true,
+  "sector_distribution_differs_from_fixed_sector_run": true,
+  "temporary_file_finalized": true,
+  "fixed_sector_request_seconds": 13.506729166998412,
+  "fixed_sector_peak_sampled_rss_gib": 1.4732513427734375,
+  "report": "/Users/kayalvizhi/Public/portfolio-attribution-benchmark/results/api/daily-snapshot-dated-sector-c1/requests/request-17244-1794135046466805000-0/country-portfolio_PF.parquet",
+  "sums": {
+    "PortfolioWeight": 1093.0000000000005,
+    "BenchmarkWeight": 1093.0000000000014,
+    "Allocation": 0.013575644425109269,
+    "Selection": -0.002220789651284793,
+    "Interaction": -0.02312730828798224,
+    "Total": -0.011772453514157755,
+    "PortfolioContribution": -0.007178952041549238,
+    "BenchmarkContribution": 0.004593501472608904,
+    "ActiveContribution": -0.011772453514158602
+  },
+  "profile": {
+    "elapsed_before_profile_write_seconds": 14.377984791,
+    "metrics_write_seconds": 0.000201083,
+    "note": "Elapsed spans include scheduling/I/O waits. Worker/input timings overlap and are not additive across workers or input readers. SMF apply includes enabled trace serialization; cleanup residuals include uninstrumented overhead. Profile writing is outside per-date spans.",
+    "planning_seconds": 0.024646291,
+    "report_write_seconds": 0.007084583,
+    "smf_reading_path": "daily_snapshot",
+    "smf_shared_at_server": true,
+    "smf_source_scope": "server",
+    "worker_phase_seconds": 14.346051125
+  }
+}

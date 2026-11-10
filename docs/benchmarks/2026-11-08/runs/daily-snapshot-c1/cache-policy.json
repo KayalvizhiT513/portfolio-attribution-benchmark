@@ -1,0 +1,8 @@
+{
+  "purge": "user-reported",
+  "user_confirmation": "purge done",
+  "preparation_before_purge": true,
+  "warmup_requests": 0,
+  "pre_run_dataset_reads_after_confirmation": false,
+  "note": "No independent verification of OS purge completeness."
+}

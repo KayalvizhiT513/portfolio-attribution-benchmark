@@ -1,9 +1,11 @@
 """Check arithmetic sums against daily attribution and serial/parallel parity."""
+import datetime as dt
 import math
 import subprocess
 import tempfile
 from pathlib import Path
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 from prepare_daily_smf import prepare
 from test_six_inputs import fixture
@@ -71,7 +73,39 @@ def main():
             assert s2['Days'] == 4
             assert s2['PortfolioWeight'] < row['PortfolioWeight']
         assert len(run('total', 3, 'both')) == 2
-    print('Passed: arithmetic totals match daily output; per-security sums reconcile; base/local selection; 1/3-worker parity.')
+        # Change the snapshot universe and slot order midway through the window.
+        before = {r['Segment']: r for r in run('security', 1)}
+        expected_total = run('total', 1)[0]
+        first_half = [r for day in ('2023-01-01', '2023-01-02')
+                      for r in run('security', 1, day=day) if r['Segment'] == 'S000001']
+        for name in ('security_master', 'portfolio_PF', 'index'):
+            path = data/f'{name}.parquet'
+            table = pq.read_table(path)
+            date_col = 'SnapshotDate' if name == 'security_master' else 'EffectiveDate'
+            values = table.to_pylist()
+            for value in values:
+                if value[date_col] >= dt.date(2023, 1, 3) and value['InstrumentId'] == 'S000001':
+                    value['InstrumentId'] = 'NEW_SECURITY'
+            with pq.ParquetWriter(path, table.schema) as writer:
+                for day in sorted({v[date_col] for v in values}):
+                    group = [v for v in values if v[date_col] == day]
+                    if name == 'security_master' and day.day % 2: group.reverse()
+                    writer.write_table(pa.Table.from_pylist(group, schema=table.schema), row_group_size=2)
+        changed = run('security', 1)
+        changed_parallel = run('security', 3)
+        assert [r['Segment'] for r in changed] == ['NEW_SECURITY', 'S000001', 'S000002']
+        for a, b in zip(changed, changed_parallel):
+            assert a['Segment'] == b['Segment']
+            for col in NUMBERS: close(a[col], b[col])
+        by_id = {r['Segment']: r for r in changed}
+        for col in NUMBERS:
+            first_sum = sum(r[col] for r in first_half)
+            close(by_id['S000001'][col], first_sum)
+            close(by_id['NEW_SECURITY'][col], before['S000001'][col]-first_sum)
+            close(by_id['S000002'][col], before['S000002'][col])
+        changed_total = run('total', 3)[0]
+        for col in NUMBERS: close(changed_total[col], expected_total[col])
+    print('Passed: arithmetic totals match daily output; per-security sums reconcile; base/local selection; changing security universe and row order; 1/3-worker parity.')
 
 
 if __name__ == '__main__': main()

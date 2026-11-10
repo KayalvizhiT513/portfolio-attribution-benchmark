@@ -1,0 +1,11 @@
+{
+  "archive_date_ist": "2026-11-08",
+  "runs_preserved": 33,
+  "deleted_files": 54,
+  "allocated_gib_removed": 63.40216064453125,
+  "canonical_files_preserved": 7,
+  "compressed_evidence_integrity": "all gzip JSON/JSONL parsed successfully",
+  "retained_sources_exist": true,
+  "full_bulk_regeneration_tested": false,
+  "rebuild_validation": "command interfaces and source dependencies checked; full regeneration intentionally not run to avoid recreating deleted bulk data"
+}

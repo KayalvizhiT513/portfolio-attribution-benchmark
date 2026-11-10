@@ -1,0 +1,11 @@
+{
+  "elapsed_before_profile_write_seconds": 12.912707125,
+  "metrics_write_seconds": 0.000190084,
+  "note": "Elapsed spans include scheduling/I/O waits. Worker/input timings overlap and are not additive across workers or input readers. SMF apply includes enabled trace serialization; cleanup residuals include uninstrumented overhead. Profile writing is outside per-date spans.",
+  "planning_seconds": 0.024490542,
+  "report_write_seconds": 0.010715875,
+  "smf_reading_path": "daily_snapshot",
+  "smf_shared_at_server": true,
+  "smf_source_scope": "server",
+  "worker_phase_seconds": 12.877308583
+}

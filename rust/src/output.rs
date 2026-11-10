@@ -35,20 +35,31 @@ pub enum Writer {
 }
 impl Writer {
     pub fn new(path: &Path, parquet: bool) -> Result<Self> {
+        Self::new_with_sector(path, parquet, false)
+    }
+    pub fn new_with_sector(path: &Path, parquet: bool, sector: bool) -> Result<Self> {
         if !parquet {
             let mut writer = csv::WriterBuilder::new()
                 .buffer_capacity(1024 * 1024)
                 .from_writer(BufWriter::with_capacity(1024 * 1024, File::create(path)?));
-            writer.write_record(OUT)?;
+            let mut header = OUT.to_vec();
+            if sector {
+                header.extend(["Sector", "Security", "Count"]);
+            }
+            writer.write_record(header)?;
             return Ok(Self::Csv(writer));
         }
         let mut fields = Vec::new();
         let mut builders: Vec<Box<dyn ArrayBuilder>> = Vec::new();
-        for (i, name) in OUT.iter().enumerate() {
+        let mut header = OUT.to_vec();
+        if sector {
+            header.extend(["Sector", "Security", "Count"]);
+        }
+        for (i, name) in header.iter().enumerate() {
             let dtype = match i {
                 2 | 3 => DataType::Date32,
-                4 => DataType::UInt32,
-                8.. => DataType::Float64,
+                4 | 22 => DataType::UInt32,
+                8..=19 => DataType::Float64,
                 _ => DataType::Utf8,
             };
             let builder: Box<dyn ArrayBuilder> = match dtype {
@@ -78,6 +89,15 @@ impl Writer {
         numbers: &[f64; 12],
         record: &mut csv::ByteRecord,
     ) -> Result<()> {
+        self.row_with_group(fields, numbers, record, None)
+    }
+    pub fn row_with_group(
+        &mut self,
+        fields: &[&str; 8],
+        numbers: &[f64; 12],
+        record: &mut csv::ByteRecord,
+        group: Option<(&str, &str, u32)>,
+    ) -> Result<()> {
         match self {
             Self::Csv(writer) => {
                 record.clear();
@@ -87,6 +107,11 @@ impl Writer {
                 let mut buffer = ryu::Buffer::new();
                 for n in numbers {
                     record.push_field(buffer.format(*n).as_bytes());
+                }
+                if let Some((sector, security, count)) = group {
+                    record.push_field(sector.as_bytes());
+                    record.push_field(security.as_bytes());
+                    record.push_field(count.to_string().as_bytes());
                 }
                 writer.write_byte_record(record)?;
             }
@@ -116,6 +141,23 @@ impl Writer {
                         .downcast_mut::<Float64Builder>()
                         .unwrap()
                         .append_value(*n);
+                }
+                if let Some((sector, security, count)) = group {
+                    builders[20]
+                        .as_any_mut()
+                        .downcast_mut::<StringBuilder>()
+                        .unwrap()
+                        .append_value(sector);
+                    builders[21]
+                        .as_any_mut()
+                        .downcast_mut::<StringBuilder>()
+                        .unwrap()
+                        .append_value(security);
+                    builders[22]
+                        .as_any_mut()
+                        .downcast_mut::<UInt32Builder>()
+                        .unwrap()
+                        .append_value(count);
                 }
                 if builders[0].len() == 65536 {
                     self.flush_batch()?;
@@ -149,6 +191,64 @@ impl Writer {
                 writer.into_inner()?.sync_all()?;
             }
         }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow_array::UInt32Array;
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+    #[test]
+    fn sector_columns_survive_output_batch_boundary() -> Result<()> {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "sector-output-{}-{stamp}.parquet",
+            std::process::id()
+        ));
+        let mut writer = Writer::new_with_sector(&path, true, true)?;
+        let mut record = csv::ByteRecord::new();
+        let fields = [
+            "sector_attribution",
+            "PF",
+            "2023-01-01",
+            "2023-01-04",
+            "4",
+            "security",
+            "S1",
+            "base",
+        ];
+        for i in 0..65537u32 {
+            writer.row_with_group(
+                &fields,
+                &[0.0; 12],
+                &mut record,
+                Some(("Technology", "S1", i)),
+            )?;
+        }
+        writer.finish()?;
+        let reader = ParquetRecordBatchReaderBuilder::try_new(File::open(&path)?)?.build()?;
+        let mut count = 0usize;
+        for batch in reader {
+            let batch = batch?;
+            assert_eq!(batch.num_columns(), 23);
+            let values = batch
+                .column_by_name("Count")
+                .unwrap()
+                .as_any()
+                .downcast_ref::<UInt32Array>()
+                .unwrap();
+            for i in 0..batch.num_rows() {
+                assert_eq!(values.value(i), (count + i) as u32);
+            }
+            count += batch.num_rows();
+        }
+        assert_eq!(count, 65537);
+        std::fs::remove_file(path)?;
         Ok(())
     }
 }
